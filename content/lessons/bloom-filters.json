@@ -1,0 +1,64 @@
+{
+  "slug": "bloom-filters",
+  "title": "Bloom Filters & Sketches",
+  "subtitle": "Watch a tiny bit array skip useless disk reads, then see how two more sketches count events and unique users in kilobytes.",
+  "minutes": 12,
+  "level": "Intermediate",
+  "learn": [
+    "How a Bloom filter answers 'definitely not here' or 'maybe here' using bits and hashes",
+    "Why false positives happen, why false negatives do not, and how bits per key set the error rate",
+    "How a filter in front of a database or cache avoids reads for keys that do not exist",
+    "How a Count-Min sketch estimates how often something happened, and which way it errs",
+    "How HyperLogLog counts unique items with about 12 KB, and why sketches merge across servers"
+  ],
+  "nodes": [
+    {"id": "app", "label": "App server", "kind": "server", "x": 8, "y": 50},
+    {"id": "bloom", "label": "Bloom filter", "kind": "cache", "x": 33, "y": 18},
+    {"id": "db", "label": "Database (disk)", "kind": "db", "x": 62, "y": 18},
+    {"id": "events", "label": "Event stream", "kind": "queue", "x": 33, "y": 82},
+    {"id": "cms", "label": "Count-Min sketch", "kind": "service", "x": 62, "y": 58},
+    {"id": "hll", "label": "HyperLogLog", "kind": "service", "x": 88, "y": 84}
+  ],
+  "edges": [
+    {"from": "app", "to": "bloom"},
+    {"from": "bloom", "to": "db"},
+    {"from": "app", "to": "db"},
+    {"from": "app", "to": "events"},
+    {"from": "app", "to": "cms"},
+    {"from": "events", "to": "cms"},
+    {"from": "events", "to": "hll"}
+  ],
+  "metrics": [
+    {"id": "reads", "label": "Disk reads", "unit": "per 1000"},
+    {"id": "mem", "label": "Memory", "unit": "KB"},
+    {"id": "err", "label": "Error rate", "unit": "%"}
+  ],
+  "steps": [
+    {"tag": "QUESTION", "title": "Asking for things that are not there", "body": "A lookup service gets 1,000 requests for user IDs that do not exist: typos, scrapers, deleted accounts. Without help, each one checks the cache, misses, then reads the disk to learn there is nothing to find. Every one of those reads is wasted work. Can we answer 'not here' cheaply, without storing every key in memory?", "idea": "Misses for absent keys are the most expensive lookups because they pay the full cost and return nothing.", "caption": "Every absent key still costs a disk read.", "focus": ["app", "db"], "flows": [{"from": "app", "to": "db", "kind": "request", "label": "get user:9"}, {"from": "db", "to": "app", "kind": "response", "label": "not found"}], "metrics": {"reads": "1000", "mem": "0", "err": "0"}},
+    {"tag": "CONCEPT", "title": "A Bloom filter: bits and hashes", "body": "A Bloom filter is an array of bits, all 0 at the start. To add a key, run it through k different hash functions and set the k bits they point to. For 1 million keys we use about 10 million bits, roughly 1.25 MB, and k = 7. The keys themselves are never stored, only their fingerprints in the bits.", "idea": "Adding a key flips k bits to 1; the filter stores no keys, only bit patterns.", "caption": "Each new key sets 7 bits in the filter.", "focus": ["app", "bloom"], "flows": [{"from": "app", "to": "bloom", "kind": "async", "label": "add user:42"}], "metrics": {"mem": "1250"}},
+    {"tag": "CONCEPT", "title": "A 'no' is always true", "body": "To check a key, hash it the same k ways and look at those bits. If even one bit is 0, the key was never added, because adding it would have set that bit. The filter says 'definitely not present' and the app skips the disk entirely. Bits are never cleared, so this answer can never be wrong.", "idea": "One zero bit proves absence: Bloom filters have no false negatives.", "caption": "A zero bit means: skip the disk read.", "focus": ["app", "bloom"], "flows": [{"from": "app", "to": "bloom", "kind": "request", "label": "has user:9?"}, {"from": "bloom", "to": "app", "kind": "response", "label": "no, skip disk"}], "metrics": {"reads": "10"}},
+    {"tag": "CONCEPT", "title": "A 'yes' only means maybe", "body": "If all k bits are 1, the key may have been added, or other keys may have set those same bits by coincidence. The filter says 'maybe present', so the app must still check the real store. When that check finds nothing, we have a false positive. It costs one wasted read, which is the price of the whole scheme.", "idea": "All-ones means 'maybe': the filter can wrongly say yes, never wrongly say no.", "caption": "A false positive costs one wasted disk read.", "focus": ["app", "bloom", "db"], "flows": [{"from": "app", "to": "bloom", "kind": "request", "label": "has user:77?"}, {"from": "bloom", "to": "app", "kind": "response", "label": "maybe"}, {"from": "app", "to": "db", "kind": "request", "label": "get user:77"}, {"from": "db", "to": "app", "kind": "fail", "label": "false positive"}], "metrics": {"reads": "10", "err": "1"}},
+    {"tag": "TRADE-OFF", "title": "Sizing the filter", "body": "Error rate depends on bits per key. As a rule of thumb with the best k, about 5 bits per key gives roughly 10% false positives, 10 bits gives about 1%, and 14 to 15 bits gives about 0.1%. At 10 bits per key, our 1,000 absent lookups drop from 1,000 disk reads to about 10. Memory is paid once; saved reads are saved on every lookup.", "idea": "Each extra 5 bits per key cuts false positives roughly ten-fold, at linear memory cost.", "caption": "10 bits per key: about 1 in 100 slips through.", "focus": ["bloom"], "flows": [], "metrics": {"reads": "10", "mem": "1250", "err": "1"}},
+    {"tag": "LIMIT", "title": "What a Bloom filter cannot do", "body": "You cannot delete a key, because clearing its bits could erase bits shared with other keys and create false negatives. You cannot list the keys or read a value back. And if you add far more keys than you sized for, more bits fill up and false positives climb. Variants such as counting Bloom filters or cuckoo filters add deletion, and many systems simply rebuild the filter periodically.", "idea": "Size for the expected key count; a filter only grows more wrong as it fills, and it cannot forget.", "caption": "Deleting a key is not supported.", "focus": ["app", "bloom"], "flows": [{"from": "app", "to": "bloom", "kind": "fail", "label": "delete user:42?"}], "metrics": {}},
+    {"tag": "CONCEPT", "title": "Count-Min sketch: how often?", "body": "A different question: how many times did each video get viewed? A Count-Min sketch is a small grid, say 5 rows by 2,719 counters. For every event, hash the item once per row and add 1 to one counter in each row. With those dimensions, memory is about 54 KB of 4-byte counters, no matter how many distinct videos exist.", "idea": "A Count-Min sketch keeps approximate counts for unlimited items in fixed memory.", "caption": "Each event increments one counter per row.", "focus": ["app", "events", "cms"], "flows": [{"from": "app", "to": "events", "kind": "async", "label": "view video 7"}, {"from": "events", "to": "cms", "kind": "async", "label": "+1 in 5 rows"}], "metrics": {"mem": "54", "err": "0.1"}},
+    {"tag": "CONCEPT", "title": "Reading a count: take the minimum", "body": "To estimate a count, hash the item in each row and take the smallest of the 5 counters. Other items collide into the same counters and only ever add to them, so every counter is at least the true count. The minimum is the least inflated one. The estimate can be too high but never too low, by at most about 0.1% of total events with 99% confidence.", "idea": "Count-Min overestimates, never underestimates; the minimum across rows trims the damage.", "caption": "Estimate = smallest counter across rows.", "focus": ["app", "cms"], "flows": [{"from": "app", "to": "cms", "kind": "request", "label": "count(video 7)?"}, {"from": "cms", "to": "app", "kind": "response", "label": "about 4,210"}], "metrics": {}},
+    {"tag": "CONCEPT", "title": "HyperLogLog: how many different?", "body": "Counting unique visitors exactly needs a set of every ID: a billion 8-byte IDs is over 8 GB. HyperLogLog hashes each ID and watches for rare patterns such as many leading zero bits; seeing one with 20 zeros suggests about a million distinct items were hashed. It splits items into 16,384 buckets and averages them, giving about 0.8% error in 12 KB. Two HyperLogLogs from different servers merge by taking the max of each bucket.", "idea": "HyperLogLog estimates unique counts in about 12 KB and merges cleanly across machines.", "caption": "Unique users counted in 12 KB.", "focus": ["events", "hll"], "flows": [{"from": "events", "to": "hll", "kind": "async", "label": "hash(user id)"}], "metrics": {"mem": "12", "err": "0.81"}},
+    {"tag": "RECAP", "title": "Pick the sketch by the question", "body": "Is this key in the set? Use a Bloom filter: no is certain, yes is maybe. How many times did this item occur? Use Count-Min: counts can be high, never low. How many distinct items were there? Use HyperLogLog: a small relative error. All three trade a little accuracy for fixed, tiny memory. Use them where an approximate answer is acceptable, never where you need exactness.", "idea": "Sketches trade bounded, one-directional error for memory that does not grow with the data.", "caption": "Three questions, three small structures.", "focus": ["bloom", "cms", "hll"], "flows": [], "metrics": {}}
+  ],
+  "quiz": [
+    {"q": "A Bloom filter in front of a database answers 'no' for a key. What should the app do?", "options": ["Query the database anyway to confirm", "Retry the filter with different hash functions", "Skip the database: the key is definitely absent", "Treat it as present with 50% probability"], "answer": 2, "why": "A 'no' means at least one required bit is 0. Since bits are never cleared, the key was never added. Bloom filters have no false negatives."},
+    {"q": "A filter with a 1% false-positive rate guards a store. 1,000,000 lookups arrive, all for keys that do not exist. About how many disk reads happen?", "options": ["About 10,000", "About 1,000,000", "About 100", "Zero, since the filter is exact"], "answer": 0, "why": "Only false positives pass through the filter, so about 1% of 1,000,000 = 10,000 reads, instead of 1,000,000 without the filter."},
+    {"q": "Your Count-Min sketch says an item occurred 5,300 times. Which statement is correct?", "options": ["The true count is exactly 5,300", "The true count is at most 5,300, possibly less", "The true count may be above or below 5,300 equally", "The true count is at least 5,300, possibly more"], "answer": 1, "why": "Collisions only add to counters, so estimates are never below the true count. The true count is therefore at most 5,300."},
+    {"q": "Fifty servers each track unique daily visitors. You need one global unique count without shipping all IDs. Which fits best?", "options": ["A Bloom filter per server, summing the 'yes' answers", "A Count-Min sketch per server, summing the counters", "A HyperLogLog per server, merged by taking the max of each bucket", "A plain counter per server, added together"], "answer": 2, "why": "Visitors seen on several servers would be double-counted by a plain sum. HyperLogLogs merge by per-bucket max, which removes duplicates, in about 12 KB each."}
+  ],
+  "cheatsheet": [
+    {"term": "Bloom filter", "def": "Bit array plus k hashes. Answers 'definitely not in set' or 'maybe in set'. No false negatives, some false positives, no deletes."},
+    {"term": "False positive rate", "def": "Rule of thumb with best k: about 10% at 5 bits per key, 1% at 10, 0.1% at 15. Optimal k is about 0.7 times bits per key."},
+    {"term": "Where it is used", "def": "In front of disk or SSTable reads, caches, and databases, so lookups for absent keys skip the expensive read."},
+    {"term": "Count-Min sketch", "def": "Grid of counters with one hash per row. Add: +1 in each row. Estimate: min across rows. Overestimates only."},
+    {"term": "Heavy hitters", "def": "The most frequent items. Count-Min plus a small top-N list finds trending items without a counter per item."},
+    {"term": "HyperLogLog", "def": "Estimates distinct count from leading-zero patterns of hashes. About 12 KB gives roughly 0.8% error, for billions of items."},
+    {"term": "Mergeable", "def": "Bloom filters merge by OR, Count-Min by adding counters, HyperLogLog by max per bucket, so shards can be combined."},
+    {"term": "When not to use", "def": "When you need exact answers, deletion, or the actual keys: money, inventory, billing, access control."}
+  ]
+}

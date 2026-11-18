@@ -1,0 +1,63 @@
+{
+  "slug": "oltp-olap",
+  "title": "OLTP vs OLAP & Warehouses",
+  "subtitle": "Watch one revenue report choke a checkout database, then see how a warehouse and a pipeline fix it.",
+  "minutes": 12,
+  "level": "Intermediate",
+  "learn": [
+    "How OLTP workloads (many tiny reads and writes) differ from OLAP workloads (few huge scans)",
+    "Why row storage suits transactions and column storage suits analytics",
+    "How ETL and ELT move data from the live database into a warehouse or lake",
+    "Why running analytics on the production database hurts customers",
+    "When to pick a warehouse, a data lake, or both"
+  ],
+  "nodes": [
+    {"id": "users", "label": "Shoppers", "kind": "user", "x": 8, "y": 22},
+    {"id": "oltp", "label": "OLTP DB (row store)", "kind": "db", "x": 30, "y": 22},
+    {"id": "etl", "label": "ETL / ELT pipeline", "kind": "worker", "x": 52, "y": 50},
+    {"id": "lake", "label": "Data lake (files)", "kind": "storage", "x": 52, "y": 84},
+    {"id": "wh", "label": "Warehouse (columns)", "kind": "db", "x": 74, "y": 50},
+    {"id": "analyst", "label": "Analyst dashboard", "kind": "client", "x": 88, "y": 22}
+  ],
+  "edges": [
+    {"from": "users", "to": "oltp"},
+    {"from": "oltp", "to": "etl"},
+    {"from": "etl", "to": "wh"},
+    {"from": "etl", "to": "lake"},
+    {"from": "lake", "to": "wh"},
+    {"from": "wh", "to": "analyst"},
+    {"from": "analyst", "to": "oltp"}
+  ],
+  "metrics": [
+    {"id": "p99", "label": "Checkout p99", "unit": "ms"},
+    {"id": "scanned", "label": "Data scanned", "unit": "GB"},
+    {"id": "query", "label": "Report time", "unit": "s"}
+  ],
+  "steps": [
+    {"tag": "QUESTION", "title": "Why does checkout slow down at 9am?", "body": "A shop keeps 500 million orders in one Postgres-style database. Checkout is fast: p99 latency is about 8 ms. Every morning an analyst opens a dashboard titled revenue by day, and suddenly shoppers see timeouts. Same database, same data. What changed? The kind of question being asked, not the amount of traffic.", "idea": "Two workloads can be harmless alone and destructive together on the same database.", "caption": "Healthy checkout, one analyst about to ask a big question.", "focus": ["users", "oltp", "analyst"], "flows": [], "metrics": {"p99": "8", "scanned": "0", "query": "0"}},
+    {"tag": "OLTP", "title": "Transactions: many tiny operations", "body": "OLTP (online transaction processing) means thousands of small operations per second, each touching one or a few rows: insert this order, read this user's cart, update this stock count. Each must be fast and correct. Databases built for this store each row's fields together on disk, so one row is one cheap read or write, usually found through an index.", "idea": "OLTP is point reads and writes by key, optimized for latency and correctness.", "caption": "Shoppers write and read single rows in milliseconds.", "focus": ["users", "oltp"], "flows": [{"from": "users", "to": "oltp", "kind": "request", "label": "INSERT order"}, {"from": "oltp", "to": "users", "kind": "response", "label": "committed"}], "metrics": {"p99": "8"}},
+    {"tag": "WHAT IF", "title": "Analytics hits the live database", "body": "Now the analyst runs SELECT day, SUM(amount) FROM orders GROUP BY day. It must read every one of the 500 million rows. At roughly 200 bytes per row that is about 100 GB. Even at an optimistic 2 GB/s that is around 50 seconds of heavy disk and CPU use, evicting hot pages from the cache that checkout relies on. Checkout queries now queue behind it.", "idea": "A full-table scan competes for the same disk, cache and CPU that transactions need.", "caption": "The big scan starves checkout of cache and I/O.", "focus": ["analyst", "oltp", "users"], "flows": [{"from": "analyst", "to": "oltp", "kind": "fail", "label": "SUM ... GROUP BY"}, {"from": "users", "to": "oltp", "kind": "fail", "label": "checkout slow"}], "metrics": {"p99": "900", "scanned": "100", "query": "50"}},
+    {"tag": "CONCEPT", "title": "Row store vs column store", "body": "A row store keeps all fields of one order side by side, which is perfect for fetching a whole order. A column store keeps all values of one column together, so the revenue query reads only the date and amount columns, about 16 bytes per row instead of 200. Similar values sit together too, so they compress very well, often 3 to 10 times. That is roughly 8 GB shrunk to 1 to 3 GB.", "idea": "Columns let analytics read only what it needs, and compress better; rows make single-record access cheap.", "caption": "Same data, laid out by column for scanning.", "focus": ["oltp", "wh"], "flows": [], "metrics": {"scanned": "2", "query": "1"}},
+    {"tag": "ETL", "title": "Copy data out: ETL", "body": "We cannot just move everything to a column store, because checkout still needs fast row writes. So we keep both and copy. In classic ETL (extract, transform, load) a pipeline pulls changes from the OLTP database, cleans and reshapes them on its own workers, then loads finished tables into the warehouse. Reading changes from the database log (change data capture) puts far less load on it than rescanning tables.", "idea": "The OLTP database stays the source of truth; analytics works on a copy.", "caption": "Pipeline extracts changes and loads the warehouse.", "focus": ["oltp", "etl", "wh"], "flows": [{"from": "oltp", "to": "etl", "kind": "async", "label": "change feed"}, {"from": "etl", "to": "wh", "kind": "async", "label": "cleaned tables"}], "metrics": {"p99": "8"}},
+    {"tag": "ELT + LAKE", "title": "Dump first, transform later: ELT", "body": "Modern warehouses are powerful and cheap to scale, so many teams flip the order: ELT (extract, load, transform). Raw data lands first in a data lake, which is cheap object storage holding files such as Parquet or JSON in any shape. Transformations then run as SQL inside the warehouse. The lake also feeds machine learning and data nobody has modeled yet; the warehouse serves clean, governed tables.", "idea": "A lake stores raw data cheaply and flexibly; a warehouse stores modeled data for fast SQL.", "caption": "Raw files land in the lake, then the warehouse transforms them.", "focus": ["etl", "lake", "wh"], "flows": [{"from": "etl", "to": "lake", "kind": "async", "label": "raw files"}, {"from": "lake", "to": "wh", "kind": "async", "label": "load + SQL"}], "metrics": {}},
+    {"tag": "OLAP", "title": "The same report, off the hot path", "body": "OLAP (online analytical processing) means few queries that each scan huge amounts of data and aggregate it. Run the revenue report on the warehouse and it reads two compressed columns, spread across many nodes in parallel, in about a second. Checkout never notices, because the OLTP database is not involved at all.", "idea": "OLAP is built for big scans and aggregates; isolating it protects transactions.", "caption": "Report answered by the warehouse; checkout is untouched.", "focus": ["analyst", "wh"], "flows": [{"from": "analyst", "to": "wh", "kind": "request", "label": "SUM ... GROUP BY"}, {"from": "wh", "to": "analyst", "kind": "response", "label": "daily totals"}], "metrics": {"p99": "8", "scanned": "2", "query": "1"}},
+    {"tag": "TRADE-OFF", "title": "The price: freshness and complexity", "body": "The copy is never instant. With change capture the warehouse may lag by seconds to minutes; with a nightly batch job, up to a day. You also now run a pipeline that can break, duplicate rows, or drift from the source. Warehouses are poor at single-row updates, so do not point your app at one. Pick the lag the business actually needs.", "idea": "You trade data freshness and operational effort for isolation and fast analytics.", "caption": "The warehouse is a slightly stale copy fed by a pipeline.", "focus": ["oltp", "etl", "wh"], "flows": [{"from": "oltp", "to": "etl", "kind": "async", "label": "lag: ~1-5 min"}], "metrics": {}},
+    {"tag": "RECAP", "title": "Two workloads, two systems", "body": "OLTP serves many small, correct, low-latency row operations, so it uses row storage and indexes. OLAP serves few huge scans and aggregates, so it uses column storage and parallel scans. Do not run the second on the first. Move data with ETL or ELT, keep raw history in a lake if you want flexibility, and serve reports from a warehouse.", "idea": "Match the storage layout and system to the access pattern, and keep analytics off the transaction path.", "caption": "Transactions on the left, analytics on the right.", "focus": ["users", "oltp", "etl", "lake", "wh", "analyst"], "flows": [], "metrics": {"p99": "8", "scanned": "2", "query": "1"}}
+  ],
+  "quiz": [
+    {"q": "A report needs SUM(amount) over 500 million rows of a 40-column table. Why is a column store usually much faster than a row store here?", "options": ["It stores fewer rows overall", "It reads only the amount column, and that column compresses well", "It skips the need for aggregation", "It keeps all data in memory by default"], "answer": 1, "why": "A column store reads just the columns the query needs, and similar values in one column compress strongly, so far fewer bytes come off disk."},
+    {"q": "Why can one heavy analytics query make checkout slow even though it only reads data?", "options": ["Reads always lock every table for writing", "It competes for disk, CPU and buffer cache with transactions", "Read queries are replicated to shoppers", "It increases the number of rows in the table"], "answer": 1, "why": "The scan saturates I/O and pushes hot pages out of cache, so small transactional queries wait. Reads do not need to block writes for this to hurt."},
+    {"q": "A team lands raw JSON and CSV exports in cheap object storage first and models them into tables later, only when someone needs them. Which approach is this?", "options": ["ETL into an OLTP database", "A data lake, often feeding ELT", "Row-based sharding", "A write-through cache"], "answer": 1, "why": "Storing raw files first and transforming afterwards is the data lake plus ELT pattern; classic ETL transforms before loading."},
+    {"q": "Your app needs to update one customer's address and show it back instantly. Where should that live?", "options": ["Only in the warehouse, since it holds all data", "In the OLTP database, with the warehouse updated later by the pipeline", "In the data lake as a new file each time", "In the dashboard tool"], "answer": 1, "why": "Warehouses are tuned for big scans, not frequent single-row updates. The OLTP database is the source of truth and the warehouse catches up afterwards."}
+  ],
+  "cheatsheet": [
+    {"term": "OLTP", "def": "Online transaction processing: many small, fast reads and writes of individual rows, such as orders and carts. Needs low latency and strong correctness."},
+    {"term": "OLAP", "def": "Online analytical processing: few queries that scan and aggregate huge volumes of history, such as revenue by region. Needs throughput, not single-row speed."},
+    {"term": "Row vs column store", "def": "Row stores keep a record's fields together (good for point access). Column stores keep each column together (good for scans, compression)."},
+    {"term": "ETL vs ELT", "def": "ETL transforms data before loading it into the target. ELT loads raw data first and transforms it inside the warehouse using SQL."},
+    {"term": "Data warehouse", "def": "A column-oriented analytical database holding cleaned, modeled data, queried with SQL by analysts and dashboards."},
+    {"term": "Data lake", "def": "Cheap object storage of raw data in open file formats (for example Parquet). Flexible, but needs structure added before it is easy to query."},
+    {"term": "Change data capture", "def": "Reading a database's change log to stream inserts, updates and deletes downstream, with less load than repeated full table queries."},
+    {"term": "Rule of thumb", "def": "Never point heavy analytics at the production OLTP database. Use a copy, with a freshness lag the business can accept."}
+  ]
+}

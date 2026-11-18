@@ -1,0 +1,173 @@
+{
+  "slug": "napkin-math",
+  "title": "Napkin Math",
+  "subtitle": "Turn 'ten million daily users' into requests per second, terabytes, and gigabits in a few lines of arithmetic.",
+  "minutes": 12,
+  "level": "Beginner",
+  "learn": [
+    "Convert daily active users into average and peak requests per second",
+    "Estimate how fast storage grows and what a year of data costs in space",
+    "Convert photo or video sizes into bandwidth, and avoid the bits-versus-bytes trap",
+    "Recall the latency numbers that separate memory, SSD, network, and distance",
+    "Use powers of two and round numbers to do all of this in your head"
+  ],
+  "nodes": [
+    {"id": "users", "label": "10M daily users", "kind": "user", "x": 10, "y": 50},
+    {"id": "cdn", "label": "CDN", "kind": "cdn", "x": 35, "y": 18},
+    {"id": "api", "label": "API servers", "kind": "server", "x": 38, "y": 58},
+    {"id": "cache", "label": "Cache", "kind": "cache", "x": 88, "y": 52},
+    {"id": "db", "label": "Database", "kind": "db", "x": 65, "y": 28},
+    {"id": "store", "label": "Photo storage", "kind": "storage", "x": 65, "y": 80}
+  ],
+  "edges": [
+    {"from": "users", "to": "cdn"},
+    {"from": "users", "to": "api"},
+    {"from": "api", "to": "cache"},
+    {"from": "api", "to": "db"},
+    {"from": "api", "to": "store"},
+    {"from": "cdn", "to": "store"}
+  ],
+  "metrics": [
+    {"id": "avg", "label": "Average QPS", "unit": "req/s"},
+    {"id": "peak", "label": "Peak QPS", "unit": "req/s"},
+    {"id": "storage", "label": "Storage / year", "unit": "TB"},
+    {"id": "egress", "label": "Egress", "unit": "Gbps"}
+  ],
+  "steps": [
+    {
+      "tag": "QUESTION",
+      "title": "Will it fit on one machine?",
+      "body": "You are designing a photo-sharing app with 10 million daily active users (DAU). Before drawing any boxes, a good engineer asks: how many requests per second, how much storage, how much bandwidth? Napkin math answers in minutes, using rough numbers, and tells you whether you need one server or a fleet.",
+      "idea": "Estimate first: the answer decides the architecture, and being within 2x to 3x is good enough.",
+      "caption": "Ten million people, and we know nothing else yet.",
+      "focus": ["users"],
+      "flows": [],
+      "metrics": {}
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "Round numbers are your friend",
+      "body": "A day has 86,400 seconds, which we round to about 100,000 (10^5). So 1 million requests per day is roughly 10 per second (really 11.6). Powers of two give the sizes: 2^10 is about a thousand (KB), 2^20 a million (MB), 2^30 a billion (GB), 2^40 a trillion (TB). Rounding errors of 10 to 20 percent do not matter here.",
+      "idea": "Memorise 86,400 s/day and the 2^10 ladder; most estimates then reduce to moving zeros.",
+      "caption": "We state assumptions: 100 photo views per user per day, 10% of users upload one photo.",
+      "focus": ["users", "api"],
+      "flows": [{"from": "users", "to": "api", "kind": "request", "label": "100 views / day"}],
+      "metrics": {}
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "From DAU to QPS",
+      "body": "Reads per day: 10M users x 100 views = 1 billion. Divide by about 86,400 seconds and you get roughly 12,000 reads per second on average. Uploads: 10% of users, one photo each, is 1M per day, about 12 writes per second. The read-to-write ratio is around 1000 to 1, which says this system should be built around fast reads.",
+      "idea": "QPS = (DAU x actions per user per day) / 86,400. The read/write ratio shapes the design.",
+      "caption": "About 12,000 reads per second hit the system on average.",
+      "focus": ["users", "api"],
+      "flows": [{"from": "users", "to": "api", "kind": "request", "label": "12k reads/s"}, {"from": "users", "to": "api", "kind": "request", "label": "12 uploads/s"}],
+      "metrics": {"avg": "12000"}
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "Design for the peak",
+      "body": "Traffic is not flat. People look at photos in the evening, so the busiest hour can be several times the average. A common rule of thumb is peak = 2x to 5x average; we use 3x, giving about 36,000 reads per second. Servers must survive the peak, not the average, or the app falls over exactly when the most people are watching.",
+      "idea": "Capacity is sized for peak load, so multiply the average by a peak factor (a rule of thumb, often 2x to 5x).",
+      "caption": "Peak is about 36,000 reads per second.",
+      "focus": ["users", "api"],
+      "flows": [{"from": "users", "to": "api", "kind": "request", "label": "36k reads/s peak"}],
+      "metrics": {"peak": "36000"}
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "Storage grows every day",
+      "body": "One million uploads a day at about 2 MB each is 2 TB per day. Over 365 days that is roughly 730 TB, close to three quarters of a petabyte, before replication. Keeping 3 copies for durability makes it about 2.2 PB. Notice that thumbnails and metadata are tiny by comparison: the raw photos dominate the bill.",
+      "idea": "Storage per year = writes per day x size per item x 365, then multiply by the replication factor.",
+      "caption": "Uploads pile up in object storage at 2 TB per day.",
+      "focus": ["api", "store"],
+      "flows": [{"from": "api", "to": "store", "kind": "request", "label": "2 MB photo"}],
+      "metrics": {"storage": "730"}
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "Bandwidth: watch bits and bytes",
+      "body": "Each view serves a resized image of about 200 KB. A billion views a day is 200 TB, or about 2.3 GB per second. Network links are quoted in bits, so multiply by 8: roughly 18 Gbps on average and 55 Gbps at peak. That is far too much for the origin, which is why a CDN serves most of these bytes from the edge.",
+      "idea": "Bandwidth = QPS x bytes per response. Multiply bytes by 8 to compare with link speeds in bits.",
+      "caption": "About 18 Gbps leaves the system, mostly served from CDN caches.",
+      "focus": ["users", "cdn", "store"],
+      "flows": [{"from": "store", "to": "cdn", "kind": "response", "label": "cache misses"}, {"from": "cdn", "to": "users", "kind": "response", "label": "200 KB images"}],
+      "metrics": {"egress": "18"}
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "Latency numbers to remember",
+      "body": "Rough orders of magnitude: reading from memory takes about 100 nanoseconds, an SSD random read about 100 microseconds, a round trip inside one data center about 0.5 ms, a spinning-disk seek about 10 ms, and a round trip across continents about 150 ms. Each step is roughly 10 to 1000 times slower than the last, so avoid slow tiers on the hot path.",
+      "idea": "Memory is about 1000x faster than SSD, and a cross-continent round trip is about 300x slower than one inside a data center.",
+      "caption": "A cache lookup is cheaper than a database or storage read.",
+      "focus": ["api", "cache", "db"],
+      "flows": [{"from": "api", "to": "cache", "kind": "request", "label": "~0.5 ms"}, {"from": "cache", "to": "api", "kind": "response", "label": "hit"}, {"from": "api", "to": "db", "kind": "request", "label": "~5 ms miss"}],
+      "metrics": {}
+    },
+    {
+      "tag": "TRADE-OFF",
+      "title": "Turning numbers into decisions",
+      "body": "Suppose one API server handles about 2,000 requests per second. Peak 36,000 needs 18 servers, so plan around 25 for headroom. A single database comfortably serves a few thousand simple reads per second, say 5,000. To keep misses under that, the cache must hit at least 85 percent of the time: 15 percent of 36,000 is 5,400, so aim for 90 percent or more.",
+      "idea": "Divide the estimate by what one machine can do; the quotient tells you how many machines or what cache hit rate you need.",
+      "caption": "The cache absorbs reads so the database sees only misses.",
+      "focus": ["api", "cache", "db"],
+      "flows": [{"from": "api", "to": "cache", "kind": "request", "label": "36k lookups/s"}, {"from": "api", "to": "db", "kind": "request", "label": "~3.6k misses/s"}],
+      "metrics": {}
+    },
+    {
+      "tag": "WHAT IF",
+      "title": "What if they were videos?",
+      "body": "Change one assumption: each upload is a 50 MB video instead of a 2 MB photo. Storage becomes 1M x 50 MB = 50 TB per day, about 18,000 TB (18 PB) per year, 25 times more. Nothing else in the estimate moved, yet the cost and design of the storage layer changed completely. One input can dominate everything, so check the big ones.",
+      "idea": "Find the assumption that moves the result most and sanity-check that one first.",
+      "caption": "Same upload rate, 25x the bytes written.",
+      "focus": ["api", "store"],
+      "flows": [{"from": "api", "to": "store", "kind": "request", "label": "50 MB video"}],
+      "metrics": {"storage": "18250"}
+    },
+    {
+      "tag": "RECAP",
+      "title": "The napkin recipe",
+      "body": "State assumptions, then convert: DAU to QPS by dividing by 86,400, average to peak with a 3x factor, items to storage by multiplying size and days, responses to bandwidth in bits. Compare each result with what one machine does and with the latency ladder. Rough answers within a factor of 2 to 3 are enough to choose a design.",
+      "idea": "Write assumptions down, round aggressively, and use the results to choose between one box and a fleet.",
+      "caption": "Our photo app: 12k QPS, 36k peak, 730 TB a year, 18 Gbps.",
+      "focus": ["users", "cdn", "api", "cache", "db", "store"],
+      "flows": [],
+      "metrics": {"avg": "12000", "peak": "36000", "storage": "730", "egress": "18"}
+    }
+  ],
+  "quiz": [
+    {
+      "q": "An app has 5 million DAU, and each user makes 20 requests a day. What is the average QPS, roughly?",
+      "options": ["About 12", "About 120", "About 1,200", "About 12,000"],
+      "answer": 2,
+      "why": "5M x 20 = 100M requests per day. Dividing by about 100,000 seconds per day gives about 1,000, or 1,160 with 86,400. Peak would be several times that."
+    },
+    {
+      "q": "300,000 uploads a day at 5 MB each, kept for one year with no replication. About how much storage is that?",
+      "options": ["About 1.5 TB", "About 55 TB", "About 5.5 PB", "About 550 TB"],
+      "answer": 3,
+      "why": "300,000 x 5 MB = 1.5 TB per day. Times 365 is about 550 TB. Replication would multiply that further."
+    },
+    {
+      "q": "You serve 1.2 GB per second on average and your network link is 10 Gbps. What does the napkin math say?",
+      "options": ["It barely fits on average and cannot handle peak, since 1.2 GB/s is about 9.6 Gbps", "It fits easily, since 1.2 is far smaller than 10", "It fits only if you compress to bits", "It is fine as long as peak is under 2x"],
+      "answer": 0,
+      "why": "Link speeds are in bits: 1.2 GB/s x 8 = 9.6 Gbps, already about 96 percent of the link. Any peak above average would saturate it."
+    },
+    {
+      "q": "Peak reads are 30,000 per second and your database safely handles 5,000. About what cache hit rate do you need at minimum?",
+      "options": ["70 percent", "85 percent", "50 percent", "99.9 percent"],
+      "answer": 1,
+      "why": "The database may see at most 5,000 of 30,000 requests, which is about 17 percent misses, so a hit rate of roughly 83 percent. 85 percent meets it; 70 percent leaves 9,000 misses, and 50 percent leaves 15,000."
+    }
+  ],
+  "cheatsheet": [
+    {"term": "Seconds per day", "def": "86,400, rounded to about 100,000 (10^5). So 1 million events per day is about 12 per second."},
+    {"term": "Powers of two", "def": "2^10 is about 1 thousand (KB), 2^20 about 1 million (MB), 2^30 about 1 billion (GB), 2^40 about 1 trillion (TB), 2^50 about 1 quadrillion (PB)."},
+    {"term": "QPS formula", "def": "Average QPS = DAU x actions per user per day / 86,400. Peak QPS = average x 2 to 5 (rule of thumb; 3 is a common default)."},
+    {"term": "Storage formula", "def": "Per year = items per day x bytes per item x 365. Multiply by the replication factor, usually 3, for the real footprint."},
+    {"term": "Bandwidth", "def": "QPS x bytes per response gives bytes per second. Multiply by 8 for bits per second, which is how network links are rated."},
+    {"term": "Latency ladder", "def": "Memory about 100 ns, SSD read about 100 us, same-data-center round trip about 0.5 ms, disk seek about 10 ms, cross-continent round trip about 150 ms."},
+    {"term": "Capacity check", "def": "Divide peak load by what one machine handles to get a server count, then add headroom. Do the same for a database against cache miss rate."}
+  ]
+}

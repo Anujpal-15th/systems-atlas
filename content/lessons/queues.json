@@ -1,0 +1,64 @@
+{
+  "slug": "queues",
+  "title": "Message Queues",
+  "subtitle": "Watch a checkout hand work to a queue, survive a traffic spike and a worker crash, and park a poison message.",
+  "minutes": 12,
+  "level": "Intermediate",
+  "learn": [
+    "How a queue decouples producers from consumers and absorbs bursts",
+    "What at-least-once delivery means and why duplicates happen",
+    "How acknowledgements and the visibility timeout recover from crashed workers",
+    "Why consumers must be idempotent",
+    "What a dead-letter queue is for and when messages end up there"
+  ],
+  "nodes": [
+    {"id": "producer", "label": "Checkout service", "kind": "service", "x": 10, "y": 52},
+    {"id": "queue", "label": "Email queue", "kind": "queue", "x": 38, "y": 52},
+    {"id": "w1", "label": "Worker A", "kind": "worker", "x": 66, "y": 20},
+    {"id": "w2", "label": "Worker B", "kind": "worker", "x": 66, "y": 52},
+    {"id": "dlq", "label": "Dead-letter queue", "kind": "queue", "x": 66, "y": 84},
+    {"id": "mail", "label": "Email provider", "kind": "external", "x": 90, "y": 36}
+  ],
+  "edges": [
+    {"from": "producer", "to": "queue"},
+    {"from": "queue", "to": "w1"},
+    {"from": "queue", "to": "w2"},
+    {"from": "w1", "to": "mail"},
+    {"from": "w2", "to": "mail"},
+    {"from": "queue", "to": "dlq"}
+  ],
+  "metrics": [
+    {"id": "depth", "label": "Queue depth", "unit": "msgs"},
+    {"id": "inflight", "label": "In flight", "unit": "msgs"},
+    {"id": "sent", "label": "Emails sent", "unit": "emails"},
+    {"id": "dead", "label": "Dead letters", "unit": "msgs"}
+  ],
+  "steps": [
+    {"tag": "QUESTION", "title": "Don't make checkout wait", "body": "After a purchase, the checkout service must email a receipt. If it calls the email provider directly, the customer waits for that call (often 300 ms to 2 s), and if the provider is down, the order fails over an email. Sending a receipt can happen a few seconds later, so why should checkout depend on it right now?", "idea": "Work that does not need to finish before you reply should not block the reply.", "caption": "Checkout and email are tied together.", "focus": ["producer", "mail"], "flows": [], "metrics": {"depth": "0", "inflight": "0", "sent": "0", "dead": "0"}},
+    {"tag": "CONCEPT", "title": "Hand the job to a queue", "body": "Instead, checkout writes a small message such as 'send receipt for order 81' to a queue and gets a confirmation that the queue stored it, usually within a few milliseconds. The service that writes is the producer. Checkout can now finish immediately, even if no email worker is running at that moment.", "idea": "A queue stores messages durably until someone is ready to handle them.", "caption": "Producer enqueues; queue confirms it is stored.", "focus": ["producer", "queue"], "flows": [{"from": "producer", "to": "queue", "kind": "request", "label": "send receipt #81"}, {"from": "queue", "to": "producer", "kind": "response", "label": "stored"}], "metrics": {"depth": "1"}},
+    {"tag": "BUFFER", "title": "Absorb a spike", "body": "A flash sale sends 300 orders per second for 10 seconds, so 3,000 messages arrive. Each worker can send about 40 emails per second, so two workers handle 80 per second. The queue holds the difference: after the burst about 2,200 messages are waiting, and the backlog drains in roughly half a minute. Without the queue, the email path would have been overwhelmed.", "idea": "A queue turns a short burst into a longer, steady flow the consumers can handle.", "caption": "Depth climbs during the burst, then drains.", "focus": ["producer", "queue"], "flows": [{"from": "producer", "to": "queue", "kind": "request", "label": "300 msgs/s"}, {"from": "producer", "to": "queue", "kind": "request", "label": "300 msgs/s"}], "metrics": {"depth": "2200"}},
+    {"tag": "DELIVER", "title": "Receive hides the message", "body": "Worker A asks the queue for a message. The queue does not delete it. It makes it invisible to other workers for a set period called the visibility timeout (30 seconds here) and counts one delivery attempt. The message is lent to Worker A, not given away. Meanwhile Worker B receives different messages, so work is shared.", "idea": "Receiving only leases a message; it stays in the queue until acknowledged.", "caption": "Worker A holds a lease on one message.", "focus": ["queue", "w1"], "flows": [{"from": "w1", "to": "queue", "kind": "request", "label": "receive"}, {"from": "queue", "to": "w1", "kind": "response", "label": "msg + 30s lease"}], "metrics": {"depth": "2199", "inflight": "1"}},
+    {"tag": "ACK", "title": "Acknowledge on success", "body": "Worker A calls the email provider, gets a success reply, and only then sends an acknowledgement (ack) to the queue. The ack deletes the message for good. The order matters: ack after the work is done, never before. Acking early would lose the email if the worker died a moment later.", "idea": "Ack means 'done, delete it', so send it only after the work has really succeeded.", "caption": "Email sent, then the message is deleted.", "focus": ["w1", "mail", "queue"], "flows": [{"from": "w1", "to": "mail", "kind": "request", "label": "send email"}, {"from": "mail", "to": "w1", "kind": "response", "label": "200 OK"}, {"from": "w1", "to": "queue", "kind": "response", "label": "ack (delete)"}], "metrics": {"inflight": "0", "sent": "1"}},
+    {"tag": "WHAT IF", "title": "A worker crashes mid-job", "body": "Now Worker A sends the email but crashes before it can ack. The queue never hears back. After the 30 second visibility timeout expires, the message becomes visible again and Worker B receives it. Nothing is lost, which is the good news. The bad news is that the customer's email may now be sent a second time.", "idea": "At-least-once delivery means no loss but possible duplicates.", "caption": "No ack arrives, so the message is redelivered.", "focus": ["w1", "queue", "w2", "mail"], "flows": [{"from": "w1", "to": "queue", "kind": "fail", "label": "crash, no ack"}, {"from": "queue", "to": "w2", "kind": "request", "label": "redeliver (try 2)"}, {"from": "w2", "to": "mail", "kind": "request", "label": "send email"}], "metrics": {"inflight": "1", "sent": "2"}},
+    {"tag": "TRADE-OFF", "title": "Make consumers idempotent", "body": "Exactly-once delivery across a network is not something a plain queue can promise, so the safe design is to make handling a message twice harmless. This property is called idempotency. Worker B includes a key such as 'receipt-order-81' with the call, or first checks a table of processed keys, so the repeat becomes a no-op. Also set the visibility timeout longer than your slowest normal job, or a slow worker will cause duplicates by itself.", "idea": "Pair at-least-once delivery with idempotent consumers to get an effectively-once result.", "caption": "A dedupe key makes the repeat harmless.", "focus": ["w2", "mail"], "flows": [{"from": "w2", "to": "mail", "kind": "request", "label": "key: order-81"}, {"from": "mail", "to": "w2", "kind": "response", "label": "already sent"}, {"from": "w2", "to": "queue", "kind": "response", "label": "ack (delete)"}], "metrics": {"inflight": "0", "sent": "2"}},
+    {"tag": "WHAT IF", "title": "A poison message", "body": "One message has a malformed address, so every attempt fails. Without a limit it would be retried forever, wasting capacity and hiding real problems. So the queue is configured with a maximum receive count, say 5. After the fifth failed delivery, the queue moves the message to a dead-letter queue (DLQ), where it waits for a human or a repair job.", "idea": "A dead-letter queue parks messages that keep failing so they stop blocking healthy work.", "caption": "After 5 failed tries the message is parked.", "focus": ["queue", "dlq", "w1"], "flows": [{"from": "queue", "to": "w1", "kind": "request", "label": "try 5 of 5"}, {"from": "w1", "to": "queue", "kind": "fail", "label": "error, no ack"}, {"from": "queue", "to": "dlq", "kind": "async", "label": "move to DLQ"}], "metrics": {"inflight": "0", "dead": "1"}},
+    {"tag": "RECAP", "title": "What the queue bought us", "body": "Producers write and move on, consumers pull at their own pace, and the queue buffers any gap between them. Receive leases a message, ack deletes it, and the visibility timeout brings back work from dead workers. That gives at-least-once delivery, so consumers must be idempotent. A DLQ catches messages that never succeed, and a growing DLQ or queue depth is your alarm.", "idea": "Decouple with a queue, ack after success, expect duplicates, and watch the DLQ.", "caption": "The full path, with a safety net.", "focus": ["producer", "queue", "w1", "w2", "dlq", "mail"], "flows": [], "metrics": {"depth": "0", "inflight": "0", "sent": "2", "dead": "1"}}
+  ],
+  "quiz": [
+    {"q": "A worker receives a message, finishes the job, but crashes just before sending the ack. What happens next with a standard at-least-once queue?", "options": ["The message is lost because the worker died", "The message becomes visible again after the visibility timeout and is delivered to a worker again", "The queue detects the crash and deletes the message", "The producer is told to resend it"], "answer": 1, "why": "Without an ack, the lease simply expires and the message returns to the queue. That is how at-least-once delivery avoids loss, at the cost of possible duplicate processing."},
+    {"q": "Jobs normally take 20 seconds but sometimes 90 seconds. The visibility timeout is 30 seconds. What is the most likely symptom?", "options": ["Workers will run out of memory", "Messages will be dropped silently", "Slow jobs will be redelivered to another worker while still running, causing duplicates", "The queue will stop accepting new messages"], "answer": 2, "why": "A job that outlasts the lease becomes visible to others while the first worker is still going. Set the timeout above your slowest normal job, or extend the lease while working."},
+    {"q": "Why should a consumer acknowledge a message only after the work succeeds?", "options": ["Acking early would lose the work if the consumer crashes afterwards", "Acks are slow, so they should be delayed", "The queue refuses early acks", "Late acks prevent duplicates"], "answer": 0, "why": "Ack deletes the message. If you ack first and crash, no copy remains to retry. Acking last trades possible duplicates for no loss."},
+    {"q": "Your DLQ depth suddenly rises from 0 to 4,000 right after a deploy. What is the best reading?", "options": ["The queue is healthy; the DLQ is just a cache", "Producers are sending too fast", "The new consumer code probably fails on messages it should handle, so investigate and then redrive the messages", "Visibility timeout is too long"], "answer": 2, "why": "Messages only reach the DLQ after repeated failed attempts. A jump right after a deploy points at a consumer bug, and once it is fixed the parked messages can be moved back to the main queue."},
+    {"q": "Orders arrive in a 10 second burst at 300/s. Two workers process 40/s each. What does the queue do for you here?", "options": ["It makes the workers faster", "It holds the backlog (about 2,200 messages) and lets the workers drain it at their own pace", "It rejects messages above 80 per second", "It guarantees each email is sent once"], "answer": 1, "why": "A queue buffers the gap between arrival rate and processing rate. It does not speed up consumers or guarantee exactly-once, but the producer is never blocked by the slow side."}
+  ],
+  "cheatsheet": [
+    {"term": "Producer / consumer", "def": "The producer writes messages to the queue; the consumer reads and handles them. Neither needs to know the other's speed or whether it is currently running."},
+    {"term": "Visibility timeout", "def": "How long a received message stays hidden from other consumers. If no ack arrives in that time, it reappears. Set it above your slowest normal job."},
+    {"term": "Ack", "def": "Tells the queue the work is done so the message can be deleted. Send it after success, not before."},
+    {"term": "At-least-once delivery", "def": "Every message is delivered one or more times. Nothing is lost, but duplicates can happen after crashes or timeouts."},
+    {"term": "Idempotent consumer", "def": "Handling the same message twice has the same effect as once, for example by using a dedupe key or an upsert."},
+    {"term": "Dead-letter queue (DLQ)", "def": "Holding area for messages that exceeded the maximum receive count. Alert on its depth, fix the cause, then redrive."},
+    {"term": "Queue depth / age", "def": "Messages waiting and the age of the oldest one. Rising depth means consumers are too slow or stuck; use it to autoscale workers."},
+    {"term": "Backpressure", "def": "When consumers fall behind, the queue grows. Limit its size or slow producers if the backlog could outlive its usefulness."}
+  ]
+}

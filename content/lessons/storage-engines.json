@@ -1,0 +1,64 @@
+{
+  "slug": "storage-engines",
+  "title": "Storage Engines: B-Trees vs LSM",
+  "subtitle": "Watch the same write travel through a B-tree and an LSM tree, and see where each one pays its cost.",
+  "minutes": 12,
+  "level": "Intermediate",
+  "learn": [
+    "How a B-tree updates a page in place, and why a tiny change rewrites a whole page",
+    "How an LSM tree turns random writes into sequential ones using a memtable, SSTables, and compaction",
+    "What write amplification and read amplification mean, with realistic numbers",
+    "Why both designs need a write-ahead log (WAL) to survive crashes",
+    "How to pick an engine from the workload: read-heavy vs write-heavy"
+  ],
+  "nodes": [
+    {"id": "app", "label": "Application", "kind": "client", "x": 10, "y": 50},
+    {"id": "wal", "label": "Write-ahead log", "kind": "storage", "x": 34, "y": 18},
+    {"id": "mem", "label": "Memtable (RAM)", "kind": "cache", "x": 34, "y": 50},
+    {"id": "btree", "label": "B-tree pages", "kind": "db", "x": 34, "y": 84},
+    {"id": "sst", "label": "SSTables (L0)", "kind": "storage", "x": 62, "y": 26},
+    {"id": "comp", "label": "Compaction", "kind": "worker", "x": 62, "y": 72},
+    {"id": "deep", "label": "Deeper levels L1+", "kind": "storage", "x": 88, "y": 50}
+  ],
+  "edges": [
+    {"from": "app", "to": "wal"},
+    {"from": "app", "to": "mem"},
+    {"from": "app", "to": "btree"},
+    {"from": "mem", "to": "sst"},
+    {"from": "app", "to": "sst"},
+    {"from": "sst", "to": "deep"},
+    {"from": "sst", "to": "comp"},
+    {"from": "comp", "to": "deep"}
+  ],
+  "metrics": [
+    {"id": "wamp", "label": "Write amp", "unit": "x"},
+    {"id": "reads", "label": "Reads/lookup", "unit": "disk"},
+    {"id": "files", "label": "L0 files", "unit": "files"}
+  ],
+  "steps": [
+    {"tag": "QUESTION", "title": "One write, two philosophies", "body": "Your app saves a 100-byte row. Disks, especially SSDs, like big sequential writes and dislike many small scattered ones. A storage engine must keep data sorted so reads are fast, yet absorb writes cheaply. The two dominant answers are the B-tree (update data in place) and the LSM tree (never update in place; merge later).", "idea": "A storage engine balances three costs: write cost, read cost, and space.", "caption": "Same row, two possible destinations.", "focus": ["app"], "flows": [], "metrics": {}},
+    {"tag": "B-TREE", "title": "B-tree: edit the page in place", "body": "A B-tree stores sorted rows in fixed-size pages (8 KiB in Postgres, 16 KiB in InnoDB). To change one row, the engine finds its leaf page, edits it, and eventually writes the whole page back, even for a 100-byte change. That is up to roughly 160x page-level write amplification, though several changes to one page often share a flush. Pages sit at scattered disk locations, so these are random writes.", "idea": "B-trees make reads cheap and predictable but pay for random, page-sized writes.", "caption": "Whole page rewritten for one small row.", "focus": ["app", "btree"], "flows": [{"from": "app", "to": "btree", "kind": "request", "label": "update row"}], "metrics": {"wamp": "160", "reads": "1", "files": "0"}},
+    {"tag": "WAL", "title": "Write-ahead log first", "body": "Edited pages live in RAM for a while, so a crash could lose them or leave a page half-written. To prevent that, both engine types first append a small record to a write-ahead log and fsync it (force it to disk). That append is sequential and fast. Only then does the engine acknowledge the write. After a crash, the log is replayed to rebuild lost changes.", "idea": "The WAL buys durability cheaply: one sequential append before anything else.", "caption": "Log record made durable before the ack.", "focus": ["app", "wal"], "flows": [{"from": "app", "to": "wal", "kind": "request", "label": "append + fsync"}, {"from": "wal", "to": "app", "kind": "response", "label": "durable"}], "metrics": {}},
+    {"tag": "LSM WRITE", "title": "LSM: write to memory", "body": "An LSM tree (log-structured merge tree) takes a different route. After the WAL append, the row goes into the memtable, a sorted structure in RAM such as a skip list. No data page is read or modified on disk. The write is acknowledged in well under a millisecond because it costs one sequential log append and one in-memory insert.", "idea": "LSM writes touch only the log and RAM, so they are fast and sequential.", "caption": "Row lands in the sorted in-memory memtable.", "focus": ["app", "wal", "mem"], "flows": [{"from": "app", "to": "wal", "kind": "request", "label": "append + fsync"}, {"from": "app", "to": "mem", "kind": "request", "label": "put(key, val)"}], "metrics": {"wamp": "1", "reads": "1", "files": "0"}},
+    {"tag": "FLUSH", "title": "Flush to an SSTable", "body": "When the memtable reaches its limit (RocksDB defaults to 64 MiB), it is frozen and written to disk in one sequential pass as an SSTable: a sorted, immutable file with an index and a Bloom filter. Immutable means never edited again, which makes files simple to cache and copy. The matching WAL segment can now be deleted. New writes go to a fresh memtable.", "idea": "Flushing turns many random updates into one big sorted sequential file.", "caption": "Memtable becomes an immutable level-0 SSTable.", "focus": ["mem", "sst"], "flows": [{"from": "mem", "to": "sst", "kind": "async", "label": "flush 64 MiB"}], "metrics": {"wamp": "2", "files": "1"}},
+    {"tag": "READ", "title": "Reads must look in many places", "body": "A key may live in the memtable or in any SSTable, and newer data shadows older data. A lookup checks the memtable, then level-0 files (which can overlap), then one file per deeper level. Each SSTable has a Bloom filter, a small structure that says 'definitely not here' quickly, so most files are skipped. Without it, a lookup could touch 8 or more files.", "idea": "LSM reads pay read amplification; Bloom filters keep it to about 1 to 2 disk reads.", "caption": "Lookup checks newest data first, skipping via Bloom.", "focus": ["app", "mem", "sst", "deep"], "flows": [{"from": "app", "to": "mem", "kind": "request", "label": "miss"}, {"from": "app", "to": "sst", "kind": "request", "label": "bloom? index"}, {"from": "sst", "to": "deep", "kind": "request", "label": "L1..L4"}, {"from": "sst", "to": "app", "kind": "response", "label": "value"}], "metrics": {"reads": "2", "files": "4"}},
+    {"tag": "COMPACT", "title": "Compaction cleans up", "body": "Background compaction merges overlapping SSTables into larger sorted ones at the next level, dropping overwritten values and deleted keys (tombstones). This keeps reads fast and reclaims space, but every byte gets rewritten several times as it moves down the levels. With a size ratio of 10, leveled compaction typically lands around 10 to 30x write amplification, a rule of thumb that varies with workload.", "idea": "Compaction is the bill for fast writes: the same data is rewritten again and again.", "caption": "Compaction merges files and rewrites them lower down.", "focus": ["sst", "comp", "deep"], "flows": [{"from": "sst", "to": "comp", "kind": "request", "label": "merge sorted runs"}, {"from": "comp", "to": "deep", "kind": "async", "label": "write L1 file"}], "metrics": {"wamp": "20", "reads": "2", "files": "1"}},
+    {"tag": "WHAT IF", "title": "A write burst outruns compaction", "body": "Imagine a bulk import pushes writes faster than compaction can merge them. Level-0 files pile up, and each lookup must check more of them, so read latency climbs. To protect itself the engine eventually slows or stalls writers (a write stall) until compaction catches up. Tuning compaction speed and file limits is a core LSM operations task.", "idea": "LSM trades smooth latency for throughput; a lagging compaction shows up as slow reads and write stalls.", "caption": "Backlog: L0 files accumulate, reads get slower.", "focus": ["sst", "comp"], "flows": [{"from": "sst", "to": "comp", "kind": "fail", "label": "backlog"}], "metrics": {"reads": "6", "files": "24"}},
+    {"tag": "RECAP", "title": "Pick by workload", "body": "B-trees update pages in place: strong, predictable reads and range scans, pricier random writes. LSM trees buffer writes in memory and merge sorted files later: very high write throughput and compact storage, but read amplification and compaction work. Both use a WAL for crash safety. Write-heavy ingest favors LSM; read-heavy transactional workloads usually favor B-trees.", "idea": "No free lunch: you choose where to pay, at write time (B-tree) or in the background (LSM).", "caption": "Two engines, same goal, different cost placement.", "focus": ["app", "wal", "mem", "btree", "sst", "comp", "deep"], "flows": [], "metrics": {"wamp": "20", "reads": "2", "files": "1"}}
+  ],
+  "quiz": [
+    {"q": "A B-tree engine uses 16 KiB pages. An update changes a 100-byte row and the page is written back alone. Roughly how large is the page-level write amplification?", "options": ["About 1x, only the changed bytes are written", "About 16x", "About 160x", "About 1,600x"], "answer": 2, "why": "16,384 bytes written for 100 bytes changed is about 160x. In practice several changes to the same page may share one flush, so real numbers are lower."},
+    {"q": "Why is an LSM write acknowledged so quickly compared with a B-tree update?", "options": ["It only needs a sequential log append and an in-memory insert, with sorting and merging deferred", "It skips the write-ahead log", "It writes directly to the final sorted position on disk", "It waits for compaction to finish first"], "answer": 0, "why": "The write touches the WAL (sequential) and the memtable (RAM). The expensive reorganization is postponed to background flush and compaction."},
+    {"q": "An LSM database was fast, then after a huge bulk load its point lookups slow down and L0 file count keeps rising. What is the most likely cause?", "options": ["The Bloom filters were deleted", "The WAL is too large", "The memtable is too small to hold any rows", "Compaction is falling behind the write rate"], "answer": 3, "why": "Many overlapping L0 files mean each lookup checks more files. That points to compaction not keeping up, and writers may soon be stalled."},
+    {"q": "The LSM engine holds recent writes in RAM. Why does it still write every change to a WAL?", "options": ["To make reads faster", "RAM contents vanish on a crash, so the log lets the engine replay unflushed writes", "To avoid ever needing compaction", "To keep SSTables sorted"], "answer": 1, "why": "The memtable is volatile. The WAL is a durable, sequential record of writes not yet flushed to an SSTable, replayed after a crash."}
+  ],
+  "cheatsheet": [
+    {"term": "B-tree", "def": "Sorted tree of fixed-size pages updated in place. Predictable reads and range scans; random, page-sized writes."},
+    {"term": "LSM tree", "def": "Writes go to a memtable, then flush to immutable sorted files merged in the background. Great write throughput."},
+    {"term": "WAL", "def": "Write-ahead log: sequential, fsynced record of each change before it is applied, replayed after a crash."},
+    {"term": "Memtable / SSTable", "def": "Memtable is the sorted in-RAM buffer; an SSTable is an immutable sorted file on disk with an index and Bloom filter."},
+    {"term": "Write amplification", "def": "Bytes physically written divided by bytes the user wrote. Leveled LSM often runs 10 to 30x; B-trees pay it per page."},
+    {"term": "Read amplification", "def": "Number of places (files or pages) checked per lookup. Low for B-trees; LSM reduces it with Bloom filters and compaction."},
+    {"term": "Compaction", "def": "Background merge of SSTables that drops overwritten and deleted data. Keeps reads fast, costs CPU, I/O, and rewrites."}
+  ]
+}

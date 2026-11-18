@@ -1,0 +1,65 @@
+{
+  "slug": "search-index",
+  "title": "Search & Inverted Indexes",
+  "subtitle": "Watch a text query hit a sharded search cluster, and see how data from the main database gets into it.",
+  "minutes": 12,
+  "level": "Intermediate",
+  "learn": [
+    "How text is tokenized and normalized so queries match documents",
+    "What an inverted index is and why it beats scanning every document",
+    "How TF-IDF and BM25 turn matches into a ranked list",
+    "How a query fans out to shards and the results are merged",
+    "How the search index stays in sync with the primary database, and what happens when it lags"
+  ],
+  "nodes": [
+    {"id": "user", "label": "Search box", "kind": "user", "x": 8, "y": 40},
+    {"id": "api", "label": "Search service", "kind": "service", "x": 31, "y": 40},
+    {"id": "s1", "label": "Shard 1", "kind": "storage", "x": 60, "y": 14},
+    {"id": "s2", "label": "Shard 2", "kind": "storage", "x": 60, "y": 40},
+    {"id": "s3", "label": "Shard 3", "kind": "storage", "x": 60, "y": 66},
+    {"id": "db", "label": "Primary database", "kind": "db", "x": 8, "y": 88},
+    {"id": "feed", "label": "Change stream", "kind": "queue", "x": 31, "y": 88},
+    {"id": "indexer", "label": "Indexer", "kind": "worker", "x": 60, "y": 88}
+  ],
+  "edges": [
+    {"from": "user", "to": "api"},
+    {"from": "api", "to": "s1"},
+    {"from": "api", "to": "s2"},
+    {"from": "api", "to": "s3"},
+    {"from": "db", "to": "feed"},
+    {"from": "feed", "to": "indexer"},
+    {"from": "indexer", "to": "s3"}
+  ],
+  "metrics": [
+    {"id": "query", "label": "Query time", "unit": "ms"},
+    {"id": "shards", "label": "Shards hit", "unit": ""},
+    {"id": "lag", "label": "Index lag", "unit": "s"}
+  ],
+  "steps": [
+    {"tag": "QUESTION", "title": "Find the words, fast", "body": "A shop has 300 million product listings, about 1 KB of text each, so roughly 300 GB. A user types \"wireless headphones\". Reading every listing and checking for the words would mean scanning 300 GB; at 1 GB/s that is about five minutes. A B-tree index on one column does not help, because the user's words can be anywhere in the text. Search needs a different structure.", "idea": "Scanning text per query is hopeless; search engines precompute where every word lives.", "caption": "A query must not touch 300 million documents.", "focus": ["user", "api"], "flows": [{"from": "user", "to": "api", "kind": "request", "label": "wireless headph."}], "metrics": {"query": "300000", "shards": "0", "lag": "0"}},
+    {"tag": "CONCEPT", "title": "Tokenize and normalize", "body": "Before anything is stored, text goes through an analyzer. It splits \"Wireless Headphones, 40% off!\" into tokens, lowercases them, drops punctuation, and often removes filler words like \"the\". Many analyzers also stem words, so \"headphones\" and \"headphone\" become one term. The same analyzer must run on the query, or \"Headphones\" would never match \"headphone\".", "idea": "Index time and query time must use the same analysis, or terms will not line up.", "caption": "Raw text becomes a list of normalized terms.", "focus": ["user", "api"], "flows": [{"from": "user", "to": "api", "kind": "request", "label": "Wireless Headph."}], "metrics": {}},
+    {"tag": "CONCEPT", "title": "The inverted index", "body": "An inverted index maps each term to a posting list: the sorted IDs of documents containing it. Say wireless appears in docs 3, 8, 21 and headphone in 8, 21, 40. For a query needing both words, the engine walks the two sorted lists and intersects them, giving docs 8 and 21. It reads two short lists instead of 300 million documents.", "idea": "An inverted index flips documents-to-words into words-to-documents, so a lookup touches only relevant IDs.", "caption": "One shard intersects two posting lists.", "focus": ["api", "s2"], "flows": [{"from": "api", "to": "s2", "kind": "request", "label": "wireless+headphone"}, {"from": "s2", "to": "api", "kind": "response", "label": "docs 8, 21"}], "metrics": {"query": "6", "shards": "1"}},
+    {"tag": "CONCEPT", "title": "Ranking the matches", "body": "Matching is not enough; thousands of listings may contain both words, and the user wants the best first. TF-IDF scores a document higher when the term appears often in it (term frequency) and lower when the term is common everywhere (inverse document frequency), since \"the\" tells you nothing. BM25, the default in Lucene-based engines, refines this: repeated terms give diminishing returns and long documents are penalized.", "idea": "Relevance rewards frequent-in-this-document and rare-in-the-corpus terms; BM25 adds saturation and length normalization.", "caption": "The shard returns matches with scores attached.", "focus": ["api", "s2"], "flows": [{"from": "s2", "to": "api", "kind": "response", "label": "doc 21: 7.3"}], "metrics": {"query": "9"}},
+    {"tag": "FLOW", "title": "Shard the index", "body": "300 million documents will not fit well on one machine, so the index is split into shards. Each document goes to one shard by hashing its ID. The search service does not know which shard holds the best answers, so it sends the query to all of them in parallel (scatter). Each shard searches its own third of the data, about 100 million documents.", "idea": "Sharding splits the data; every query fans out to every shard because any shard may hold matches.", "caption": "The query is scattered to all three shards.", "focus": ["api", "s1", "s2", "s3"], "flows": [{"from": "api", "to": "s1", "kind": "request", "label": "query"}, {"from": "api", "to": "s2", "kind": "request", "label": "query"}, {"from": "api", "to": "s3", "kind": "request", "label": "query"}], "metrics": {"shards": "3", "query": "12"}},
+    {"tag": "FLOW", "title": "Gather and merge", "body": "Each shard replies with only its own top 10 hits and their scores. The search service merges the three short lists and keeps the global top 10. Total time is set by the slowest shard, so one sluggish shard slows every query. Deep pages are costly: asking for results 1000 to 1010 forces each shard to return its top 1010.", "idea": "Latency is the slowest shard plus merge cost, and deep pagination multiplies the work.", "caption": "Shards reply; the service merges the top hits.", "focus": ["api", "s1", "s2", "s3"], "flows": [{"from": "s1", "to": "api", "kind": "response", "label": "top 10"}, {"from": "s2", "to": "api", "kind": "response", "label": "top 10"}, {"from": "s3", "to": "api", "kind": "response", "label": "top 10"}, {"from": "api", "to": "user", "kind": "response", "label": "10 results"}], "metrics": {"query": "35"}},
+    {"tag": "FLOW", "title": "Syncing from the database", "body": "The primary database is the source of truth; the search index is a derived copy. When a seller edits a listing, the change is read from the database's change log and put on a stream. An indexer consumes it, re-analyzes the text, and writes to the right shard. Writing to both database and index from the app is risky: if one write fails, they silently disagree.", "idea": "Treat the index as a rebuildable copy fed by a change stream, not as a second place to write.", "caption": "A DB change flows through the stream into a shard.", "focus": ["db", "feed", "indexer", "s3"], "flows": [{"from": "db", "to": "feed", "kind": "async", "label": "row changed"}, {"from": "feed", "to": "indexer", "kind": "async", "label": "listing 8841"}, {"from": "indexer", "to": "s3", "kind": "async", "label": "index doc"}], "metrics": {"lag": "2"}},
+    {"tag": "WHAT IF", "title": "The indexer falls behind", "body": "Suppose the indexer crashes or a bulk price update floods the stream. Searches still work, but they show stale data: a sold-out item still appears, a new listing is missing. Index lag climbs from seconds to minutes. Because the stream keeps the events, a restarted indexer replays them. If the index is badly wrong, rebuild it from the database into a fresh index and swap it in.", "idea": "Search is eventually consistent with the database; monitor lag and keep a way to replay or rebuild.", "caption": "The indexer stalls; changes pile up in the stream.", "focus": ["feed", "indexer"], "flows": [{"from": "feed", "to": "indexer", "kind": "fail", "label": "consumer down"}], "metrics": {"lag": "180"}},
+    {"tag": "RECAP", "title": "From words to ranked results", "body": "Analyzers turn text into normalized terms. An inverted index maps each term to the documents containing it, so a query reads short posting lists instead of everything. BM25-style scoring ranks the matches. Sharding spreads the data, queries scatter to all shards and merge top hits, and a change stream keeps the index fed from the database, accepting some lag.", "idea": "Search = analyze, invert, score, shard, and feed the index from the source of truth.", "caption": "The full path: sync in the background, search in milliseconds.", "focus": ["user", "api", "s1", "s2", "s3", "db", "feed", "indexer"], "flows": [], "metrics": {"query": "35", "shards": "3", "lag": "2"}}
+  ],
+  "quiz": [
+    {"q": "Your index stores the term \"headphone\", but a user searches \"Headphones\" and gets zero results. What is the most likely cause?", "options": ["The posting list for headphone is too long", "The query was not run through the same analyzer (lowercasing and stemming) as the documents", "There are too few shards", "BM25 scored the document too low to show"], "answer": 1, "why": "Matching happens on normalized terms. If the query skips the analysis used at index time, its terms never line up with the stored ones."},
+    {"q": "A query for \"the red shoes\" returns plenty of documents. Why does the word \"the\" barely affect their ranking?", "options": ["Its inverse document frequency is very low because almost every document contains it", "Its term frequency is always zero", "Stemming removes it from the query", "Posting lists cannot store common terms"], "answer": 0, "why": "IDF measures rarity across the corpus. A term in nearly every document has a tiny IDF, so it adds almost nothing to the score."},
+    {"q": "A 3-shard cluster has p50 shard latency of 10 ms, but one shard often takes 120 ms. What happens to search latency?", "options": ["It stays near 10 ms because results are averaged", "It becomes about 40 ms, the mean of the shards", "Many queries take about 120 ms, since the merge waits for the slowest shard", "Only 1/3 of queries are affected"], "answer": 2, "why": "A scattered query is not complete until every shard replies, so the slowest shard sets latency for every query it participates in, and that is all of them."},
+    {"q": "Your app writes a product to the database, then to the search index. The index write fails after the DB write succeeds. Which design best prevents silent drift?", "options": ["Retry the index write forever inside the web request", "Write to the index first, then the database", "Feed the index from the database's change stream so missed updates can be replayed", "Skip the database and store products only in the search index"], "answer": 2, "why": "A change stream makes the database the single source of truth and lets an indexer retry or replay changes. Dual writes from the app have no such recovery path."}
+  ],
+  "cheatsheet": [
+    {"term": "Tokenization / analysis", "def": "Splitting text into terms and normalizing them (lowercase, strip punctuation, drop stop words, stem). Must be identical at index and query time."},
+    {"term": "Inverted index", "def": "Map from each term to a sorted posting list of document IDs that contain it. Multi-word queries intersect or union the lists."},
+    {"term": "TF-IDF", "def": "Score = how often a term appears in a document, weighted by how rare it is across all documents. Common words count for little."},
+    {"term": "BM25", "def": "Modern TF-IDF refinement: repeated terms saturate (parameter k1, often 1.2) and long documents are normalized (parameter b, often 0.75)."},
+    {"term": "Scatter-gather", "def": "Send the query to every shard, take each shard's top N, merge into the global top N. Latency follows the slowest shard."},
+    {"term": "Deep pagination", "def": "Asking for page 100 makes every shard return 100 pages of hits. Prefer search-after cursors over large offsets."},
+    {"term": "Change stream / CDC", "def": "A feed of row changes read from the database log, consumed by an indexer. Keeps the index a rebuildable copy of the source of truth."},
+    {"term": "Index lag", "def": "Delay between a database change and its visibility in search. Typically seconds; track it and alert when it grows."}
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "slug": "gossip-failure-detection",
+  "title": "Gossip & Failure Detection",
+  "subtitle": "Watch a cluster notice a dead node, spread the news by rumor, and then get fooled by a network split.",
+  "minutes": 12,
+  "level": "Intermediate",
+  "learn": [
+    "How heartbeats let one node judge whether another is alive",
+    "Why a fixed timeout is a blunt tool and what a phi-accrual detector does instead",
+    "How gossip spreads membership news to every node in roughly log N rounds",
+    "Why a failure detector can only suspect, never know, and how that causes false alarms",
+    "What split brain is and why a majority rule contains it"
+  ],
+  "nodes": [
+    {"id": "a", "label": "Node A", "kind": "service", "x": 12, "y": 50},
+    {"id": "b", "label": "Node B", "kind": "service", "x": 38, "y": 20},
+    {"id": "c", "label": "Node C", "kind": "service", "x": 38, "y": 80},
+    {"id": "d", "label": "Node D", "kind": "service", "x": 64, "y": 20},
+    {"id": "e", "label": "Node E", "kind": "service", "x": 64, "y": 80},
+    {"id": "client", "label": "Client", "kind": "client", "x": 88, "y": 50}
+  ],
+  "edges": [
+    {"from": "a", "to": "b"},
+    {"from": "a", "to": "c"},
+    {"from": "b", "to": "c"},
+    {"from": "b", "to": "d"},
+    {"from": "c", "to": "e"},
+    {"from": "c", "to": "d"},
+    {"from": "d", "to": "e"},
+    {"from": "client", "to": "d"},
+    {"from": "client", "to": "e"}
+  ],
+  "metrics": [
+    {"id": "gap", "label": "Silence", "unit": "ms"},
+    {"id": "phi", "label": "Suspicion phi", "unit": ""},
+    {"id": "aware", "label": "Know E is down", "unit": "of 4"},
+    {"id": "leaders", "label": "Active leaders", "unit": ""}
+  ],
+  "steps": [
+    {"tag": "QUESTION", "title": "Is that node dead or just quiet?", "body": "A five-node cluster stores data and must route around machines that fail. But no node can look at another's power light. All it can see is messages arriving or not arriving. Silence could mean a crash, a slow disk, a long garbage-collection pause, or a broken network cable. This lesson shows how a cluster turns silence into a decision.", "idea": "Failure detection is inference from missing messages, never direct observation.", "caption": "Five peers and a client; nobody can see another node's health.", "focus": [], "flows": [], "metrics": {"gap": "0", "phi": "0", "aware": "4", "leaders": "1"}},
+    {"tag": "CONCEPT", "title": "Heartbeats", "body": "Each node sends a tiny heartbeat to its peers on a schedule, say once per second. Every receiver records when the last one arrived. As long as beats keep landing about a second apart, the sender is presumed healthy. A heartbeat proves only that the sender could send a moment ago, not that it is doing useful work.", "idea": "A heartbeat is a periodic I-am-alive message; its absence is the only signal of trouble.", "caption": "E sends a heartbeat to D every second; D logs each arrival.", "focus": ["d", "e"], "flows": [{"from": "e", "to": "d", "kind": "async", "label": "heartbeat #41"}, {"from": "e", "to": "d", "kind": "async", "label": "heartbeat #42"}], "metrics": {"gap": "1000", "phi": "0.4"}},
+    {"tag": "CONCEPT", "title": "The fixed timeout", "body": "Now E crashes. The simplest rule is a fixed timeout: if no heartbeat arrives for 5 seconds, declare E dead. It is easy to reason about but rigid. On a quiet LAN, 5 seconds wastes time before reacting. On a congested or cross-region link where delays vary a lot, 5 seconds fires on healthy nodes. One number cannot fit every network or every moment.", "idea": "A fixed timeout trades detection speed against false alarms, and the right value changes with conditions.", "caption": "E has crashed; D waits for the 5 s timer to expire.", "focus": ["d", "e"], "flows": [{"from": "e", "to": "d", "kind": "fail", "label": "no heartbeat"}], "metrics": {"gap": "5000", "phi": "2.2"}},
+    {"tag": "CONCEPT", "title": "Phi-accrual detection", "body": "A phi-accrual detector (used by Cassandra and Akka) learns how late beats normally are. It reports a suspicion score, phi, that grows the longer the silence lasts compared with history. Phi 1 means about a 10% chance the node is still fine, phi 2 about 1%, phi 8 about one in a hundred million. The application picks a threshold, commonly 8 in Cassandra, instead of a time.", "idea": "Phi adapts to observed network jitter and outputs a graded suspicion level, not a yes or no.", "caption": "Silence grows; phi climbs past the threshold of 8.", "focus": ["d", "e"], "flows": [{"from": "e", "to": "d", "kind": "fail", "label": "phi rising"}], "metrics": {"gap": "18400", "phi": "8"}},
+    {"tag": "FLOW", "title": "Gossip starts", "body": "D now suspects E, but a cluster needs every node to agree on membership. Rather than D messaging everyone, nodes use gossip: every second each node picks a few random peers and swaps what it knows, including a version number per member. D tells B and C that E looks down. No coordinator is needed, so none can become a bottleneck.", "idea": "Gossip is periodic random pairwise exchange of state, with no central coordinator.", "caption": "D tells two random peers that E is suspected.", "focus": ["d", "b", "c"], "flows": [{"from": "d", "to": "b", "kind": "replicate", "label": "E suspect v7"}, {"from": "d", "to": "c", "kind": "replicate", "label": "E suspect v7"}], "metrics": {"aware": "3"}},
+    {"tag": "FLOW", "title": "The rumor spreads", "body": "In the next round, B and C each pick their own random peers, and A hears it. The set of informed nodes roughly doubles every round, so news reaches N nodes in about log2(N) rounds. With 1,000 nodes that is around 10 to 15 rounds, so roughly 10 to 15 seconds at a 1 s interval. Each node sends only a few small messages per round no matter how large the cluster is.", "idea": "Informed nodes double each round, so spread time grows with log N while per-node load stays flat.", "caption": "A, B and C now agree; the live cluster converges.", "focus": ["a", "b", "c", "d"], "flows": [{"from": "b", "to": "a", "kind": "replicate", "label": "E suspect v7"}, {"from": "c", "to": "a", "kind": "replicate", "label": "E suspect v7"}], "metrics": {"aware": "4"}},
+    {"tag": "TRADE-OFF", "title": "False alarms", "body": "Suppose instead that E is fine, but a 12 s garbage-collection pause froze it. Its heartbeats stop, phi crosses the threshold, and the cluster marks it down. When E wakes up and resumes, it must be un-marked. Too sensitive a threshold causes flapping: nodes repeatedly shunned and readmitted, triggering needless data movement. Too lax a threshold leaves real failures undetected longer.", "idea": "A detector is never certain; threshold choice balances slow detection against false positives.", "caption": "A paused but healthy E looks identical to a dead one.", "focus": ["e", "c", "d"], "flows": [{"from": "c", "to": "e", "kind": "fail", "label": "no reply (GC)"}, {"from": "e", "to": "c", "kind": "async", "label": "I am back"}], "metrics": {"gap": "12000", "phi": "8", "aware": "4"}},
+    {"tag": "WHAT IF", "title": "Split brain", "body": "Now a network partition cuts the cluster: A, B, C can talk to each other, as can D, E, but the two groups cannot. Each side sees the other go silent and concludes it is the survivor. If both sides then accept writes or elect their own leader, you get split brain: two active leaders with diverging data. Clients who reach different sides see different truths.", "idea": "Split brain happens when both halves of a partition believe they alone are in charge.", "caption": "Both sides suspect the other and each elects a leader.", "focus": ["b", "d", "c", "e", "client"], "flows": [{"from": "b", "to": "d", "kind": "fail", "label": "partitioned"}, {"from": "c", "to": "e", "kind": "fail", "label": "partitioned"}, {"from": "client", "to": "e", "kind": "request", "label": "write x=2"}], "metrics": {"leaders": "2"}},
+    {"tag": "TRADE-OFF", "title": "Containing it with a majority", "body": "The usual defence is a quorum rule: only a group holding a strict majority of the configured members (3 of 5 here) may act as the leader or accept writes. The 2-node side can still detect that it lost contact, so it steps down or goes read-only. Two disjoint groups can never both hold a majority, so at most one leader exists. How elections reach that agreement is covered in the consensus lesson.", "idea": "Detection only suspects; a majority rule turns suspicion into safe action, because two majorities always overlap.", "caption": "A, B, C keep the majority; D and E refuse writes.", "focus": ["a", "b", "c", "d", "e"], "flows": [{"from": "a", "to": "b", "kind": "replicate", "label": "commit 3 of 5"}, {"from": "a", "to": "c", "kind": "replicate", "label": "commit 3 of 5"}, {"from": "client", "to": "e", "kind": "fail", "label": "no quorum"}], "metrics": {"leaders": "1"}},
+    {"tag": "RECAP", "title": "From silence to decision", "body": "Heartbeats make silence measurable. Phi-accrual turns the length of that silence into a graded suspicion that adapts to the network. Gossip spreads the verdict to every node in about log N rounds without a coordinator. Because any verdict can be wrong, safety-critical actions such as electing a leader need a majority, not just a detector's opinion.", "idea": "Detect by heartbeat, spread by gossip, and act only with a majority.", "caption": "Heartbeats, suspicion, gossip, then quorum.", "focus": ["a", "b", "c", "d", "e"], "flows": [], "metrics": {"gap": "1000", "phi": "0.4", "aware": "4", "leaders": "1"}}
+  ],
+  "quiz": [
+    {"q": "A fixed 5 s heartbeat timeout works in the data center but fires constantly on a cross-region link. What does a phi-accrual detector change?", "options": ["It sends heartbeats more often so silence is shorter", "It judges silence against the observed arrival pattern, so tolerance adapts to jitter", "It removes the need for heartbeats by using gossip", "It guarantees a suspected node is really dead"], "answer": 1, "why": "Phi compares the current silence with the learned distribution of past inter-arrival times, so a jittery link tolerates longer gaps while a steady one reacts faster."},
+    {"q": "A 1,000-node cluster gossips once per second and each node contacts one random peer. About how long until a rumor reaches nearly everyone?", "options": ["A fraction of a second", "Roughly 10 to 15 seconds", "About 1,000 seconds", "It never fully converges"], "answer": 1, "why": "The informed set roughly doubles each round, so coverage needs about log2(1000), around 10 rounds, plus a few for stragglers."},
+    {"q": "A node freezes for 12 s in a GC pause, is marked down, then resumes. What does this show about failure detectors?", "options": ["The detector had a bug", "Heartbeats should be sent over TCP", "Slow and dead are indistinguishable from outside, so verdicts are suspicions that can be wrong", "Gossip should have blocked the verdict"], "answer": 2, "why": "From a peer's view a paused node and a crashed node look identical, so any detector can only suspect and must tolerate being wrong."},
+    {"q": "A 5-node cluster partitions into groups of 3 and 2. Which rule prevents two leaders?", "options": ["Both groups elect a leader, then merge by timestamp", "Only the group with at least 3 of the 5 configured members may lead", "The group whose heartbeats are fastest leads", "The group containing the original leader always leads"], "answer": 1, "why": "Requiring a strict majority of the full membership means two disjoint groups can never both qualify, so at most one leader exists."}
+  ],
+  "cheatsheet": [
+    {"term": "Heartbeat", "def": "A small periodic message meaning I am alive. Receivers track the time of the last one; missing beats raise suspicion."},
+    {"term": "Fixed timeout", "def": "Declare a node dead after N seconds of silence. Simple, but one value cannot suit both fast LANs and jittery WANs."},
+    {"term": "Phi-accrual", "def": "A detector outputting a continuous suspicion score from learned heartbeat timing. Phi 8 is about a one-in-100-million chance of a false alarm under the model."},
+    {"term": "Gossip protocol", "def": "Each round, every node swaps state with a few random peers. Spreads news in about log N rounds with flat per-node load."},
+    {"term": "Membership list", "def": "Each node's view of who is in the cluster and whether they look up or down, versioned so newer facts win in gossip."},
+    {"term": "False positive", "def": "A healthy node wrongly marked down, often after a GC pause or network blip. Aggressive thresholds cause flapping."},
+    {"term": "Split brain", "def": "Two partitions both act as the authority and accept conflicting writes. Prevent with majority quorums."},
+    {"term": "Majority quorum", "def": "More than half of the configured members, e.g. 3 of 5. Any two majorities overlap, so only one side can proceed."}
+  ]
+}

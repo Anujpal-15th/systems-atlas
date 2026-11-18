@@ -1,0 +1,100 @@
+{
+  "slug": "design-notifications",
+  "title": "Design a Notification System",
+  "subtitle": "Send one event out as push, email, and SMS, and watch preferences, dedup, queues, retries, and rate limits keep it safe.",
+  "minutes": 16,
+  "level": "Intermediate",
+  "learn": [
+    "Why notifications are sent through per-channel queues instead of directly from the caller",
+    "How a preference service and quiet hours decide who gets what, before anything is queued",
+    "How idempotency keys stop duplicate sends, and why delivery is at-least-once",
+    "How retries with backoff, dead-letter queues, and rate limits survive flaky providers",
+    "How to size the system from daily volume to peak sends per second"
+  ],
+  "nodes": [
+    {"id": "events", "label": "Upstream services", "kind": "service", "x": 8, "y": 50},
+    {"id": "api", "label": "Notification API", "kind": "gateway", "x": 28, "y": 50},
+    {"id": "pref", "label": "Preference service", "kind": "service", "x": 28, "y": 14},
+    {"id": "redis", "label": "Dedup + rate limits", "kind": "cache", "x": 28, "y": 86},
+    {"id": "pushq", "label": "Push queue", "kind": "queue", "x": 52, "y": 22},
+    {"id": "emailq", "label": "Email queue", "kind": "queue", "x": 52, "y": 50},
+    {"id": "smsq", "label": "SMS queue", "kind": "queue", "x": 52, "y": 78},
+    {"id": "workers", "label": "Channel workers", "kind": "worker", "x": 74, "y": 50},
+    {"id": "provider", "label": "APNs / SES / SMS", "kind": "external", "x": 92, "y": 50}
+  ],
+  "edges": [
+    {"from": "events", "to": "api"},
+    {"from": "api", "to": "pref"},
+    {"from": "api", "to": "redis"},
+    {"from": "api", "to": "pushq"},
+    {"from": "api", "to": "emailq"},
+    {"from": "api", "to": "smsq"},
+    {"from": "pushq", "to": "workers"},
+    {"from": "emailq", "to": "workers"},
+    {"from": "smsq", "to": "workers"},
+    {"from": "workers", "to": "redis"},
+    {"from": "workers", "to": "provider"}
+  ],
+  "metrics": [
+    {"id": "ingest", "label": "Accepted", "unit": "events/s"},
+    {"id": "depth", "label": "Email backlog", "unit": "msgs"},
+    {"id": "sent", "label": "Delivered", "unit": "%"},
+    {"id": "dupes", "label": "Duplicates", "unit": "sent"}
+  ],
+  "steps": [
+    {"tag": "QUESTION", "title": "One event, three channels", "body": "A user's order ships. The shipping service wants them told: a push to their phone, an email with the tracking link, maybe an SMS. Assume 10 million users and about 50 million notifications a day, which is roughly 600 a second on average and 10 times that in a burst. How do you deliver all of it once, on the right channel, without melting a provider or spamming anyone?", "idea": "A notification system is a pipeline that decides whether, where, and when to send, then sends reliably.", "caption": "An upstream service has something to tell a user.", "focus": ["events"], "flows": [], "metrics": {"ingest": "600"}},
+    {"tag": "FLOW", "title": "Accept fast, send later", "body": "The shipping service calls the Notification API with an event: a user id, a template, and data. It does not wait for any email to leave. The API validates the request and answers 202 Accepted in a few milliseconds. Sending is slow and flaky (providers take 100 ms to seconds), so it must never sit on the caller's request path.", "idea": "Decouple the caller from delivery: acknowledge quickly and do the slow work asynchronously.", "caption": "Event reaches the API, which acknowledges immediately.", "focus": ["events", "api"], "flows": [{"from": "events", "to": "api", "kind": "request", "label": "order_shipped"}, {"from": "api", "to": "events", "kind": "response", "label": "202 Accepted"}], "metrics": {"ingest": "600"}},
+    {"tag": "CONCEPT", "title": "Ask the preference service", "body": "Before queuing anything the API asks the preference service what this user wants. Does she allow push for shipping updates? Has she unsubscribed from email? Is it 3 a.m. in her time zone, so non-urgent sends should wait until quiet hours end? Legal opt-outs and consent also live here. Checking this first means we never queue a message we are not allowed to send.", "idea": "Preferences are a gate in front of the queues: opt-outs, channel choice, and quiet hours are decided before any work is queued.", "caption": "Preferences say push and email yes, SMS no.", "focus": ["api", "pref"], "flows": [{"from": "api", "to": "pref", "kind": "request", "label": "prefs for u42?"}, {"from": "pref", "to": "api", "kind": "response", "label": "push, email"}], "metrics": {}},
+    {"tag": "CONCEPT", "title": "Dedup with an idempotency key", "body": "Upstream services retry, and message brokers redeliver, so the same event can arrive twice. The API builds a key from user, template, and event id, then runs a set-if-absent in Redis with a 24-hour expiry. If the key already exists, the event is dropped. Otherwise it proceeds. Without this, a retried order event means two emails.", "idea": "An idempotency key makes a repeated request harmless: the second copy finds the key and stops.", "caption": "Key not seen before, so the event continues.", "focus": ["api", "redis"], "flows": [{"from": "api", "to": "redis", "kind": "request", "label": "SETNX key"}, {"from": "redis", "to": "api", "kind": "response", "label": "new, go"}], "metrics": {"dupes": "0"}},
+    {"tag": "FLOW", "title": "One queue per channel", "body": "The API renders a small message for each allowed channel and puts it on that channel's queue: push and email here. Separate queues matter because channels behave differently. Push is fast and bulk, email is slower, and SMS is costly and tightly rate limited. If the SMS provider stalls, its queue grows while push and email keep flowing.", "idea": "Per-channel queues isolate failures and let each channel scale and throttle on its own.", "caption": "Messages fan out into the push and email queues.", "focus": ["api", "pushq", "emailq"], "flows": [{"from": "api", "to": "pushq", "kind": "async", "label": "push msg"}, {"from": "api", "to": "emailq", "kind": "async", "label": "email msg"}], "metrics": {"depth": "300"}},
+    {"tag": "FLOW", "title": "Workers send, within limits", "body": "Channel workers pull messages from a queue and call the provider: APNs or FCM for push, an email service, an SMS gateway. Before each call a worker checks a token-bucket rate limit in Redis, because providers throttle you and SMS can cost real money per message. If the bucket is empty, the worker waits instead of firing. The provider then returns an accepted response.", "idea": "Rate limits protect both the provider relationship and the budget; workers pull at the speed the limit allows.", "caption": "Workers check limits, then call the provider.", "focus": ["emailq", "workers", "redis", "provider"], "flows": [{"from": "emailq", "to": "workers", "kind": "async", "label": "pull batch"}, {"from": "workers", "to": "redis", "kind": "request", "label": "take token"}, {"from": "workers", "to": "provider", "kind": "request", "label": "send email"}, {"from": "provider", "to": "workers", "kind": "response", "label": "250 OK"}], "metrics": {"depth": "40", "sent": "99"}},
+    {"tag": "WHAT IF", "title": "The provider fails", "body": "Now the email provider returns 503 errors. A worker does not delete the message. It puts it back with a delay: retry after 1 s, then 2, 4, 8, with random jitter so thousands of messages do not all return at the same instant. Retries are capped, say at 5 attempts. Past the cap the message goes to a dead-letter queue for a person to inspect, never silently lost.", "idea": "Retry with exponential backoff and jitter, cap the attempts, and park failures in a dead-letter queue.", "caption": "Failed sends return to the queue with a delay.", "focus": ["workers", "provider", "emailq"], "flows": [{"from": "workers", "to": "provider", "kind": "request", "label": "send email"}, {"from": "provider", "to": "workers", "kind": "fail", "label": "503"}, {"from": "workers", "to": "emailq", "kind": "async", "label": "retry in 4s"}], "metrics": {"depth": "9000", "sent": "71"}},
+    {"tag": "TRADE-OFF", "title": "At-least-once means duplicates", "body": "A worker sends the email, then crashes before it acknowledges the queue message. The queue redelivers it, and a second email goes out. True exactly-once delivery across a network is not achievable here, so we choose at-least-once and shrink the duplicates: the worker records a send marker keyed by notification id in Redis right before calling the provider, and skips if it already exists. Some providers also accept an idempotency key on the call itself.", "idea": "Pick at-least-once delivery and make sending idempotent; a rare duplicate beats a lost notification.", "caption": "A redelivered message finds its send marker and is skipped.", "focus": ["workers", "redis", "emailq"], "flows": [{"from": "emailq", "to": "workers", "kind": "async", "label": "redelivered"}, {"from": "workers", "to": "redis", "kind": "request", "label": "already sent?"}, {"from": "redis", "to": "workers", "kind": "response", "label": "yes, skip"}], "metrics": {"dupes": "0", "depth": "2500", "sent": "93"}},
+    {"tag": "WHAT IF", "title": "A flash sale spike", "body": "Marketing sends a promo to 5 million users at once: about 8,000 push messages per second against a 600 per second average. The queues absorb the burst, so the API stays fast. Workers drain at their rate limit, and you add workers per channel when the backlog age grows. Priority matters too: put password resets and payment alerts on a high-priority queue so a promo never delays them.", "idea": "Queues turn a spike into a backlog; separate priorities keep urgent messages ahead of bulk ones.", "caption": "Backlog builds, drains at the allowed rate.", "focus": ["api", "pushq", "emailq", "workers"], "flows": [{"from": "events", "to": "api", "kind": "request", "label": "promo x5M"}, {"from": "api", "to": "pushq", "kind": "async", "label": "8k/s burst"}, {"from": "pushq", "to": "workers", "kind": "async", "label": "drain"}], "metrics": {"ingest": "8000", "depth": "120000", "sent": "97"}},
+    {"tag": "RECAP", "title": "The whole pipeline", "body": "Accept the event fast, check preferences, dedup with an idempotency key, then queue per channel. Workers send within rate limits, retry with backoff, park failures in a dead-letter queue, and guard against duplicates at send time. Track queue age, delivery rate, and provider errors per channel, because those tell you which stage is hurting.", "idea": "Gate, dedup, queue per channel, send within limits, retry safely: each stage removes one failure mode.", "caption": "Each stage guards against one failure.", "focus": ["events", "api", "pref", "redis", "pushq", "emailq", "smsq", "workers", "provider"], "flows": [], "metrics": {"ingest": "600", "depth": "40", "sent": "99", "dupes": "0"}}
+  ],
+  "quiz": [
+    {"q": "Why does the Notification API return 202 Accepted and put messages on queues instead of calling the email provider directly?", "options": ["Queues make emails arrive faster than direct calls", "Provider calls are slow and flaky, so the caller should not wait on them, and a queue lets us buffer and retry", "Providers refuse direct calls from application servers", "It lets us skip the preference check"], "answer": 1, "why": "Sending is slow and can fail. A queue decouples the caller, absorbs bursts, and gives a place to retry. It does not make a single email faster."},
+    {"q": "The email provider has an outage for 10 minutes. Which design keeps push notifications flowing normally?", "options": ["A single shared queue with FIFO order", "Sending push and email in the same worker call", "Retrying email immediately in a tight loop", "One queue and worker pool per channel"], "answer": 3, "why": "Per-channel queues isolate failures: the email backlog grows while push workers keep draining their own queue."},
+    {"q": "A worker sends an email, then crashes before acknowledging the queue message. What does an at-least-once system do, and how do we limit the harm?", "options": ["The message is lost; add more workers", "It sends exactly once by design, so nothing is needed", "It redelivers the message; a send marker keyed by notification id lets the next worker skip the duplicate", "It moves the message to the dead-letter queue immediately"], "answer": 2, "why": "Queues redeliver unacknowledged messages. Recording a send marker, or using the provider's idempotency key, makes the second attempt a no-op."},
+    {"q": "Retries after a provider outage all fire at the same moment and knock the provider over again. What is the best fix?", "options": ["Retry as fast as possible to finish sooner", "Exponential backoff with random jitter and a maximum attempt count", "Never retry; drop the messages", "Retry every message exactly every 10 seconds"], "answer": 1, "why": "Backoff spreads load over time, jitter prevents synchronized retry waves, and a cap plus dead-letter queue stops endless retrying."},
+    {"q": "A marketing blast of 5 million messages is queued. Which step best protects password-reset notifications from long delays?", "options": ["Use a separate high-priority queue that workers drain first", "Send the blast faster by removing rate limits", "Delete old promo messages", "Ask users to wait"], "answer": 0, "why": "Priority queues keep urgent, time-sensitive messages from waiting behind bulk traffic, even when the bulk backlog is large."}
+  ],
+  "cheatsheet": [
+    {"term": "Idempotency key", "def": "A unique id for an event or send. Stored with an expiry; a second request with the same key is recognized and ignored."},
+    {"term": "At-least-once delivery", "def": "Messages are redelivered until acknowledged, so none are lost but duplicates are possible. Handle duplicates with idempotent sends."},
+    {"term": "Exponential backoff + jitter", "def": "Wait longer after each failure (1s, 2s, 4s...) plus a random offset so many retries do not synchronize."},
+    {"term": "Dead-letter queue (DLQ)", "def": "Holds messages that exceeded their retry cap, so they can be inspected or replayed instead of vanishing."},
+    {"term": "Token bucket", "def": "Rate limiter: tokens refill at a steady rate, each send takes one, and an empty bucket means wait. Allows small bursts."},
+    {"term": "Quiet hours", "def": "A user setting that delays non-urgent notifications during certain local hours. Urgent types such as security alerts may bypass it."},
+    {"term": "Queue age", "def": "How long the oldest message has waited. Better to alert on than depth, because it shows user-visible delay."},
+    {"term": "Sizing rule of thumb", "def": "50M a day is about 580 per second average; plan for 10x peaks and size workers from provider throughput and latency."}
+  ],
+  "lab": {
+    "prompt": "Design the notification system for a marketplace with 20M users sending 100M notifications a day across push, email, and SMS. Sketch the components, data flow, and failure handling on paper.",
+    "requirements": [
+      "Accept events from many internal services and respond in under 50 ms",
+      "Respect per-user channel preferences, opt-outs, and quiet hours",
+      "Never send the same notification twice in normal operation, even when callers retry",
+      "Survive a provider outage without losing messages",
+      "Deliver urgent notifications such as security codes within 10 seconds, even during a promo blast",
+      "Stay within each provider's rate limits and the SMS budget"
+    ],
+    "hints": [
+      "Compute average and peak sends per second first: 100M a day is about 1,160 per second, so plan for 10x or more at peak.",
+      "Put the preference check and idempotency check before queuing, so work you cannot send is never queued.",
+      "Use one queue per channel, and a separate high-priority queue for urgent types.",
+      "Retry with exponential backoff and jitter, cap attempts, and add a dead-letter queue.",
+      "Rate limit per provider, and consider per-user limits so one user is not flooded with ten messages in a minute."
+    ],
+    "checklist": [
+      "Is the caller decoupled from delivery with an asynchronous queue?",
+      "Are preferences and opt-outs checked before any message is queued?",
+      "Do both an idempotency key at the API and a send marker at the worker exist?",
+      "Does each channel have its own queue and worker pool?",
+      "Are retries bounded, with backoff, jitter, and a dead-letter queue?",
+      "Is there a priority path for urgent notifications?",
+      "Do you monitor queue age, delivery rate, and provider error rate per channel?"
+    ]
+  }
+}

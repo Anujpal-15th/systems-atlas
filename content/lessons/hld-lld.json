@@ -1,0 +1,64 @@
+{
+  "slug": "hld-lld",
+  "title": "High-Level vs Low-Level Design",
+  "subtitle": "Walk a design from vague idea to boxes, API, data model and one component's internals, using a link shortener.",
+  "minutes": 12,
+  "level": "Beginner",
+  "learn": [
+    "The order a design process follows: requirements, estimates, high-level boxes, API, data model, deep dive",
+    "How a back-of-envelope estimate shapes the architecture before you draw anything",
+    "What high-level design (HLD) decides versus what low-level design (LLD) decides",
+    "How to design one component in detail, including its failure case",
+    "Why every added box (cache, queue) is a trade-off you should be able to defend"
+  ],
+  "nodes": [
+    {"id": "user", "label": "Users", "kind": "user", "x": 8, "y": 50},
+    {"id": "gw", "label": "API gateway", "kind": "gateway", "x": 29, "y": 50},
+    {"id": "svc", "label": "Link service", "kind": "service", "x": 52, "y": 50},
+    {"id": "cache", "label": "Cache", "kind": "cache", "x": 76, "y": 20},
+    {"id": "db", "label": "Link database", "kind": "db", "x": 76, "y": 50},
+    {"id": "q", "label": "Click queue", "kind": "queue", "x": 52, "y": 84},
+    {"id": "worker", "label": "Click counter", "kind": "worker", "x": 80, "y": 84}
+  ],
+  "edges": [
+    {"from": "user", "to": "gw"},
+    {"from": "gw", "to": "svc"},
+    {"from": "svc", "to": "cache"},
+    {"from": "svc", "to": "db"},
+    {"from": "svc", "to": "q"},
+    {"from": "q", "to": "worker"},
+    {"from": "worker", "to": "db"}
+  ],
+  "metrics": [
+    {"id": "writes", "label": "Writes", "unit": "/sec"},
+    {"id": "reads", "label": "Reads", "unit": "/sec"},
+    {"id": "storage", "label": "5-yr storage", "unit": "TB"}
+  ],
+  "steps": [
+    {"tag": "QUESTION", "title": "\"Design a link shortener\"", "body": "You are handed one sentence: build something like a short-link service. That is not yet a design, because it does not say how big it is, who uses it, or what matters most. A good process turns the vague sentence into decisions in a fixed order, starting wide (high-level design, HLD) and ending narrow (low-level design, LLD). We will follow that order.", "idea": "Design is narrowing: broad shape first, details only after the shape is agreed.", "caption": "One vague sentence, no boxes yet.", "focus": ["user"], "flows": [], "metrics": {}},
+    {"tag": "REQUIREMENTS", "title": "Ask before you draw", "body": "Start by asking questions. Functional requirements say what it does: create a short link, redirect when someone visits it. Non-functional requirements say how well: redirects must feel instant, links must not break, the service should survive a server failure. Also agree on what is out of scope, such as custom domains or accounts, so you do not design forever.", "idea": "Requirements decide the design; unstated requirements become surprises later.", "caption": "Scope agreed with the person asking.", "focus": ["user", "gw"], "flows": [{"from": "user", "to": "gw", "kind": "request", "label": "scope?"}, {"from": "gw", "to": "user", "kind": "response", "label": "create + redirect"}], "metrics": {}},
+    {"tag": "ESTIMATES", "title": "Size it with napkin math", "body": "Assume 100 million new links a month and 100 redirects for every link created. That is about 40 writes per second and about 4,000 reads per second on average, perhaps 12,000 at peak. At roughly 500 bytes per link, five years is around 3 TB. These are rule-of-thumb numbers, but they already tell you the system is read-heavy and fits on a small database cluster.", "idea": "A few minutes of arithmetic tells you what to optimize: here, reads, not storage.", "caption": "Read-heavy, modest storage.", "focus": ["svc", "db"], "flows": [], "metrics": {"writes": "40", "reads": "4000", "storage": "3"}},
+    {"tag": "HLD", "title": "Draw the boxes", "body": "Now sketch the high-level design: clients talk to an API gateway, which forwards to a stateless link service, which stores links in a database. Keep it to boxes and arrows. HLD answers which major components exist and how they talk, not how any one of them works inside. You can add boxes later when the numbers demand it.", "idea": "HLD is the map: components and connections, with no internals yet.", "caption": "Minimum viable architecture: gateway, service, database.", "focus": ["user", "gw", "svc", "db"], "flows": [{"from": "user", "to": "gw", "kind": "request", "label": "request"}, {"from": "gw", "to": "svc", "kind": "request", "label": "route"}, {"from": "svc", "to": "db", "kind": "request", "label": "read/write"}], "metrics": {}},
+    {"tag": "API", "title": "Define the contract", "body": "Next, write the API, because it is the contract between boxes. POST /links takes a long URL and returns a short code. GET /{code} looks the code up and answers 301 or 302 with the long URL in the Location header. Choosing 302 keeps every click visible to you, while 301 lets browsers cache the redirect and skip you next time.", "idea": "Fix the interfaces early; they are hard to change once clients depend on them.", "caption": "Create a link, then follow it.", "focus": ["user", "gw", "svc"], "flows": [{"from": "user", "to": "gw", "kind": "request", "label": "POST /links"}, {"from": "gw", "to": "svc", "kind": "request", "label": "create"}, {"from": "svc", "to": "gw", "kind": "response", "label": "code: aB3xK9"}, {"from": "gw", "to": "user", "kind": "response", "label": "201 Created"}], "metrics": {}},
+    {"tag": "DATA MODEL", "title": "Decide what is stored", "body": "The data model lists what you store and how you look it up. Here a link has a code, a long URL, a creation time and an owner. Every read asks one question, give me the URL for this code, so the code is the primary key and a simple key-value lookup is enough. Knowing the access pattern first is what lets you pick a sensible database.", "idea": "Choose storage from the access pattern, not from habit.", "caption": "Single-key lookups: code to long URL.", "focus": ["svc", "db"], "flows": [{"from": "svc", "to": "db", "kind": "request", "label": "put aB3xK9"}, {"from": "db", "to": "svc", "kind": "response", "label": "stored"}], "metrics": {}},
+    {"tag": "LLD", "title": "Zoom into one component", "body": "Low-level design opens one box. Take code generation inside the link service. Seven characters from a 62-letter alphabet give about 3.5 trillion codes, far more than 6 billion links. If the service picks random codes, two links can collide, so it inserts only if the code is absent and retries on a collision. LLD is classes, algorithms and edge cases like this.", "idea": "LLD is the inside of a box: algorithms, data structures and the awkward edge cases.", "caption": "Collision detected, retry with a new code.", "focus": ["svc", "db"], "flows": [{"from": "svc", "to": "db", "kind": "request", "label": "insert if absent"}, {"from": "db", "to": "svc", "kind": "fail", "label": "code taken"}, {"from": "svc", "to": "db", "kind": "request", "label": "retry new code"}], "metrics": {}},
+    {"tag": "TRADE-OFF", "title": "Add a cache, pay for it", "body": "At 4,000 reads per second, most traffic hits the same popular links, so a cache in front of the database absorbs most of it and makes redirects faster. The price is complexity: cached data can be stale, and you must decide what happens when a link is deleted. Say that aloud. A box without a stated cost is a guess, not a design.", "idea": "Every added component buys something and costs something; name both.", "caption": "Hot links served from the cache.", "focus": ["svc", "cache", "db"], "flows": [{"from": "svc", "to": "cache", "kind": "request", "label": "GET aB3xK9"}, {"from": "cache", "to": "svc", "kind": "response", "label": "hit: long URL"}], "metrics": {"reads": "4000"}},
+    {"tag": "TRADE-OFF", "title": "Count clicks off the hot path", "body": "Owners want click counts. Writing a counter to the database on every redirect would slow the fast path and add 4,000 writes per second. Instead the service drops an event on a queue and returns the redirect immediately. A worker reads the queue and updates counts in batches. The cost is that counts are a few seconds behind, which the requirements allow.", "idea": "Move non-urgent work to a queue so the user-facing path stays fast.", "caption": "Redirect first, count later.", "focus": ["svc", "q", "worker", "db"], "flows": [{"from": "svc", "to": "q", "kind": "async", "label": "click event"}, {"from": "q", "to": "worker", "kind": "async", "label": "batch"}, {"from": "worker", "to": "db", "kind": "async", "label": "add counts"}], "metrics": {}},
+    {"tag": "RECAP", "title": "Wide first, then deep", "body": "The order was requirements, estimates, HLD boxes, API, data model, a deep dive into one component, then trade-offs. HLD decides what the parts are and how they connect. LLD decides how one part works inside. Later lessons cover numbers, caching and queues in depth; here the point is the sequence and defending each choice with a reason.", "idea": "Decide the shape first, the details second, and justify every box.", "caption": "The finished design, built in layers.", "focus": ["user", "gw", "svc", "cache", "db", "q", "worker"], "flows": [], "metrics": {"writes": "40", "reads": "4000", "storage": "3"}}
+  ],
+  "quiz": [
+    {"q": "Why do you do rough estimates before drawing the architecture?", "options": ["Interviewers require numbers on the whiteboard", "They show what the system must optimize for, such as read-heavy traffic", "They let you skip asking requirements questions", "They fix the exact database vendor"], "answer": 1, "why": "Estimates reveal the shape of the load (read-heavy, small storage), which decides which components are worth adding. They do not replace requirements or pick vendors."},
+    {"q": "Which question belongs to low-level design rather than high-level design?", "options": ["Should we put a cache between the service and the database?", "Which services does the gateway route to?", "How does the code generator avoid or handle two links getting the same code?", "Is the system read-heavy or write-heavy?"], "answer": 2, "why": "Handling collisions is an algorithm inside one component. The other options are about which components exist or the overall load shape."},
+    {"q": "A teammate adds a cache to the design but says nothing else. What is the most important thing missing?", "options": ["The cache's brand name", "A diagram with colors", "What it costs: staleness, invalidation and extra failure modes", "A second cache for backup"], "answer": 2, "why": "Every component is a trade-off. A cache speeds reads but can serve stale data, so a good design states when it may be wrong and how that is handled."},
+    {"q": "Click counts may lag by a few seconds. How does that requirement shape the design?", "options": ["Counting can go through a queue, keeping redirects fast", "Counts must be written to the database before redirecting", "Counting needs a second database region", "Redirects should use 301 instead of 302"], "answer": 0, "why": "Because slightly late counts are acceptable, the service can enqueue an event and respond at once. A strict real-time requirement would push you toward synchronous writes."}
+  ],
+  "cheatsheet": [
+    {"term": "Functional requirement", "def": "What the system does, such as create a short link or redirect to the long URL."},
+    {"term": "Non-functional requirement", "def": "How well it does it: latency, availability, durability, scale, consistency."},
+    {"term": "HLD", "def": "High-level design: the major components, how they connect, and what each is responsible for. No internals."},
+    {"term": "LLD", "def": "Low-level design: the inside of one component, its classes, algorithms, data structures and edge cases."},
+    {"term": "Access pattern", "def": "How the data is read and written. Decide this before choosing a database or schema."},
+    {"term": "Order of attack", "def": "Requirements, estimates, HLD boxes, API, data model, deep dive on one part, then trade-offs and failure cases."},
+    {"term": "Trade-off", "def": "Every component gains something and costs something. State both, plus when your choice would flip."}
+  ]
+}

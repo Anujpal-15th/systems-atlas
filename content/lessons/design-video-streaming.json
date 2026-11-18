@@ -1,0 +1,97 @@
+{
+  "slug": "design-video-streaming",
+  "title": "Design Video Streaming",
+  "subtitle": "Follow one uploaded video through transcoding and segmenting, then watch a player pull it from a CDN and adapt to bandwidth.",
+  "minutes": 16,
+  "level": "Intermediate",
+  "learn": [
+    "Why uploads go straight to object storage and are processed asynchronously",
+    "How a transcoding pipeline turns one source file into a ladder of renditions",
+    "How HLS and DASH split video into short segments listed in a manifest",
+    "How a player switches quality mid-stream without the server being involved",
+    "Why the CDN carries almost all the bytes and the metadata service carries almost none"
+  ],
+  "nodes": [
+    {"id": "creator", "label": "Creator app", "kind": "client", "x": 8, "y": 18},
+    {"id": "upload", "label": "Upload service", "kind": "service", "x": 30, "y": 18},
+    {"id": "queue", "label": "Transcode queue", "kind": "queue", "x": 52, "y": 18},
+    {"id": "workers", "label": "Transcode workers", "kind": "worker", "x": 74, "y": 18},
+    {"id": "raw", "label": "Raw video store", "kind": "storage", "x": 30, "y": 50},
+    {"id": "meta", "label": "Metadata service", "kind": "db", "x": 52, "y": 50},
+    {"id": "origin", "label": "Segment store", "kind": "storage", "x": 74, "y": 50},
+    {"id": "viewer", "label": "Viewer player", "kind": "client", "x": 10, "y": 82},
+    {"id": "cdn", "label": "CDN edge", "kind": "cdn", "x": 52, "y": 82}
+  ],
+  "edges": [
+    {"from": "creator", "to": "upload"},
+    {"from": "creator", "to": "raw"},
+    {"from": "upload", "to": "queue"},
+    {"from": "upload", "to": "meta"},
+    {"from": "queue", "to": "workers"},
+    {"from": "raw", "to": "workers"},
+    {"from": "workers", "to": "origin"},
+    {"from": "workers", "to": "meta"},
+    {"from": "viewer", "to": "meta"},
+    {"from": "viewer", "to": "cdn"},
+    {"from": "cdn", "to": "origin"}
+  ],
+  "metrics": [
+    {"id": "source", "label": "Source size", "unit": "MB"},
+    {"id": "renditions", "label": "Renditions", "unit": "versions"},
+    {"id": "startup", "label": "Start delay", "unit": "ms"},
+    {"id": "hit", "label": "Edge hit rate", "unit": "%"}
+  ],
+  "steps": [
+    {"tag": "QUESTION", "title": "One file in, thousands of ways out", "body": "A creator uploads one 10-minute 1080p file. Viewers will watch it on a phone over weak mobile data, on a laptop on fibre, and on a TV, at the same time, from every continent. No single file or server fits all of them. This lesson builds the system that turns one upload into something every viewer can play smoothly.", "idea": "Streaming is two problems: a slow, heavy write path (upload and process) and a huge, cheap read path (deliver bytes).", "caption": "One source video, many different viewers.", "focus": ["creator", "viewer"], "flows": [], "metrics": {}},
+    {"tag": "UPLOAD", "title": "Upload straight to storage", "body": "The creator app asks the upload service to start. The service checks who is uploading, creates a video record marked processing, and returns a presigned URL: a temporary signed link that lets the client write to object storage. The app then sends the file in chunks of about 8 MB and can resume after a dropped connection. The big bytes never pass through our servers.", "idea": "Presigned, chunked, resumable uploads keep large files off your app servers and survive flaky networks.", "caption": "Chunks flow into the raw store; a record is created.", "focus": ["creator", "upload", "raw", "meta"], "flows": [{"from": "creator", "to": "upload", "kind": "request", "label": "init upload"}, {"from": "upload", "to": "meta", "kind": "request", "label": "status: processing"}, {"from": "upload", "to": "creator", "kind": "response", "label": "presigned URL"}, {"from": "creator", "to": "raw", "kind": "request", "label": "8 MB chunks"}], "metrics": {"source": "600"}},
+    {"tag": "PIPELINE", "title": "Queue the work", "body": "When the last chunk lands, the upload is marked complete and a job message goes onto a queue. Transcoding takes minutes, so the creator is not kept waiting on a request. Workers pull jobs when they have capacity, and a job that fails is simply retried. A big video is split into pieces of a few seconds each, so many workers can encode different pieces in parallel.", "idea": "A queue decouples slow processing from the upload request and lets you scale workers by backlog.", "caption": "A job is queued and a worker picks it up.", "focus": ["upload", "queue", "workers"], "flows": [{"from": "upload", "to": "queue", "kind": "async", "label": "job: video 81f"}, {"from": "queue", "to": "workers", "kind": "async", "label": "pull job"}], "metrics": {}},
+    {"tag": "TRANSCODE", "title": "Encode a bitrate ladder", "body": "Workers read the source and re-encode it several times, producing a ladder: for example 240p at 0.4 Mbps, 360p at 0.8, 480p at 1.4, 720p at 3, and 1080p at 5 Mbps. Together that is about 10.6 Mbps, so a 10-minute video becomes roughly 800 MB across all renditions. This is CPU-heavy work, often on GPUs or dedicated encoder hardware. Audio is encoded once or twice and shared.", "idea": "Each rendition is a separate encode of the same content at a different resolution and bitrate.", "caption": "Workers read the raw file and produce 5 renditions.", "focus": ["raw", "workers"], "flows": [{"from": "raw", "to": "workers", "kind": "response", "label": "source chunks"}], "metrics": {"renditions": "5"}},
+    {"tag": "SEGMENT", "title": "Cut into short segments", "body": "Each rendition is cut into segments of about 4 seconds and stored as ordinary files, with a playlist listing them in order. This is HLS (Apple's format, .m3u8 playlists) or DASH (an open standard, .mpd manifests); both can share the same fMP4 segment files (CMAF). Every segment starts on a keyframe, and the cut points are identical across renditions. A 600-second video gives 150 segments per rendition, so about 750 files.", "idea": "Segments are plain static files, so any HTTP server or CDN can serve them. Aligned cuts make switching quality safe.", "caption": "Segments and playlists land in the segment store.", "focus": ["workers", "origin"], "flows": [{"from": "workers", "to": "origin", "kind": "async", "label": "4 s segments"}], "metrics": {}},
+    {"tag": "PUBLISH", "title": "Mark it ready", "body": "When every rendition is done, a worker updates the metadata service: status becomes ready, and the record stores the manifest location, duration, available renditions, and thumbnails. The metadata service holds titles, owners, permissions, and counters, usually in a database with a cache in front. It stores kilobytes per video, never the video bytes. Search and recommendations read from it too.", "idea": "Metadata is small and queried constantly; media is huge and fetched by URL. Keep them in separate systems.", "caption": "The video record flips from processing to ready.", "focus": ["workers", "meta"], "flows": [{"from": "workers", "to": "meta", "kind": "request", "label": "status: ready"}], "metrics": {}},
+    {"tag": "PLAYBACK", "title": "Player asks what to play", "body": "A viewer opens the video. The player calls the metadata service, which checks that the viewer is allowed to watch and returns the title and a signed manifest URL. The player then downloads the master playlist, a small file listing every rendition. No video bytes have moved yet, and the metadata service is already out of the picture for the rest of the session.", "idea": "The metadata call happens once per video; everything after it is plain file fetching.", "caption": "Metadata returns a manifest URL for the player.", "focus": ["viewer", "meta"], "flows": [{"from": "viewer", "to": "meta", "kind": "request", "label": "GET video 81f"}, {"from": "meta", "to": "viewer", "kind": "response", "label": "manifest URL"}], "metrics": {"startup": "300"}},
+    {"tag": "CDN", "title": "Segments come from the edge", "body": "The player requests the first segment at a middle quality. The request goes to the nearest CDN edge. On the first view the edge has nothing, so it fetches the segment from the segment store (a cache miss) and keeps a copy. Every later viewer in that region gets it straight from the edge. Segments never change, so they can be cached for a very long time. Startup lands around 1.2 seconds.", "idea": "Only the first viewer per region pays the trip to the origin; the CDN serves everyone after that.", "caption": "Cache miss: the edge fetches from origin, then serves.", "focus": ["viewer", "cdn", "origin"], "flows": [{"from": "viewer", "to": "cdn", "kind": "request", "label": "seg 1 @ 480p"}, {"from": "cdn", "to": "origin", "kind": "request", "label": "miss: fetch"}, {"from": "origin", "to": "cdn", "kind": "response", "label": "segment"}, {"from": "cdn", "to": "viewer", "kind": "response", "label": "segment"}], "metrics": {"startup": "1200", "hit": "0"}},
+    {"tag": "ADAPT", "title": "Bandwidth drops, quality follows", "body": "The player measures how fast each segment downloads and how much video it has buffered. When the train enters a tunnel, throughput falls and the buffer shrinks, so the player asks for the next segment at 360p instead of 480p. The server does nothing special: it just serves whichever file is requested. Because cut points line up, the switch is invisible apart from sharper or softer pixels. Popular segments are now cached, so the edge hit rate climbs.", "idea": "Adaptive bitrate is decided by the player, using ordinary file requests. This keeps the servers stateless and cacheable.", "caption": "Player drops to 360p; edge serves it from cache.", "focus": ["viewer", "cdn"], "flows": [{"from": "viewer", "to": "cdn", "kind": "fail", "label": "slow download"}, {"from": "viewer", "to": "cdn", "kind": "request", "label": "seg 40 @ 360p"}, {"from": "cdn", "to": "viewer", "kind": "response", "label": "cache hit"}], "metrics": {"hit": "96"}},
+    {"tag": "RECAP", "title": "Heavy write, cheap read", "body": "Upload goes direct to storage, a queue feeds workers that encode a ladder and cut segments, and the metadata service records when it is ready. Playback is one metadata call, then segment files from a CDN, with the player choosing quality. The write path is slow and compute-bound but runs once per video. The read path runs millions of times, so it is built from cacheable static files.", "idea": "Do the expensive work once, ahead of time, so serving is just fetching cached files.", "caption": "The whole path from upload to playback.", "focus": ["creator", "upload", "queue", "workers", "raw", "meta", "origin", "viewer", "cdn"], "flows": [], "metrics": {"source": "600", "renditions": "5", "startup": "1200", "hit": "96"}}
+  ],
+  "quiz": [
+    {"q": "Why does the creator app send file chunks directly to object storage with a presigned URL instead of through the upload service?", "options": ["Object storage encrypts data and the upload service cannot", "Presigned URLs make the upload faster by using a better protocol", "Large file bytes would otherwise tie up app servers and bandwidth, while the service still controls who may upload", "The upload service cannot accept files over 1 MB"], "answer": 2, "why": "The upload service only authorizes and records the upload. Moving gigabytes through it would waste its capacity, and object storage already handles large, resumable writes well."},
+    {"q": "Segments for every rendition are cut at the same timestamps, each starting on a keyframe. What does that make possible?", "options": ["The CDN can merge renditions into one file", "The player can switch quality at a segment boundary without a glitch", "Transcoding runs without needing a queue", "The metadata service can skip storing the manifest URL"], "answer": 1, "why": "A segment that begins on a keyframe can be decoded on its own. Aligned boundaries mean segment 41 at 360p picks up exactly where segment 40 at 480p ended."},
+    {"q": "A video goes viral and 2 million people start watching within an hour. Which part of the design protects the origin segment store?", "options": ["The transcode queue absorbs the viewers", "The metadata service rate-limits playback", "More transcoding workers are added automatically", "Segments are immutable static files, so CDN edges cache them and serve nearly every request"], "answer": 3, "why": "Each segment is fetched from the origin about once per region, then served from cache. Viewers hitting the edge never touch the origin."},
+    {"q": "A 2-hour movie takes 6 hours to transcode on one machine. What is the most effective fix within this design?", "options": ["Split the source into chunks of a few seconds and encode them in parallel on many workers", "Encode only one rendition and let the player upscale", "Store the source in a faster database", "Have the CDN transcode on the first request"], "answer": 0, "why": "Video chunks can be encoded independently, so parallelism cuts wall-clock time almost linearly. The segment playlist already treats the output as separate files, so no heavy re-joining is needed."}
+  ],
+  "cheatsheet": [
+    {"term": "Bitrate ladder", "def": "The set of renditions of one video, from low resolution and bitrate to high, e.g. 240p at 0.4 Mbps up to 1080p at 5 Mbps."},
+    {"term": "Transcoding", "def": "Decoding a video and re-encoding it at a different resolution, bitrate, or codec. CPU/GPU heavy, so run it asynchronously on workers."},
+    {"term": "Segment", "def": "A short file (about 2 to 6 seconds) of one rendition. Starts on a keyframe so it decodes independently."},
+    {"term": "HLS / DASH", "def": "Two adaptive streaming standards that deliver video as segments listed in a playlist or manifest (.m3u8 / .mpd) over plain HTTP."},
+    {"term": "Adaptive bitrate (ABR)", "def": "The player picks the next segment's rendition from measured throughput and buffer level. The server stays unaware."},
+    {"term": "Presigned URL", "def": "A time-limited signed link that lets a client read or write one object in storage without holding credentials."},
+    {"term": "Origin vs edge", "def": "Origin holds the full set of segments. Edges cache the popular ones near viewers; only misses travel back to origin."},
+    {"term": "Time to first frame", "def": "Delay from pressing play to the first picture. Driven by the metadata call, manifest fetch, and first segment download."}
+  ],
+  "lab": {
+    "prompt": "Design the video platform for 5 million daily active viewers watching an average of 40 minutes each, with 50,000 new uploads per day averaging 8 minutes. Sketch the upload path, the processing pipeline, the delivery path, and estimate storage and peak egress.",
+    "requirements": [
+      "Uploads must be resumable and must not pass large files through the application servers.",
+      "Each video is playable at several quality levels and adapts to changing bandwidth.",
+      "Playback starts within about 2 seconds for most viewers worldwide.",
+      "A failed or slow transcode must not lose the upload or block other videos.",
+      "Estimate daily new storage for all renditions and peak delivery bandwidth, stating your assumptions."
+    ],
+    "hints": [
+      "Use a ladder of about 10 Mbps total. 8 minutes is 480 s, so one video is roughly 600 MB across renditions. Multiply by 50,000 uploads.",
+      "Watch time: 5 million viewers times 40 minutes. Convert to bytes using an average delivered bitrate of about 3 Mbps, then think about peak versus average (a rule of thumb is 2 to 3 times).",
+      "Ask which pieces are idempotent. Re-running a transcode job for the same video should overwrite the same output paths.",
+      "Decide where the metadata lives and what the playback request returns. Keep its size and cost far below the media path.",
+      "Consider long-tail content: most videos get few views, so edge caches hold the popular head while the tail comes from origin."
+    ],
+    "checklist": [
+      "Presigned, chunked upload direct to object storage, with a record created in processing state.",
+      "Queue plus parallel transcode workers, with retries and a dead-letter path for bad files.",
+      "Multiple renditions cut into aligned segments with HLS or DASH manifests.",
+      "Metadata service separate from media storage, returning a signed manifest URL.",
+      "CDN in front of the segment store, with long TTLs for immutable segments.",
+      "Back-of-envelope numbers for storage per day and peak egress, with assumptions written down."
+    ]
+  }
+}

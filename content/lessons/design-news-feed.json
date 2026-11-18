@@ -1,0 +1,96 @@
+{
+  "slug": "design-news-feed",
+  "title": "Design a News Feed",
+  "subtitle": "Watch one post reach a million timelines, and see why celebrities force a hybrid of push and pull.",
+  "minutes": 14,
+  "level": "Intermediate",
+  "learn": [
+    "Fan-out on write (push) versus fan-out on read (pull), and what each costs",
+    "Why a feed is stored as a per-user list of post IDs in a cache",
+    "The celebrity problem and the hybrid that fixes it",
+    "Where the ranking stage sits and why it only scores a few hundred candidates",
+    "How to size writes per second and cache memory from a few assumptions"
+  ],
+  "nodes": [
+    {"id": "author", "label": "Author app", "kind": "client", "x": 8, "y": 20},
+    {"id": "post", "label": "Post service", "kind": "service", "x": 28, "y": 20},
+    {"id": "queue", "label": "Fan-out queue", "kind": "queue", "x": 48, "y": 20},
+    {"id": "worker", "label": "Fan-out workers", "kind": "worker", "x": 68, "y": 20},
+    {"id": "store", "label": "Post store", "kind": "db", "x": 28, "y": 50},
+    {"id": "cache", "label": "Feed cache", "kind": "cache", "x": 86, "y": 47},
+    {"id": "reader", "label": "Reader app", "kind": "client", "x": 8, "y": 80},
+    {"id": "feed", "label": "Feed service", "kind": "service", "x": 48, "y": 80},
+    {"id": "ranker", "label": "Ranker", "kind": "service", "x": 68, "y": 80}
+  ],
+  "edges": [
+    {"from": "author", "to": "post"},
+    {"from": "post", "to": "store"},
+    {"from": "post", "to": "queue"},
+    {"from": "queue", "to": "worker"},
+    {"from": "worker", "to": "cache"},
+    {"from": "reader", "to": "feed"},
+    {"from": "feed", "to": "cache"},
+    {"from": "feed", "to": "store"},
+    {"from": "feed", "to": "ranker"}
+  ],
+  "metrics": [
+    {"id": "writes", "label": "Writes / post", "unit": ""},
+    {"id": "read", "label": "Feed load", "unit": "ms"},
+    {"id": "cache", "label": "Feed cache", "unit": "GB"}
+  ],
+  "steps": [
+    {"tag": "QUESTION", "title": "What does opening the app need?", "body": "You open the app and expect a list of recent posts from the people you follow, newest and most relevant first, in under half a second. Assume 100 million daily users, about 200 followers each, one post per user per day. That is roughly 100 million posts and 1 billion feed loads a day, so reads outnumber writes about 10 to 1. The question is when to do the work of building each person's feed.", "idea": "A feed is a read-heavy join between who you follow and what they posted; the design question is when to compute it.", "caption": "Many authors, many readers, and one expensive join between them.", "focus": [], "flows": [], "metrics": {}},
+    {"tag": "NAIVE", "title": "Fan-out on read (pull)", "body": "The simplest design builds the feed at read time. The feed service fetches your list of followed accounts, queries the post store for each one's recent posts, merges them, and returns the top page. Writes are trivial: one row per post. But every feed load fans out into hundreds of lookups, so reads are slow and the post store absorbs about 11,000 feed loads per second multiplied by those lookups.", "idea": "Pull makes writes cheap and reads expensive, which is backwards when reads dominate.", "caption": "Each feed load queries the post store for every followed account.", "focus": ["reader", "feed", "store"], "flows": [{"from": "reader", "to": "feed", "kind": "request", "label": "GET /feed"}, {"from": "feed", "to": "store", "kind": "request", "label": "posts of 200 users"}, {"from": "store", "to": "feed", "kind": "response", "label": "merge + sort"}, {"from": "feed", "to": "reader", "kind": "response", "label": "feed page"}], "metrics": {"writes": "1", "read": "800"}},
+    {"tag": "CONCEPT", "title": "Fan-out on write (push)", "body": "Flip it: do the work when a post is created. The author saves the post, then a fan-out job looks up the author's followers and inserts the new post ID into each follower's precomputed feed list. The post service returns as soon as the post is stored and the job is queued, so the author never waits on the fan-out. A 200-follower author costs 200 small writes, and none of them sit on any reader's path.", "idea": "Push moves the cost from the many reads to the fewer writes, and does it in the background.", "caption": "A new post is stored, then queued for fan-out.", "focus": ["author", "post", "store", "queue"], "flows": [{"from": "author", "to": "post", "kind": "request", "label": "new post"}, {"from": "post", "to": "store", "kind": "request", "label": "save post"}, {"from": "post", "to": "queue", "kind": "async", "label": "fan-out job"}, {"from": "post", "to": "author", "kind": "response", "label": "201 Created"}], "metrics": {"writes": "200"}},
+    {"tag": "FLOW", "title": "Workers fill the feed cache", "body": "Workers pull the job off the queue, fetch the follower list, and append the post ID to each follower's feed in the cache, for example a capped list of the latest 500 IDs per user in an in-memory store. Store IDs, not full posts: 500 IDs of 8 bytes is about 4 KB per user, so 100 million users need roughly 400 GB, which fits on a modest cache cluster. At 100 million posts a day and 200 followers each, that is about 230,000 cache writes per second on average.", "idea": "Feeds are lists of post IDs in memory; the cap keeps memory bounded and the writes cheap.", "caption": "Workers write the post ID into every follower's list.", "focus": ["queue", "worker", "cache"], "flows": [{"from": "queue", "to": "worker", "kind": "async", "label": "job"}, {"from": "worker", "to": "cache", "kind": "async", "label": "push ID x200"}], "metrics": {"cache": "400"}},
+    {"tag": "FLOW", "title": "Reading becomes a lookup", "body": "Now a feed load is cheap. The feed service reads the caller's ID list from the cache in a millisecond or two, then fetches the post bodies for the top candidates in one batched lookup, and returns them. Because the list was built ahead of time, read cost no longer depends on how many people you follow. Posts from deleted or blocked accounts are filtered out at read time, so a delete does not require rewriting every list.", "idea": "Push turns a feed load into a cache read plus a batched fetch of post bodies.", "caption": "Feed service reads a ready-made list from the cache.", "focus": ["reader", "feed", "cache", "store"], "flows": [{"from": "reader", "to": "feed", "kind": "request", "label": "GET /feed"}, {"from": "feed", "to": "cache", "kind": "request", "label": "my post IDs"}, {"from": "cache", "to": "feed", "kind": "response", "label": "500 IDs"}, {"from": "feed", "to": "store", "kind": "request", "label": "fetch bodies"}, {"from": "feed", "to": "reader", "kind": "response", "label": "feed page"}], "metrics": {"read": "60"}},
+    {"tag": "WHAT IF", "title": "The celebrity problem", "body": "Push breaks for accounts with huge audiences. One post from a user with 50 million followers means 50 million cache writes. At a few hundred thousand writes per second per cluster, that is minutes of backlog, delaying everyone else's posts and wasting writes on followers who will never open the app. A single account can create a write spike larger than the whole system's normal load.", "idea": "Push cost scales with follower count, so a few huge accounts can dominate total write load.", "caption": "One celebrity post triggers tens of millions of writes.", "focus": ["author", "post", "queue", "worker", "cache"], "flows": [{"from": "post", "to": "queue", "kind": "async", "label": "50M followers"}, {"from": "queue", "to": "worker", "kind": "fail", "label": "backlog grows"}, {"from": "worker", "to": "cache", "kind": "fail", "label": "50M writes"}], "metrics": {"writes": "50000000"}},
+    {"tag": "TRADE-OFF", "title": "The hybrid", "body": "Real systems mix both. Normal accounts use push. Accounts above a follower threshold, say 100,000 (a tunable rule of thumb), skip fan-out entirely and only save the post. At read time the feed service takes your pre-built list from the cache, then pulls recent posts from the few celebrities you follow, straight from the post store, and merges the two. Pull is cheap here because you follow only a handful of celebrities, and their latest posts are hot and cacheable.", "idea": "Push for the many small authors, pull for the few huge ones, merge at read time.", "caption": "Feed service merges cached IDs with fresh celebrity posts.", "focus": ["reader", "feed", "cache", "store"], "flows": [{"from": "feed", "to": "cache", "kind": "request", "label": "pushed IDs"}, {"from": "cache", "to": "feed", "kind": "response", "label": "500 IDs"}, {"from": "feed", "to": "store", "kind": "request", "label": "celebrity posts"}, {"from": "store", "to": "feed", "kind": "response", "label": "recent posts"}], "metrics": {"writes": "200", "read": "70"}},
+    {"tag": "CONCEPT", "title": "The ranking stage", "body": "A reverse-chronological list is simple, but most products rank. Scoring every post you could ever see is too slow, so ranking is a second stage: the feed service gathers a few hundred candidates (cached IDs plus celebrity posts), and the ranker scores only those, using signals like recency, your past interactions with the author, and post engagement. It returns the top 20. The cache stores candidates cheaply; the ranker spends its compute budget only on a small shortlist.", "idea": "Candidate generation is cheap and wide; ranking is expensive and narrow, so keep them separate.", "caption": "Ranker scores a few hundred candidates and returns the top page.", "focus": ["feed", "ranker", "reader"], "flows": [{"from": "feed", "to": "ranker", "kind": "request", "label": "300 candidates"}, {"from": "ranker", "to": "feed", "kind": "response", "label": "top 20 scored"}, {"from": "feed", "to": "reader", "kind": "response", "label": "ranked feed"}], "metrics": {"read": "120"}},
+    {"tag": "WHAT IF", "title": "A cache node dies", "body": "The feed cache is a derived copy, not the source of truth, so losing a node loses no posts. For affected users the feed service finds an empty or missing list and rebuilds it by pulling recent posts from the people they follow, then writes the result back to the cache. That rebuild is slow, so it is rate limited and often done lazily on first read. It also gives inactive users a cheap policy: skip pushing to them and rebuild only if they return.", "idea": "Treat feeds as rebuildable caches: pull is the fallback that makes push safe to lose.", "caption": "Missing list is rebuilt with a slower pull, then recached.", "focus": ["feed", "cache", "store"], "flows": [{"from": "feed", "to": "cache", "kind": "fail", "label": "miss"}, {"from": "feed", "to": "store", "kind": "request", "label": "rebuild by pull"}, {"from": "feed", "to": "cache", "kind": "replicate", "label": "refill list"}], "metrics": {"read": "400"}},
+    {"tag": "RECAP", "title": "When to do the work", "body": "Pull builds feeds at read time: cheap writes, slow reads. Push builds them at write time into a per-user list of IDs in cache: fast reads, write cost proportional to followers. Celebrities break push, so the hybrid pushes for normal accounts and pulls for huge ones. A ranker then scores a few hundred candidates, and the cache can always be rebuilt from the post store.", "idea": "Move work from the hot read path to the write path, except where the write cost explodes.", "caption": "Push for most, pull for celebrities, rank a shortlist.", "focus": ["author", "post", "store", "queue", "worker", "cache", "reader", "feed", "ranker"], "flows": [], "metrics": {"writes": "200", "read": "120", "cache": "400"}}
+  ],
+  "quiz": [
+    {"q": "Reads outnumber writes about 10 to 1 and most users follow around 200 accounts. Why is fan-out on write usually preferred for these users?", "options": ["It uses less total storage than pulling", "It does the merge work once per post, instead of once per feed load", "It guarantees every follower sees the post instantly", "It removes the need for a post store"], "answer": 1, "why": "With many more reads than writes, doing the work once at write time (200 small inserts) beats redoing a 200-way merge on each of the 10 reads."},
+    {"q": "An account with 30 million followers posts. Pure fan-out on write would do what?", "options": ["Make 30 million cache writes for one post, creating a large backlog", "Make one write, because the cache is shared", "Fail the post until followers come online", "Have no effect on other users' posts"], "answer": 0, "why": "Push cost equals follower count, so one post means about 30 million writes, delaying fan-out for everyone queued behind it."},
+    {"q": "In the hybrid design, how does a user's feed include a celebrity's post?", "options": ["The celebrity's post is pushed to the user's list as usual", "The feed service pulls recent celebrity posts at read time and merges them with the cached list", "The user's app polls the celebrity's profile directly", "Celebrity posts are shown only if the user refreshes twice"], "answer": 1, "why": "Celebrities are skipped during fan-out. At read time the feed service fetches their latest posts and merges them with the pushed list."},
+    {"q": "Why does the ranker score only a few hundred candidates instead of every post from followed accounts?", "options": ["Ranking models cannot handle more than 300 inputs", "Scoring is expensive per item, so a cheap first stage narrows the set within the latency budget", "The cache can only hold 300 IDs per user", "Users never scroll past 300 posts"], "answer": 1, "why": "Candidate generation is cheap and wide, ranking is costly per post. Limiting the scored set keeps the feed load within its latency budget."},
+    {"q": "A feed cache node is lost. What is the right recovery approach?", "options": ["Restore from the ranker's output", "Declare the affected users' posts lost and notify them", "Rebuild each affected list by pulling from the post store, ideally lazily and rate limited", "Stop all new posts until the node returns"], "answer": 2, "why": "The cache is derived data. The post store is the source of truth, so lists can be rebuilt by pull, throttled so a rebuild storm does not overload the store."}
+  ],
+  "cheatsheet": [
+    {"term": "Fan-out on write", "def": "On each new post, insert its ID into every follower's feed list ahead of time. Fast reads, write cost grows with follower count."},
+    {"term": "Fan-out on read", "def": "Build the feed at request time by querying and merging the posts of everyone followed. Cheap writes, slow and costly reads."},
+    {"term": "Celebrity problem", "def": "Accounts with millions of followers make push write millions of entries per post. Handle them with pull instead."},
+    {"term": "Hybrid feed", "def": "Push for normal accounts, pull for accounts above a follower threshold, merged by the feed service at read time."},
+    {"term": "Feed cache", "def": "Per-user capped list of recent post IDs (not bodies) in memory, about 4 KB for 500 IDs. Derived data that can be rebuilt."},
+    {"term": "Candidate generation", "def": "The cheap first stage that gathers a few hundred possible posts before the ranker scores them."},
+    {"term": "Ranking stage", "def": "A model scoring candidates on recency, affinity and engagement, returning the top page. Costly per item, so run on a shortlist."},
+    {"term": "Back-of-envelope", "def": "100M posts/day is about 1,160 posts/s; times 200 followers is about 230K cache writes/s. Divide per-day numbers by 86,400."}
+  ],
+  "lab": {
+    "prompt": "Design the news feed for a social app with 100 million daily users. Users follow about 200 accounts on average, a small number of accounts have over 10 million followers, and a feed must load in under 500 ms at p99. Sketch the write path, the read path, and what is stored where.",
+    "requirements": [
+      "Posting returns quickly and does not wait for followers' feeds to update",
+      "Feed loads meet a 500 ms p99 target at roughly 12K reads per second average",
+      "Accounts with tens of millions of followers must not stall fan-out for everyone else",
+      "Feeds can be ranked, not only sorted by time",
+      "Losing a feed cache node must not lose any posts",
+      "State your assumptions and compute writes per second and cache memory"
+    ],
+    "hints": [
+      "Convert per day to per second by dividing by about 86,400, then multiply posts per second by average followers.",
+      "Store post IDs, not post bodies, in the feed list; keep bodies in the post store and batch the lookup.",
+      "Pick a follower threshold for pull accounts, and say what happens to a user who follows both kinds.",
+      "Split feed building into candidate generation and ranking so each has its own latency budget.",
+      "Ask what to do for inactive users: do you push to them at all?"
+    ],
+    "checklist": [
+      "Post path: save to post store first, then enqueue fan-out asynchronously",
+      "Feed list stored as a capped per-user list of post IDs in cache with a size estimate",
+      "Hybrid rule: push for normal accounts, pull and merge for celebrity accounts",
+      "Ranking stage scores a few hundred candidates and returns a top page",
+      "Recovery plan: rebuild lists from the post store, throttled",
+      "Numbers shown: about 1.2K posts/s, about 230K push writes/s, about 400 GB of feed cache"
+    ]
+  }
+}

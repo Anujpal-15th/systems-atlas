@@ -1,0 +1,65 @@
+{
+  "slug": "time-series",
+  "title": "Time-Series Data",
+  "subtitle": "Watch a metrics system absorb 100,000 points per second, roll old data up, and drop it on schedule.",
+  "minutes": 12,
+  "level": "Intermediate",
+  "learn": [
+    "Why time-series workloads are append-heavy and mostly read as recent ranges",
+    "How time-partitioned chunks make writes, queries and deletes cheap",
+    "How rollups (downsampling) trade detail for speed and storage",
+    "Why retention is a policy of dropping whole chunks, not deleting rows",
+    "How high-cardinality labels blow up the number of series"
+  ],
+  "nodes": [
+    {"id": "agents", "label": "App hosts", "kind": "client", "x": 9, "y": 50},
+    {"id": "queue", "label": "Ingest queue", "kind": "queue", "x": 29, "y": 50},
+    {"id": "writer", "label": "Ingest writer", "kind": "worker", "x": 50, "y": 50},
+    {"id": "hot", "label": "Raw chunks (hot)", "kind": "db", "x": 72, "y": 22},
+    {"id": "rollup", "label": "Rollup job", "kind": "worker", "x": 72, "y": 78},
+    {"id": "cold", "label": "Rollup store", "kind": "storage", "x": 92, "y": 78},
+    {"id": "dash", "label": "Dashboard", "kind": "user", "x": 92, "y": 22}
+  ],
+  "edges": [
+    {"from": "agents", "to": "queue"},
+    {"from": "queue", "to": "writer"},
+    {"from": "writer", "to": "hot"},
+    {"from": "hot", "to": "rollup"},
+    {"from": "rollup", "to": "cold"},
+    {"from": "dash", "to": "hot"},
+    {"from": "dash", "to": "cold"}
+  ],
+  "metrics": [
+    {"id": "writes", "label": "Writes", "unit": "k pts/s"},
+    {"id": "rawday", "label": "Raw per day", "unit": "GB"},
+    {"id": "keep", "label": "Raw kept", "unit": "days"},
+    {"id": "query", "label": "Query time", "unit": "ms"}
+  ],
+  "steps": [
+    {"tag": "QUESTION", "title": "A firehose of numbers", "body": "Picture 10,000 servers, each reporting 100 metrics (CPU, latency, queue depth) every 10 seconds. That is 1 million separate series and 100,000 new points per second, forever. Nobody edits old points, and people mostly ask about the last hour. How do you store this so it stays fast and cheap? These numbers are an assumed scenario.", "idea": "Time-series data is a never-ending stream of timestamped appends, read mostly by recent time range.", "caption": "Many hosts, constant small writes.", "focus": ["agents"], "flows": [], "metrics": {"writes": "100", "rawday": "17", "keep": "0", "query": "0"}},
+    {"tag": "FLOW", "title": "Buffer the stream", "body": "Each host sends points as (series name, timestamp, value). They land in an ingest queue first, so a slow database or a traffic spike delays points instead of losing them. The writer then pulls batches rather than handling 100,000 tiny writes one by one.", "idea": "Buffer and batch: appends are cheap in bulk and painful one at a time.", "caption": "Points flow through a buffer to the writer.", "focus": ["agents", "queue", "writer"], "flows": [{"from": "agents", "to": "queue", "kind": "async", "label": "name,ts,value"}, {"from": "queue", "to": "writer", "kind": "async", "label": "batch of 5,000"}], "metrics": {}},
+    {"tag": "CONCEPT", "title": "Append into the newest chunk", "body": "The writer groups points by series and writes them into the chunk for the current time window, say one day. Within a chunk, timestamps and values compress well: consecutive timestamps differ by a steady 10 seconds, and values change slowly. A good scheme gets raw points down to roughly 1 to 2 bytes each, so a day is about 17 GB here. Slightly late points are still accepted into recent chunks.", "idea": "Writes only touch the newest chunk, and regular timestamps compress extremely well.", "caption": "Today's chunk takes all the writes.", "focus": ["writer", "hot"], "flows": [{"from": "writer", "to": "hot", "kind": "request", "label": "append to today"}, {"from": "hot", "to": "writer", "kind": "response", "label": "ack"}], "metrics": {"rawday": "17"}},
+    {"tag": "CONCEPT", "title": "Query a time range", "body": "A dashboard asks for one service's p95 latency over the last hour. Because data is partitioned by time, the database opens only today's chunk and skips every older one. This is partition pruning, and it is the main reason time-partitioned storage stays fast as history grows. A narrow query like this returns in tens of milliseconds.", "idea": "Time partitioning lets a range query ignore almost all the data.", "caption": "One chunk is read; the rest are skipped.", "focus": ["dash", "hot"], "flows": [{"from": "dash", "to": "hot", "kind": "request", "label": "last 1h, svc=api"}, {"from": "hot", "to": "dash", "kind": "response", "label": "360 points"}], "metrics": {"query": "40"}},
+    {"tag": "TRADE-OFF", "title": "Long ranges hurt", "body": "Now someone charts one metric across 90 days from raw data. The database must open 90 chunks and read every point for the matching series, yet the screen can only draw a couple thousand points anyway. Scanning far more detail than the chart can show wastes time and money. In a big fleet this kind of query can take many seconds.", "idea": "Raw points answer long-range questions slowly, and the chart cannot show that detail anyway.", "caption": "A 90-day raw scan is slow.", "focus": ["dash", "hot"], "flows": [{"from": "dash", "to": "hot", "kind": "fail", "label": "90 days raw"}], "metrics": {"query": "9000"}},
+    {"tag": "FLOW", "title": "Roll up into coarser points", "body": "A rollup job reads finished raw chunks and writes summaries: one point per series per minute, then one per hour. Each summary keeps count, sum, min and max, not just the average, so later math stays correct. A 1-minute rollup has 6 times fewer points than 10-second data, and an hourly one has 360 times fewer. Percentiles cannot be averaged, so they need stored histograms or sketches.", "idea": "Downsampling trades detail for a huge cut in points; keep count, sum, min and max so it stays useful.", "caption": "Raw data is summarized into minute and hour points.", "focus": ["hot", "rollup", "cold"], "flows": [{"from": "hot", "to": "rollup", "kind": "async", "label": "read old chunk"}, {"from": "rollup", "to": "cold", "kind": "async", "label": "1m + 1h points"}], "metrics": {}},
+    {"tag": "FLOW", "title": "Serve long ranges from rollups", "body": "The 90-day chart now reads hourly rollups: about 2,160 points per series instead of over 700,000 raw ones. The query layer picks the coarsest resolution that still gives enough points for the screen. The chart that took seconds returns in tens of milliseconds, with the trade-off that you cannot zoom back into 10-second detail.", "idea": "Pick the resolution to match the question: coarse for long ranges, raw for short ones.", "caption": "Long queries are answered from rollups.", "focus": ["dash", "cold"], "flows": [{"from": "dash", "to": "cold", "kind": "request", "label": "90 days, 1h step"}, {"from": "cold", "to": "dash", "kind": "response", "label": "2,160 points"}], "metrics": {"query": "30"}},
+    {"tag": "CONCEPT", "title": "Retention: drop, do not delete", "body": "Nobody needs 10-second data from a year ago, so a retention policy might keep raw data for 15 days, 1-minute rollups for 13 months, and hourly ones for years. Because each chunk covers a fixed time window, expiry means dropping a whole old chunk, which is close to deleting a file. Running DELETE on billions of rows would be slow and leave the table bloated. These durations are examples; pick yours from alerting and audit needs.", "idea": "Retention works best as dropping whole time chunks, not deleting individual rows.", "caption": "Expired raw chunks are removed whole.", "focus": ["hot", "rollup"], "flows": [{"from": "rollup", "to": "hot", "kind": "async", "label": "safe to drop"}], "metrics": {"keep": "15"}},
+    {"tag": "WHAT IF", "title": "A label explodes the series count", "body": "A developer adds user_id as a label on a request-count metric. Every distinct label combination is its own series, so 1 million series can become 100 million. Indexes and memory grow with series count, not with points per second, so the system falls over even though traffic is unchanged. Keep labels low-cardinality (region, status code) and put per-user detail in logs or traces.", "idea": "Cost grows with the number of distinct series, so unbounded labels are the classic way to break a metrics store.", "caption": "Series count explodes and ingest stalls.", "focus": ["agents", "queue", "writer"], "flows": [{"from": "agents", "to": "queue", "kind": "fail", "label": "100M series"}], "metrics": {}},
+    {"tag": "RECAP", "title": "Design for time", "body": "Buffer and batch the appends, store them in time-partitioned compressed chunks, and answer recent queries from the newest chunks. Roll old data up so long ranges read few points, and enforce retention by dropping whole chunks. Watch series cardinality, because it is the cost that grows quietly.", "idea": "Time is the partition key, the query filter, and the retention unit all at once.", "caption": "Ingest, chunk, roll up, expire.", "focus": ["agents", "queue", "writer", "hot", "rollup", "cold", "dash"], "flows": [], "metrics": {"writes": "100", "rawday": "17", "keep": "15", "query": "30"}}
+  ],
+  "quiz": [
+    {"q": "Why does partitioning data into daily chunks make 'last hour' queries fast?", "options": ["Each chunk is stored on a faster disk", "The database can skip every chunk outside the time range", "Daily chunks are never compressed", "It removes the need for timestamps"], "answer": 1, "why": "Partition pruning means only the chunk covering the queried window is read, so cost does not grow as history accumulates."},
+    {"q": "You downsample raw data to 1-minute points storing only the average. Which question can you no longer answer correctly?", "options": ["What was the typical load in that minute?", "What was the peak value in that minute?", "How many hours of data exist?", "Which host sent the data?"], "answer": 1, "why": "An average hides spikes. Keeping min, max, count and sum in each rollup preserves peaks and lets you recompute averages correctly."},
+    {"q": "You need to expire data older than 15 days from a 10 TB table. What is usually the best approach in a time-series store?", "options": ["Run DELETE with a timestamp filter every night", "Rewrite the table without the old rows", "Compress old rows more aggressively", "Drop the whole chunk partitions outside the window"], "answer": 3, "why": "Chunks align with time, so dropping one is a cheap metadata and file operation. Row-by-row deletes are slow and leave dead space."},
+    {"q": "A metrics store runs out of memory after a release, though points per second is unchanged. A new metric now carries a request_id label. What is the cause?", "options": ["Too many readers on the dashboard", "The rollup job runs too often", "Series count exploded because each request_id is a new series", "Timestamps are arriving out of order"], "answer": 2, "why": "Memory and index size scale with distinct series. An unbounded label creates a new series per value, which is high cardinality."}
+  ],
+  "cheatsheet": [
+    {"term": "Time series", "def": "A sequence of values for one named thing, each with a timestamp, such as CPU% of host A every 10 seconds."},
+    {"term": "Series cardinality", "def": "The number of distinct series (metric name plus label values). Memory and index cost scale with it."},
+    {"term": "Time-partitioned chunk", "def": "A storage unit covering a fixed time window, so queries can skip chunks and retention can drop them whole."},
+    {"term": "Downsampling / rollup", "def": "Replacing many fine points with fewer coarse ones (for example 10s to 1m). Store count, sum, min and max."},
+    {"term": "Retention policy", "def": "Rules for how long each resolution is kept, for example raw 15 days, 1-minute 13 months."},
+    {"term": "Delta-of-delta encoding", "def": "Store the change in the gap between timestamps; steady intervals become near-zero values that compress to a bit or two."},
+    {"term": "Out-of-order write", "def": "A point arriving after newer ones for the same series. Stores usually accept it only within a recent window."}
+  ]
+}

@@ -1,0 +1,67 @@
+{
+  "slug": "load-balancing",
+  "title": "Load Balancing",
+  "subtitle": "Watch a load balancer spread traffic across servers, pick the right one, drop a dead one, and survive its own failure.",
+  "minutes": 12,
+  "level": "Intermediate",
+  "learn": [
+    "The difference between Layer 4 and Layer 7 load balancing, and when each fits",
+    "How round robin, least connections, and consistent hashing choose a server, and where each one goes wrong",
+    "How health checks detect a dead server and how long detection really takes",
+    "Why the load balancer itself needs a standby, and how failover works"
+  ],
+  "nodes": [
+    {"id": "clients", "label": "Clients", "kind": "client", "x": 10, "y": 50},
+    {"id": "lb1", "label": "LB (active)", "kind": "lb", "x": 40, "y": 30},
+    {"id": "lb2", "label": "LB (standby)", "kind": "lb", "x": 40, "y": 76},
+    {"id": "a", "label": "Server A", "kind": "server", "x": 74, "y": 14},
+    {"id": "b", "label": "Server B", "kind": "server", "x": 74, "y": 50},
+    {"id": "c", "label": "Server C", "kind": "server", "x": 74, "y": 86}
+  ],
+  "edges": [
+    {"from": "clients", "to": "lb1"},
+    {"from": "clients", "to": "lb2"},
+    {"from": "lb1", "to": "lb2", "label": "heartbeat"},
+    {"from": "lb1", "to": "a"},
+    {"from": "lb1", "to": "b"},
+    {"from": "lb1", "to": "c"},
+    {"from": "lb2", "to": "a"},
+    {"from": "lb2", "to": "b"},
+    {"from": "lb2", "to": "c"}
+  ],
+  "metrics": [
+    {"id": "ca", "label": "Conns A", "unit": ""},
+    {"id": "cb", "label": "Conns B", "unit": ""},
+    {"id": "cc", "label": "Conns C", "unit": ""},
+    {"id": "healthy", "label": "Healthy", "unit": "of 3"}
+  ],
+  "steps": [
+    {"tag": "QUESTION", "title": "One server is not enough", "body": "Your API gets about 6,000 requests per second at peak, but one server tops out near 2,500. You run three servers, yet clients only know one address. Something must sit in front, accept every connection, and decide which server handles it. That something is a load balancer, and it also decides what happens when a server dies.", "idea": "A load balancer gives many servers one front door and chooses who answers each request.", "caption": "Three servers, one entry point, and a choice to make.", "focus": ["clients", "lb1"], "flows": [], "metrics": {"ca": "0", "cb": "0", "cc": "0", "healthy": "3"}},
+    {"tag": "LAYER 4", "title": "L4: route by connection", "body": "A Layer 4 balancer works on TCP or UDP. It sees addresses and ports, picks a server when the connection opens, and then passes bytes through without reading them. It is very fast and protocol-agnostic, so it suits databases, gRPC streams, and raw TLS. The catch: it cannot see URLs, headers, or cookies.", "idea": "L4 decides once per connection using only IPs and ports, so it is fast but blind to content.", "caption": "A TCP connection is pinned to one server.", "focus": ["clients", "lb1", "a"], "flows": [{"from": "clients", "to": "lb1", "kind": "handshake", "label": "TCP SYN :443"}, {"from": "lb1", "to": "a", "kind": "request", "label": "same TCP stream"}], "metrics": {"ca": "1"}},
+    {"tag": "LAYER 7", "title": "L7: route by request", "body": "A Layer 7 balancer terminates the connection, reads the HTTP request, and routes on what it finds: path, host, header, or cookie. So /api can go to one pool and /images to another, and it can retry a failed request on a different server. It costs more CPU per request, since it parses HTTP and often decrypts TLS.", "idea": "L7 understands requests, enabling smart routing and retries, at the price of more work per request.", "caption": "The path /api/orders picks the API pool.", "focus": ["clients", "lb1", "b"], "flows": [{"from": "clients", "to": "lb1", "kind": "request", "label": "GET /api/orders"}, {"from": "lb1", "to": "b", "kind": "request", "label": "to API pool"}, {"from": "b", "to": "lb1", "kind": "response", "label": "200 OK"}, {"from": "lb1", "to": "clients", "kind": "response", "label": "200 OK"}], "metrics": {"ca": "1", "cb": "1"}},
+    {"tag": "ALGORITHM", "title": "Round robin: take turns", "body": "The simplest policy sends request 1 to A, request 2 to B, request 3 to C, then starts over. It needs no state beyond a counter and works well when requests cost about the same and servers are equal. It breaks down when a few requests are very heavy, because the rotation keeps sending new work to a server that is already buried.", "idea": "Round robin is fair in count, not in load, so it assumes similar requests and similar servers.", "caption": "Requests rotate A, B, C evenly.", "focus": ["lb1", "a", "b", "c"], "flows": [{"from": "lb1", "to": "a", "kind": "request", "label": "req 1"}, {"from": "lb1", "to": "b", "kind": "request", "label": "req 2"}, {"from": "lb1", "to": "c", "kind": "request", "label": "req 3"}], "metrics": {"ca": "10", "cb": "10", "cc": "10"}},
+    {"tag": "ALGORITHM", "title": "Least connections: pick the idlest", "body": "Now Server B is stuck on slow report exports and holds 48 open connections, while A has 12 and C has 9. Least connections sends the next request to the server with the fewest active ones, here C. Because it reacts to real load, it copes with uneven request cost far better than round robin. Weights can handle servers of different sizes.", "idea": "Least connections follows actual load, so slow requests naturally steer new work elsewhere.", "caption": "New request goes to C, the least busy.", "focus": ["lb1", "a", "b", "c"], "flows": [{"from": "lb1", "to": "c", "kind": "request", "label": "fewest conns"}], "metrics": {"ca": "12", "cb": "48", "cc": "10"}},
+    {"tag": "ALGORITHM", "title": "Consistent hash: same key, same server", "body": "Sometimes you want a given user or cache key to land on the same server every time, for example because that server holds a warm in-memory cache. The balancer hashes the key and maps it onto a ring of servers. If a server is added or removed, only about 1/N of the keys move, instead of nearly all of them as with plain hash modulo N.", "idea": "Consistent hashing gives stickiness by key while keeping reshuffling small when the pool changes.", "caption": "User 42 always hashes to Server B.", "focus": ["lb1", "b"], "flows": [{"from": "lb1", "to": "b", "kind": "request", "label": "hash(user 42)"}, {"from": "lb1", "to": "b", "kind": "request", "label": "hash(user 42)"}], "metrics": {"ca": "12", "cb": "49", "cc": "10"}},
+    {"tag": "HEALTH", "title": "Health checks find the dead", "body": "Server C crashes. The balancer probes every server on a schedule, for example GET /healthz every 5 seconds, and marks a server out after 3 straight failures. That means up to roughly 15 seconds of bad traffic before removal. Passive checks help: if real requests to C time out, the balancer counts those too and can react sooner.", "idea": "Detection takes time: probe interval times failure threshold sets how long users may hit a dead server.", "caption": "Probes to C time out and C is pulled.", "focus": ["lb1", "c"], "flows": [{"from": "lb1", "to": "c", "kind": "request", "label": "GET /healthz"}, {"from": "c", "to": "lb1", "kind": "fail", "label": "timeout x3"}], "metrics": {"cc": "0", "healthy": "2"}},
+    {"tag": "FAILOVER", "title": "Traffic reroutes around C", "body": "With C out of rotation, the balancer spreads load over A and B only. Each now carries about 3,000 requests per second at peak, above the 2,500 each can sustain, so this is where headroom matters. A common rule of thumb is to size the pool so it survives losing one server (N+1), and the balancer keeps probing C so it rejoins once it passes again.", "idea": "Removing a server shifts its load to the rest, so capacity planning must leave room for failure.", "caption": "Only A and B receive requests now.", "focus": ["lb1", "a", "b"], "flows": [{"from": "lb1", "to": "a", "kind": "request", "label": "req"}, {"from": "lb1", "to": "b", "kind": "request", "label": "req"}], "metrics": {"ca": "20", "cb": "30", "cc": "0", "healthy": "2"}},
+    {"tag": "WHAT IF", "title": "The load balancer dies", "body": "You removed one single point of failure and created another: if the only balancer dies, everything is down. So you run two. The active one sends heartbeats to a standby; when they stop for a few seconds, the standby takes over the shared virtual IP (for example with VRRP) and clients reconnect to the same address. Managed cloud balancers do this across zones for you.", "idea": "Run the load balancer as a redundant pair or managed multi-zone service so it is not the weak link.", "caption": "Heartbeat stops, standby takes the traffic.", "focus": ["lb1", "lb2", "clients"], "flows": [{"from": "lb1", "to": "lb2", "kind": "fail", "label": "heartbeat lost"}, {"from": "clients", "to": "lb2", "kind": "request", "label": "same virtual IP"}, {"from": "lb2", "to": "a", "kind": "request", "label": "req"}], "metrics": {"ca": "21", "cb": "30"}},
+    {"tag": "RECAP", "title": "What to remember", "body": "L4 balances connections quickly; L7 balances requests intelligently. Round robin suits uniform work, least connections suits uneven work, and consistent hashing suits key-based affinity. Health checks remove dead servers after a delay you can tune, and the balancer needs its own redundancy. Keep spare capacity so a lost server does not overload the survivors.", "idea": "Pick the layer and algorithm for your traffic, check health, and make the balancer redundant.", "caption": "Pool, policy, health, and redundancy together.", "focus": ["clients", "lb1", "lb2", "a", "b", "c"], "flows": [], "metrics": {"ca": "21", "cb": "30", "cc": "0", "healthy": "2"}}
+  ],
+  "quiz": [
+    {"q": "You must route /api/* to one server pool and /static/* to another, and retry failed GETs on a different server. Which balancer type do you need?", "options": ["Layer 4, because it is faster", "Layer 7, because it can read the HTTP path and retry requests", "Layer 4, because paths are in the TCP header", "Either one, routing by path works the same at both layers"], "answer": 1, "why": "Path-based routing and per-request retries need the balancer to parse HTTP, which is Layer 7. Layer 4 only sees IPs and ports."},
+    {"q": "Requests vary wildly: most take 10 ms but some take 20 seconds. Which policy handles this best?", "options": ["Round robin", "Consistent hashing on user ID", "Least connections", "Always send to the first server"], "answer": 2, "why": "Least connections reacts to servers that are tied up with slow requests and routes new work away from them. Round robin ignores load."},
+    {"q": "A balancer probes every 10 s and removes a server after 3 failed probes. Roughly how long can users hit a server that died just after a successful probe?", "options": ["About 10 s at most", "Up to about 30 s", "Exactly 3 s", "No time, removal is instant"], "answer": 1, "why": "Three consecutive failures at 10 s intervals take about 30 s to confirm. Lowering the interval or threshold shortens this but risks false alarms."},
+    {"q": "Why is consistent hashing preferred over hash(key) mod N when servers are added or removed?", "options": ["It makes every request faster", "It removes the need for health checks", "Only about 1/N of keys move to a new server, so caches stay mostly warm", "It balances load perfectly with no skew"], "answer": 2, "why": "With mod N, changing N remaps almost every key. A hash ring moves only the keys adjacent to the changed server."},
+    {"q": "Your three servers each handle 2,500 req/s, and peak traffic is 6,000 req/s. One server fails. What happens?", "options": ["Nothing, the two survivors easily cope", "The survivors need 3,000 req/s each, above their limit, so they overload", "The standby load balancer absorbs the extra load", "Traffic drops to 5,000 req/s automatically"], "answer": 1, "why": "6,000 / 2 = 3,000 per server, above the 2,500 limit. You need N+1 headroom so a single failure stays within capacity."}
+  ],
+  "cheatsheet": [
+    {"term": "L4 balancer", "def": "Routes TCP/UDP connections by IP and port without reading content. Fast and protocol-agnostic, but cannot route by URL or header."},
+    {"term": "L7 balancer", "def": "Terminates the connection and routes each HTTP request by path, host, header, or cookie. Enables retries and canaries; costs more CPU."},
+    {"term": "Round robin", "def": "Rotate through servers in order. Simple and stateless; best when requests and servers are uniform."},
+    {"term": "Least connections", "def": "Send to the server with the fewest active connections. Handles uneven request cost; weights cover unequal servers."},
+    {"term": "Consistent hashing", "def": "Map a key onto a hash ring of servers so the same key hits the same server. Adding or removing a server moves only about 1/N of keys."},
+    {"term": "Health check", "def": "Active probe (such as GET /healthz) or passive error counting. Detection time is roughly interval times failure threshold."},
+    {"term": "N+1 capacity", "def": "Size the pool so the loss of any one server leaves enough capacity for peak load. Otherwise failover causes a cascade."},
+    {"term": "Active/standby LB", "def": "Two balancers share a virtual IP and exchange heartbeats. If the active one goes silent, the standby takes over within seconds."}
+  ]
+}

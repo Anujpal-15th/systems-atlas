@@ -1,0 +1,102 @@
+{
+  "modules": [
+    {"id": "foundations", "title": "Foundations", "lessons": [
+      {"slug": "request-lifecycle", "title": "How a Request Travels", "isNew": false, "scope": "One page load hop by hop: DNS, TCP/TLS handshake, request, server + DB, response, extra assets; where time goes."},
+      {"slug": "latency-throughput", "title": "Latency & Throughput", "isNew": false, "scope": "Latency vs throughput vs bandwidth, percentiles (p50/p99), tail latency, Little's Law."},
+      {"slug": "napkin-math", "title": "Napkin Math", "isNew": false, "scope": "Back-of-envelope estimation: QPS from DAU, storage growth, bandwidth, latency numbers every engineer should know, powers of two."},
+      {"slug": "dns", "title": "DNS in Depth", "isNew": true, "scope": "Recursive vs authoritative resolvers, root/TLD, record types (A, AAAA, CNAME, MX, TXT), TTL and caching, GeoDNS and DNS-based failover."},
+      {"slug": "http-tls", "title": "HTTP, TLS & Connections", "isNew": true, "scope": "HTTP/1.1 vs HTTP/2 multiplexing vs HTTP/3 (QUIC), keep-alive and connection pooling, TLS 1.3 handshake, head-of-line blocking."},
+      {"slug": "hld-lld", "title": "High-Level vs Low-Level Design", "isNew": false, "scope": "How a design interview/process flows: requirements, estimates, HLD boxes, API, data model, LLD of a component, trade-offs."}
+    ]},
+    {"id": "scaling", "title": "Scaling", "lessons": [
+      {"slug": "vertical-horizontal", "title": "Vertical vs Horizontal Scaling", "isNew": false, "scope": "Scale up vs scale out, limits of each, cost curves, when a bigger box is the right answer."},
+      {"slug": "stateless", "title": "Stateless Services", "isNew": false, "scope": "Moving session state out of servers (tokens, shared session store), why statelessness enables scaling and failover; sticky sessions trade-off."},
+      {"slug": "load-balancing", "title": "Load Balancing", "isNew": false, "scope": "L4 vs L7, algorithms (round robin, least connections, consistent hash), health checks, LB redundancy."},
+      {"slug": "autoscaling", "title": "Autoscaling", "isNew": true, "scope": "Reactive vs scheduled vs predictive scaling, metrics to scale on, warm-up/cooldown, scaling lag and over-provisioning."},
+      {"slug": "cdn", "title": "CDNs & Edge", "isNew": false, "scope": "Edge caching of static and dynamic content, origin shield, cache keys, purge, push vs pull CDN, edge compute."},
+      {"slug": "proxies-gateways", "title": "Proxies & API Gateways", "isNew": true, "scope": "Forward vs reverse proxy, API gateway responsibilities (auth, routing, rate limits, aggregation), BFF pattern, gateway as SPOF."}
+    ]},
+    {"id": "caching", "title": "Caching", "lessons": [
+      {"slug": "caching", "title": "Caching Basics", "isNew": false, "scope": "Cache-aside, read-through, write-through, write-back, write-around; hit ratio; eviction (LRU/LFU); where caches live."},
+      {"slug": "cache-invalidation", "title": "Cache Invalidation & Stampedes", "isNew": true, "scope": "TTL vs explicit invalidation, stale reads, thundering herd / cache stampede, request coalescing, probabilistic early expiry, hot keys."},
+      {"slug": "bloom-filters", "title": "Bloom Filters & Sketches", "isNew": true, "scope": "Bloom filter mechanics and false positives, use to avoid disk/cache misses, Count-Min sketch and HyperLogLog for counting at scale."}
+    ]},
+    {"id": "data", "title": "Data & Storage", "lessons": [
+      {"slug": "sql-nosql", "title": "SQL vs NoSQL", "isNew": false, "scope": "Relational vs key-value, document, wide-column, graph; schema, joins, query patterns; choosing by access pattern."},
+      {"slug": "indexes", "title": "Indexes", "isNew": false, "scope": "B-tree indexes, composite index column order, covering indexes, write cost of indexes, full scans vs index seeks."},
+      {"slug": "storage-engines", "title": "Storage Engines: B-Trees vs LSM", "isNew": false, "scope": "B-tree page updates vs LSM memtable/SSTables/compaction, write vs read amplification, WAL."},
+      {"slug": "transactions", "title": "Transactions & Isolation", "isNew": false, "scope": "ACID, isolation levels, anomalies (dirty read, lost update, write skew), MVCC, locking."},
+      {"slug": "replication", "title": "Replication", "isNew": false, "scope": "Leader-follower, sync vs async, replication lag and read-your-writes, multi-leader and leaderless, failover."},
+      {"slug": "sharding", "title": "Sharding", "isNew": false, "scope": "Range vs hash partitioning, choosing a shard key, hot partitions, cross-shard queries, resharding."},
+      {"slug": "consistent-hashing", "title": "Consistent Hashing", "isNew": false, "scope": "Hash ring, minimal key movement on node add/remove, virtual nodes, use in caches and Dynamo-style stores."},
+      {"slug": "files", "title": "Files & Object Storage", "isNew": false, "scope": "Block vs file vs object storage, blobs in S3-like stores, metadata DB + blob pattern, presigned URLs, multipart upload."},
+      {"slug": "search-index", "title": "Search & Inverted Indexes", "isNew": true, "scope": "Tokenization, inverted index, ranking (TF-IDF/BM25 idea), sharded search clusters, syncing from primary DB."},
+      {"slug": "geospatial", "title": "Geospatial Indexing", "isNew": true, "scope": "Proximity search problem, geohash, quadtrees, S2/H3 cells idea, nearby-driver style queries."},
+      {"slug": "time-series", "title": "Time-Series Data", "isNew": true, "scope": "Append-heavy timestamped data, downsampling/rollups, retention, time-partitioned storage, metrics use case."},
+      {"slug": "oltp-olap", "title": "OLTP vs OLAP & Warehouses", "isNew": true, "scope": "Row vs column storage, ETL/ELT, data warehouse vs data lake, why analytics queries kill an OLTP DB."}
+    ]},
+    {"id": "distributed", "title": "Distributed Systems", "lessons": [
+      {"slug": "cap", "title": "CAP & PACELC", "isNew": false, "scope": "Partitions force choosing consistency or availability; PACELC latency vs consistency; consistency models (strong, eventual, causal)."},
+      {"slug": "quorums", "title": "Quorums (N, R, W)", "isNew": true, "scope": "Leaderless replication, R + W > N, sloppy quorum and hinted handoff, read repair, anti-entropy."},
+      {"slug": "consensus", "title": "Consensus (Raft)", "isNew": false, "scope": "Why consensus, Raft leader election, log replication, majority commit, terms; what etcd/ZooKeeper are used for."},
+      {"slug": "leader-election-locks", "title": "Leader Election & Distributed Locks", "isNew": true, "scope": "Leases, lock services, fencing tokens, why a lock with only a TTL is unsafe under GC pauses."},
+      {"slug": "clocks-ordering", "title": "Clocks & Ordering", "isNew": true, "scope": "Clock skew, NTP, Lamport timestamps, vector clocks, happens-before, hybrid logical clocks; why last-write-wins loses data."},
+      {"slug": "gossip-failure-detection", "title": "Gossip & Failure Detection", "isNew": true, "scope": "Heartbeats, timeouts vs phi-accrual detectors, gossip dissemination and membership, split brain."},
+      {"slug": "crdts", "title": "Conflict Resolution & CRDTs", "isNew": true, "scope": "Concurrent writes in multi-leader/offline systems, LWW vs merge, G-counter, OR-set, collaborative editing idea."},
+      {"slug": "unique-ids", "title": "Unique ID Generation", "isNew": false, "scope": "Auto-increment limits, UUIDv4 vs v7, Snowflake-style IDs (time + machine + sequence), ticket servers, sortability."}
+    ]},
+    {"id": "communication", "title": "Communication", "lessons": [
+      {"slug": "apis", "title": "API Styles: REST, RPC, GraphQL", "isNew": false, "scope": "REST resources, gRPC/protobuf, GraphQL; pagination, versioning, choosing a style."},
+      {"slug": "realtime", "title": "Real-Time: Polling, SSE, WebSockets", "isNew": false, "scope": "Short vs long polling, Server-Sent Events, WebSockets, connection fan-out and stateful gateways."},
+      {"slug": "queues", "title": "Message Queues", "isNew": false, "scope": "Producers/consumers, decoupling and buffering, at-least-once delivery, acks, visibility timeout, dead-letter queues."},
+      {"slug": "pubsub", "title": "Pub/Sub & Event Logs", "isNew": false, "scope": "Topics, fan-out, partitioned logs (Kafka-style), consumer groups and offsets, ordering per partition, retention/replay."},
+      {"slug": "batch-stream", "title": "Batch vs Stream Processing", "isNew": false, "scope": "MapReduce-style batch, stream processing, windows, late events, lambda vs kappa architecture."},
+      {"slug": "event-sourcing-cqrs", "title": "Event Sourcing & CQRS", "isNew": true, "scope": "Storing events not state, rebuilding projections, separate read/write models, eventual consistency of read side, snapshots."},
+      {"slug": "service-discovery", "title": "Service Discovery", "isNew": false, "scope": "Client-side vs server-side discovery, registries, health-based registration, DNS-based discovery."},
+      {"slug": "outbox-cdc", "title": "Outbox Pattern & CDC", "isNew": true, "scope": "The dual-write problem, transactional outbox, change data capture from the DB log, keeping caches/search in sync."}
+    ]},
+    {"id": "reliability", "title": "Reliability", "lessons": [
+      {"slug": "redundancy", "title": "Redundancy & Failover", "isNew": false, "scope": "SPOFs, active-active vs active-passive, availability math (nines, serial vs parallel), failover."},
+      {"slug": "timeouts-retries", "title": "Timeouts & Retries", "isNew": false, "scope": "Setting timeouts, retries with exponential backoff and jitter, retry storms, retry budgets."},
+      {"slug": "idempotency", "title": "Idempotency & Exactly-Once", "isNew": true, "scope": "Idempotency keys, dedup tables, why exactly-once delivery is really at-least-once + idempotent processing."},
+      {"slug": "circuit-breakers", "title": "Circuit Breakers & Bulkheads", "isNew": true, "scope": "Closed/open/half-open states, failing fast, bulkhead isolation of pools, graceful degradation and fallbacks."},
+      {"slug": "backpressure", "title": "Backpressure & Load Shedding", "isNew": true, "scope": "Queues growing unbounded, bounded queues, shedding low-priority work, admission control, adaptive concurrency."},
+      {"slug": "rate-limiting", "title": "Rate Limiting", "isNew": false, "scope": "Token bucket, leaky bucket, fixed vs sliding window, distributed counters in Redis, where to enforce."},
+      {"slug": "multi-region", "title": "Multi-Region & Disaster Recovery", "isNew": true, "scope": "RPO/RTO, backups vs replicas, active-passive vs active-active regions, data residency, failover drills."},
+      {"slug": "chaos-engineering", "title": "Chaos Engineering & SLOs", "isNew": true, "scope": "SLIs, SLOs, error budgets, game days, injecting failure safely, blast radius."}
+    ]},
+    {"id": "architecture", "title": "Architecture", "lessons": [
+      {"slug": "microservices", "title": "Monolith vs Microservices", "isNew": false, "scope": "Modular monolith, service boundaries, data ownership per service, costs of distribution."},
+      {"slug": "sagas", "title": "Sagas & Distributed Transactions", "isNew": false, "scope": "Why 2PC is avoided, orchestration vs choreography sagas, compensating actions."},
+      {"slug": "service-mesh", "title": "Sidecars & Service Mesh", "isNew": true, "scope": "Sidecar proxies, mTLS, retries/timeouts in the mesh, control plane vs data plane, overhead."},
+      {"slug": "serverless", "title": "Serverless & Containers", "isNew": true, "scope": "Containers and orchestrators (Kubernetes-style scheduling), functions-as-a-service, cold starts, when each fits."}
+    ]},
+    {"id": "security", "title": "Security", "lessons": [
+      {"slug": "authentication", "title": "Authentication", "isNew": false, "scope": "Passwords + hashing, sessions vs JWTs, OAuth 2.0 / OIDC login flow, MFA, token refresh."},
+      {"slug": "authorization", "title": "Authorization", "isNew": false, "scope": "RBAC vs ABAC vs ReBAC, centralized policy checks, least privilege, multi-tenant isolation."},
+      {"slug": "encryption", "title": "Encryption in Transit & at Rest", "isNew": false, "scope": "TLS, symmetric vs asymmetric, envelope encryption with KMS, key rotation, hashing vs encryption."},
+      {"slug": "ddos-abuse", "title": "DDoS & Abuse Protection", "isNew": true, "scope": "Volumetric vs application-layer attacks, anycast and scrubbing, WAF, bot detection, per-client limits."},
+      {"slug": "secrets-management", "title": "Secrets Management", "isNew": true, "scope": "Why not in code/env files, vaults, short-lived credentials, rotation, workload identity."}
+    ]},
+    {"id": "shipping", "title": "Shipping & Operations", "lessons": [
+      {"slug": "testing", "title": "Testing Distributed Systems", "isNew": false, "scope": "Test pyramid, contract tests, integration with real dependencies, load tests, fault injection in tests."},
+      {"slug": "cicd", "title": "CI/CD Pipelines", "isNew": false, "scope": "Build, test, artifact, deploy stages; trunk-based development; pipeline as code; rollback."},
+      {"slug": "deploy-strategies", "title": "Deploys: Canary, Blue-Green, Flags", "isNew": true, "scope": "Rolling vs blue-green vs canary, feature flags, dark launches, schema migrations with expand/contract."},
+      {"slug": "observability", "title": "Observability", "isNew": false, "scope": "Metrics, logs, traces; RED/USE methods; distributed tracing with trace IDs; alerting on symptoms."}
+    ]},
+    {"id": "case-studies", "title": "Whole Systems", "lessons": [
+      {"slug": "design-url-shortener", "title": "Design a URL Shortener", "isNew": false, "scope": "Write/read paths, key generation, redirect caching, analytics counting, scale numbers."},
+      {"slug": "design-chat", "title": "Design a Chat App", "isNew": false, "scope": "WebSocket gateways, message storage, delivery/read receipts, presence, group fan-out, offline sync."},
+      {"slug": "design-news-feed", "title": "Design a News Feed", "isNew": false, "scope": "Fan-out on write vs read, celebrity problem hybrid, feed cache, ranking stage."},
+      {"slug": "design-typeahead", "title": "Design Search Autocomplete", "isNew": true, "scope": "Trie / prefix index, top-k per prefix precomputation, update pipeline, edge caching, latency budget."},
+      {"slug": "design-notifications", "title": "Design a Notification System", "isNew": true, "scope": "Multi-channel (push, email, SMS), preference service, queues per channel, retries, dedup, rate limits."},
+      {"slug": "design-video-streaming", "title": "Design Video Streaming", "isNew": true, "scope": "Upload, transcoding pipeline, adaptive bitrate (HLS/DASH segments), CDN delivery, metadata service."},
+      {"slug": "design-ride-sharing", "title": "Design Ride Sharing", "isNew": true, "scope": "Driver location ingest, geospatial index for nearby drivers, matching, trip state machine, surge."},
+      {"slug": "design-web-crawler", "title": "Design a Web Crawler", "isNew": true, "scope": "URL frontier, politeness per host, dedup of URLs and content, DNS caching, distributed workers."},
+      {"slug": "design-kv-store", "title": "Design a Key-Value Store", "isNew": true, "scope": "Dynamo-style: consistent hashing, replication, quorums, vector clocks/conflicts, gossip, hinted handoff."},
+      {"slug": "design-payments", "title": "Design a Payment System", "isNew": true, "scope": "Idempotent payment API, ledger with double-entry, PSP integration, reconciliation, exactly-once money movement."},
+      {"slug": "design-file-sync", "title": "Design File Sync (Dropbox-like)", "isNew": true, "scope": "Chunking and dedup, metadata vs block storage, sync notifications, conflict handling, delta sync."},
+      {"slug": "design-ticketing", "title": "Design Ticket Booking", "isNew": true, "scope": "Seat inventory contention, temporary holds with expiry, virtual waiting room, avoiding double booking."}
+    ]}
+  ]
+}

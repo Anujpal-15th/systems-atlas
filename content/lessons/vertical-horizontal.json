@@ -1,0 +1,66 @@
+{
+  "slug": "vertical-horizontal",
+  "title": "Vertical vs Horizontal Scaling",
+  "subtitle": "Watch one overloaded server get fixed two ways, a bigger box or more boxes, and see what each choice costs.",
+  "minutes": 10,
+  "level": "Beginner",
+  "learn": [
+    "The difference between scaling up (vertical) and scaling out (horizontal)",
+    "Why a single big machine has both a hard ceiling and a single point of failure",
+    "How adding servers behind a load balancer raises capacity and survives failures",
+    "Why cost per unit of capacity often rises at the top of the instance range",
+    "When a bigger box is the right and simplest answer, especially for databases"
+  ],
+  "nodes": [
+    {"id": "users", "label": "Users", "kind": "user", "x": 8, "y": 50},
+    {"id": "lb", "label": "Load balancer", "kind": "lb", "x": 32, "y": 50},
+    {"id": "s1", "label": "Server 1 (4 vCPU)", "kind": "server", "x": 57, "y": 14},
+    {"id": "s2", "label": "Server 2 (4 vCPU)", "kind": "server", "x": 57, "y": 36},
+    {"id": "s3", "label": "Server 3 (4 vCPU)", "kind": "server", "x": 57, "y": 58},
+    {"id": "big", "label": "Big server (16 vCPU)", "kind": "server", "x": 57, "y": 84},
+    {"id": "db", "label": "Database", "kind": "db", "x": 88, "y": 50}
+  ],
+  "edges": [
+    {"from": "users", "to": "lb"},
+    {"from": "users", "to": "big"},
+    {"from": "users", "to": "s1"},
+    {"from": "lb", "to": "s1"},
+    {"from": "lb", "to": "s2"},
+    {"from": "lb", "to": "s3"},
+    {"from": "s1", "to": "db"},
+    {"from": "s2", "to": "db"},
+    {"from": "s3", "to": "db"},
+    {"from": "big", "to": "db"}
+  ],
+  "metrics": [
+    {"id": "cap", "label": "Capacity", "unit": "req/s"},
+    {"id": "cpu", "label": "Peak CPU", "unit": "%"},
+    {"id": "cost", "label": "App cost", "unit": "$/mo"},
+    {"id": "avail", "label": "Availability", "unit": "%"}
+  ],
+  "steps": [
+    {"tag": "QUESTION", "title": "One server is running hot", "body": "Your shop runs on one 4 vCPU server that can handle about 800 requests per second (an assumption for this lesson). Traffic has doubled and now peaks at 680 requests per second, so the CPU sits at 85 percent. One more good week and requests will queue and time out. You need more capacity. There are two basic moves.", "idea": "Capacity problems have two fixes: make the machine bigger, or add more machines.", "caption": "Peak load is close to the server's limit.", "focus": ["users", "s1"], "flows": [{"from": "users", "to": "s1", "kind": "request", "label": "680 req/s"}, {"from": "s1", "to": "db", "kind": "request", "label": "queries"}], "metrics": {"cap": "800", "cpu": "85", "cost": "150", "avail": "99.9"}},
+    {"tag": "CONCEPT", "title": "Scale up: a bigger box", "body": "Vertical scaling means replacing the server with a larger one: more CPU cores, more RAM, faster disks. Here you move from 4 to 16 vCPU. Capacity rises roughly four times, to about 2,800 requests per second (a bit less than 4x because of contention). Cloud prices in this range grow about in line with size, so cost goes to about $600 a month. Your code does not change at all.", "idea": "Scaling up is the simplest fix because the application stays exactly the same.", "caption": "Traffic now goes to one much larger server.", "focus": ["users", "big", "db"], "flows": [{"from": "users", "to": "big", "kind": "request", "label": "680 req/s"}, {"from": "big", "to": "db", "kind": "request", "label": "queries"}], "metrics": {"cap": "2800", "cpu": "24", "cost": "600", "avail": "99.9"}},
+    {"tag": "TRADE-OFF", "title": "The limits of one machine", "body": "Keep scaling up and you hit walls. The largest instances top out at a few hundred cores, and software often stops using extra cores well (locks and shared memory limit the gain). Prices also bend upward near the top, since rare hardware costs more per core. Resizing usually needs a restart, and the one box is still a single point of failure: if it dies, the site is down.", "idea": "Scale up has a hard ceiling, rising unit cost at the top, and no protection from failure.", "caption": "Even the big server is one failure away from an outage.", "focus": ["users", "big"], "flows": [{"from": "users", "to": "big", "kind": "fail", "label": "box crashed"}], "metrics": {"cap": "9000", "cpu": "8", "cost": "2400", "avail": "99.9"}},
+    {"tag": "CONCEPT", "title": "Scale out: more boxes", "body": "Horizontal scaling adds more machines of ordinary size and spreads the work across them. Here a load balancer fronts three 4 vCPU servers. Capacity is about 2,400 requests per second for roughly $450 of servers plus about $20 for the load balancer. Adding a fourth box later adds another 800, so growth is in small, cheap, reversible steps. The catch: your app must work when requests land on different servers.", "idea": "Scale out grows capacity in small steps by adding ordinary machines behind a load balancer.", "caption": "The load balancer now fronts three servers.", "focus": ["users", "lb", "s1", "s2", "s3"], "flows": [{"from": "users", "to": "lb", "kind": "request", "label": "680 req/s"}, {"from": "lb", "to": "s1", "kind": "request"}, {"from": "lb", "to": "s2", "kind": "request"}, {"from": "lb", "to": "s3", "kind": "request"}], "metrics": {"cap": "2400", "cpu": "28", "cost": "470", "avail": "99.9"}},
+    {"tag": "FLOW", "title": "Work is shared", "body": "Each request lands on one of the three servers, so each carries about 227 requests per second, around 28 percent CPU. Every server talks to the same database, which is where shared data lives. For this to work, servers must not keep user state in local memory, or the next request may land somewhere that does not know the user. That design (statelessness) and the balancing rules are covered in their own lessons.", "idea": "Scale out works when any server can handle any request, so state must live outside the servers.", "caption": "All three servers read and write one database.", "focus": ["lb", "s1", "s2", "s3", "db"], "flows": [{"from": "s1", "to": "db", "kind": "request", "label": "queries"}, {"from": "s2", "to": "db", "kind": "request", "label": "queries"}, {"from": "s3", "to": "db", "kind": "request", "label": "queries"}, {"from": "db", "to": "s1", "kind": "response"}, {"from": "db", "to": "s2", "kind": "response"}, {"from": "db", "to": "s3", "kind": "response"}], "metrics": {"cap": "2400", "cpu": "28"}},
+    {"tag": "WHAT IF", "title": "One server dies", "body": "Now server 2 crashes. The load balancer notices through health checks and stops sending it traffic. The remaining two servers handle about 1,600 requests per second, well above the 680 you actually have, so users see nothing except maybe a few failed requests during detection. Spare capacity beyond peak, often called N+1, turns a hardware failure into a non-event. The single big server could not do this.", "idea": "Many small servers survive failures; spare capacity is what makes that survival real.", "caption": "Server 2 fails, the other two absorb its traffic.", "focus": ["lb", "s1", "s2", "s3"], "flows": [{"from": "lb", "to": "s2", "kind": "fail", "label": "unhealthy"}, {"from": "lb", "to": "s1", "kind": "request", "label": "340 req/s"}, {"from": "lb", "to": "s3", "kind": "request", "label": "340 req/s"}], "metrics": {"cap": "1600", "cpu": "43", "avail": "99.99"}},
+    {"tag": "TRADE-OFF", "title": "What scale out costs you", "body": "Horizontal scaling moves complexity from hardware into software and operations. You need a load balancer, health checks, deployment across many machines, shared session storage, and monitoring of a fleet. Data is the hardest part: three app servers can all be cloned, but they still share one database, which now carries three servers' worth of queries. Scaling data out (replicas, sharding) is much harder than scaling stateless app code.", "idea": "Scaling out adds operational and design complexity, and shared data stores become the next bottleneck.", "caption": "Three servers now funnel into one database.", "focus": ["s1", "s2", "s3", "db"], "flows": [{"from": "s1", "to": "db", "kind": "request"}, {"from": "s2", "to": "db", "kind": "request"}, {"from": "s3", "to": "db", "kind": "request"}, {"from": "db", "to": "s2", "kind": "fail", "label": "connections full"}], "metrics": {"cap": "2400", "cpu": "28"}},
+    {"tag": "WHAT IF", "title": "When the bigger box wins", "body": "A relational database is the classic case. It keeps data consistent in one place, and splitting it across machines is hard, so the usual first move is a larger instance with more RAM to keep hot data in memory. Small products also win with one box: at 680 requests per second, two 16 vCPU servers or one big one are simpler than a fleet. Scale up first while it is cheap and easy, then scale out when you hit the ceiling or need availability.", "idea": "Scale up first for databases and small systems; scale out when you need failure tolerance or outgrow one box.", "caption": "A larger database absorbs the load without redesign.", "focus": ["big", "db"], "flows": [{"from": "big", "to": "db", "kind": "request", "label": "queries"}, {"from": "db", "to": "big", "kind": "response", "label": "rows from RAM"}], "metrics": {"cap": "2800", "cpu": "24", "cost": "600"}},
+    {"tag": "RECAP", "title": "Pick by the constraint", "body": "Scaling up is simple and needs no code change, but it has a ceiling, rising cost at the top, and one point of failure. Scaling out adds capacity in small steps and survives failures, but requires stateless services, a load balancer, and a plan for shared data. Most real systems do both: scale the database up, and scale the stateless app tier out.", "idea": "Scale up for simplicity, scale out for headroom and resilience, and combine them.", "caption": "Both paths shown: one big box and a pool of servers.", "focus": ["users", "lb", "s1", "s2", "s3", "big", "db"], "flows": [], "metrics": {"cap": "2400", "cpu": "28", "cost": "470", "avail": "99.99"}}
+  ],
+  "quiz": [
+    {"q": "Which statement best describes the main weakness of scaling up a single server, even a very large one?", "options": ["It always requires rewriting the application", "It has a hard ceiling and remains a single point of failure", "It cannot use more than 4 CPU cores", "It makes the database slower by definition"], "answer": 1, "why": "A bigger box needs no code change, but there is a largest machine you can buy, and if that one machine fails everything it serves goes down."},
+    {"q": "You run three servers, each at 75 percent CPU at peak. One fails. What is the most likely result?", "options": ["Nothing changes because load balancers add capacity", "The other two run near 90 percent, which is tight but workable", "The other two need about 112 percent each, so they overload and requests fail", "The failed server's traffic is automatically dropped"], "answer": 2, "why": "Three servers at 75 percent carry 2.25 servers' worth of work. Two servers can only supply 2.0, so they cannot keep up. This is why N+1 headroom matters: size the fleet so peak load still fits after losing one."},
+    {"q": "Your stateless web tier is at its limit, and your single database is at 40 percent CPU with room to spare. What is the sensible first move?", "options": ["Shard the database across four servers", "Add more web servers behind the load balancer", "Replace the web tier with one very large server", "Switch the database to a different vendor"], "answer": 1, "why": "The web tier is the bottleneck and is stateless, so adding servers is cheap and low risk. The database has headroom, so sharding it would add heavy complexity for no benefit."},
+    {"q": "A team wants to scale a primary relational database for the next year with minimal risk. Why is a larger instance often a good first choice?", "options": ["Databases cannot run on more than one machine ever", "It keeps data in one place with no new consistency problems and needs no application changes", "Bigger instances are always cheaper per core", "Scaling out is impossible in the cloud"], "answer": 1, "why": "A single primary avoids splitting data and the coordination problems that follow. Scaling up is often the simplest path until you outgrow it, though replicas and sharding exist for later."}
+  ],
+  "cheatsheet": [
+    {"term": "Vertical scaling (scale up)", "def": "Make one machine bigger with more CPU, RAM, or faster disks. Simple, no code change, but has a ceiling and one point of failure."},
+    {"term": "Horizontal scaling (scale out)", "def": "Add more machines and spread work across them. Grows in small steps and tolerates failures, but needs stateless design and a load balancer."},
+    {"term": "Single point of failure", "def": "A component whose failure takes the whole system down. One big server is the typical example."},
+    {"term": "N+1 headroom", "def": "Keep enough spare capacity that losing any one server still leaves you above peak load. A rule of thumb, not a guarantee."},
+    {"term": "Cost curve", "def": "Mid-range cloud instances cost roughly linearly with size, but the very largest cost more per core and gains flatten."},
+    {"term": "Default order of operations", "def": "Scale up first while it is cheap and simple. Scale out the stateless tier when you need headroom or resilience. Scale databases out last."}
+  ]
+}

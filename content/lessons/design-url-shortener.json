@@ -1,0 +1,98 @@
+{
+  "slug": "design-url-shortener",
+  "title": "Design a URL Shortener",
+  "subtitle": "Build the whole system: create a short link, redirect fast from a cache, and count clicks without slowing anyone down.",
+  "minutes": 16,
+  "level": "Intermediate",
+  "learn": [
+    "Why a shortener is a read-heavy system and how the 100:1 ratio shapes every choice",
+    "Three ways to generate short keys and why block allocation from a counter wins",
+    "How a cache-aside redirect path serves most traffic without touching the database",
+    "Why click analytics go through a queue instead of the redirect path",
+    "How to size traffic, storage, and cache with simple back-of-envelope numbers"
+  ],
+  "nodes": [
+    {"id": "client", "label": "Browser", "kind": "client", "x": 8, "y": 50},
+    {"id": "lb", "label": "Load balancer", "kind": "lb", "x": 27, "y": 50},
+    {"id": "redirect", "label": "Redirect service", "kind": "server", "x": 47, "y": 25},
+    {"id": "create", "label": "Create service", "kind": "service", "x": 47, "y": 75},
+    {"id": "cache", "label": "Redis cache", "kind": "cache", "x": 68, "y": 12},
+    {"id": "db", "label": "URL store", "kind": "db", "x": 88, "y": 45},
+    {"id": "keygen", "label": "Key allocator", "kind": "service", "x": 68, "y": 88},
+    {"id": "queue", "label": "Click events", "kind": "queue", "x": 68, "y": 55},
+    {"id": "worker", "label": "Analytics worker", "kind": "worker", "x": 88, "y": 78}
+  ],
+  "edges": [
+    {"from": "client", "to": "lb"},
+    {"from": "lb", "to": "redirect"},
+    {"from": "lb", "to": "create"},
+    {"from": "redirect", "to": "cache"},
+    {"from": "redirect", "to": "db"},
+    {"from": "redirect", "to": "queue"},
+    {"from": "create", "to": "keygen"},
+    {"from": "create", "to": "db"},
+    {"from": "queue", "to": "worker"},
+    {"from": "worker", "to": "db"},
+    {"from": "redirect", "to": "client"}
+  ],
+  "metrics": [
+    {"id": "rps", "label": "Redirects/s", "unit": "req/s"},
+    {"id": "hit", "label": "Cache hit", "unit": "%"},
+    {"id": "dbq", "label": "DB reads/s", "unit": "req/s"},
+    {"id": "p99", "label": "p99 redirect", "unit": "ms"}
+  ],
+  "steps": [
+    {"tag": "QUESTION", "title": "Two jobs, very different load", "body": "A URL shortener does two things: turn a long URL into a short one (a write), and turn the short one back into a redirect (a read). Assume 100 million new links a month, which is about 40 writes per second. People click far more than they create, say 100 clicks per link, so reads run near 4,000 per second on average and maybe 12,000 at peak. Those are assumptions, but the shape is real: reads dominate.", "idea": "Design for the read path first; the write path is small and can afford to be slower.", "caption": "Two paths share one store: rare writes, constant reads.", "focus": ["client", "create", "redirect"], "flows": [], "metrics": {"rps": "4000", "hit": "0", "dbq": "4000", "p99": "40"}},
+    {"tag": "WRITE", "title": "Create a short link", "body": "The client sends POST /links with the long URL. The load balancer hands it to a create service, which validates the URL (scheme, length, not on a blocklist) and picks the short key. It then stores one row mapping key to long URL, plus the owner and an optional expiry. At 40 writes per second, one modest database primary handles this easily.", "idea": "Writes are low volume, so correctness (unique keys, valid URLs) matters more than raw speed here.", "caption": "A POST reaches the create service.", "focus": ["client", "lb", "create"], "flows": [{"from": "client", "to": "lb", "kind": "request", "label": "POST /links"}, {"from": "lb", "to": "create", "kind": "request", "label": "POST /links"}], "metrics": {}},
+    {"tag": "KEYS", "title": "Generating the short key", "body": "A 7-character key from 62 symbols (a-z, A-Z, 0-9) gives 62^7, about 3.5 trillion keys, far more than we need. Hashing the URL and truncating risks collisions you must detect and retry. Random keys have the same problem. A better way: the create service asks a key allocator for a block of numbers, say 1 million, and hands them out locally as a counter, encoding each in base62. No per-write coordination, and no collisions by construction.", "idea": "Allocating ID blocks from a counter avoids collisions and makes key creation a local, constant-time step.", "caption": "Create service leases a number block, then stores the row.", "focus": ["create", "keygen", "db"], "flows": [{"from": "create", "to": "keygen", "kind": "request", "label": "lease 1M ids"}, {"from": "keygen", "to": "create", "kind": "response", "label": "5M to 6M"}, {"from": "create", "to": "db", "kind": "request", "label": "INSERT aZ3kQ9x"}, {"from": "db", "to": "create", "kind": "response", "label": "ok"}], "metrics": {}},
+    {"tag": "TRADE-OFF", "title": "Sequential keys leak", "body": "Plain counters give keys that are guessable and enumerable: anyone can walk through links one by one. If links are private-ish, scramble the number before encoding, for example with a reversible permutation or a keyed block cipher, so output looks random but stays unique. If a leased block is lost when a server crashes, you simply skip those numbers. With trillions available, gaps cost nothing.", "idea": "Unique and unguessable are separate properties; a counter plus a reversible scramble gives both.", "caption": "The allocator only hands out blocks, never single keys.", "focus": ["create", "keygen"], "flows": [{"from": "create", "to": "keygen", "kind": "request", "label": "next block"}, {"from": "keygen", "to": "create", "kind": "response", "label": "6M to 7M"}], "metrics": {}},
+    {"tag": "READ", "title": "A redirect, served from cache", "body": "Someone opens short.example/aZ3kQ9x. The redirect service looks the key up in Redis first. For popular links this is a hit: a sub-millisecond lookup returns the long URL, and the service answers with an HTTP redirect. Link popularity is heavily skewed, so a cache holding the hottest 20 percent of keys can serve about 90 percent of reads. Cache-aside means the app, not the cache, loads missing entries.", "idea": "A small cache in front of the store absorbs almost all redirect traffic.", "caption": "Cache hit: redirect returned without touching the database.", "focus": ["client", "lb", "redirect", "cache"], "flows": [{"from": "client", "to": "lb", "kind": "request", "label": "GET /aZ3kQ9x"}, {"from": "lb", "to": "redirect", "kind": "request", "label": "GET /aZ3kQ9x"}, {"from": "redirect", "to": "cache", "kind": "request", "label": "GET aZ3kQ9x"}, {"from": "cache", "to": "redirect", "kind": "response", "label": "hit: long URL"}, {"from": "redirect", "to": "client", "kind": "response", "label": "302 Location"}], "metrics": {"rps": "12000", "hit": "90", "dbq": "1200", "p99": "8"}},
+    {"tag": "MISS", "title": "A cache miss falls to the store", "body": "A rarely used link is not in Redis. The redirect service reads the row from the URL store by primary key, a single indexed lookup that takes a few milliseconds, then writes the result back to the cache with a TTL so the next click is a hit. Keys that do not exist are cached briefly too, so a flood of bad keys cannot hammer the database.", "idea": "Misses cost one indexed read plus a cache fill; negative caching protects the store from junk keys.", "caption": "Miss: read from the store, then refill the cache.", "focus": ["redirect", "cache", "db"], "flows": [{"from": "redirect", "to": "cache", "kind": "request", "label": "GET rareKey"}, {"from": "cache", "to": "redirect", "kind": "response", "label": "miss"}, {"from": "redirect", "to": "db", "kind": "request", "label": "SELECT by key"}, {"from": "db", "to": "redirect", "kind": "response", "label": "long URL"}, {"from": "redirect", "to": "cache", "kind": "request", "label": "SET, TTL 24h"}], "metrics": {"p99": "25"}},
+    {"tag": "TRADE-OFF", "title": "301 or 302?", "body": "A 301 says the move is permanent, so browsers cache it and later clicks never reach you. That cuts load but hides those clicks from your analytics and makes edits or deletions slow to take effect. A 302 (temporary) is sent every time, so you keep counting and can change the target. Most shorteners that offer stats or editing use 302 and accept the extra traffic.", "idea": "The redirect status code decides whether you keep control and visibility, or save load.", "caption": "A 302 forces every click back through the service.", "focus": ["client", "redirect"], "flows": [{"from": "redirect", "to": "client", "kind": "response", "label": "302 Location"}, {"from": "client", "to": "redirect", "kind": "request", "label": "next click"}], "metrics": {}},
+    {"tag": "ANALYTICS", "title": "Count clicks off the hot path", "body": "Writing a click count to the database on every redirect would turn 12,000 reads per second into 12,000 writes per second on the same rows. Instead, the redirect service drops a small event (key, time, country, user agent) onto a queue and returns immediately. A worker consumes batches, adds them up, and writes totals per link per minute. Counts lag by seconds, which is fine for a dashboard.", "idea": "Fire-and-forget events plus batch aggregation keep analytics from slowing redirects.", "caption": "Click events flow through a queue to a batching worker.", "focus": ["redirect", "queue", "worker", "db"], "flows": [{"from": "redirect", "to": "queue", "kind": "async", "label": "click event"}, {"from": "queue", "to": "worker", "kind": "async", "label": "batch of 500"}, {"from": "worker", "to": "db", "kind": "request", "label": "counts += N"}], "metrics": {}},
+    {"tag": "WHAT IF", "title": "The cache goes cold", "body": "Suppose the Redis cluster restarts and every key is gone. All 12,000 reads per second now miss and land on the store, which was sized for about 1,200. Latency spikes and the database may fall over. Defences: replicate the cache, warm it from recent hot keys before taking traffic, coalesce concurrent misses for the same key into one database read, and add jitter to TTLs so keys do not expire together.", "idea": "A cache that hides load also hides your real capacity, so plan for the day it is empty.", "caption": "Cold cache: nearly every redirect hits the database.", "focus": ["redirect", "cache", "db"], "flows": [{"from": "redirect", "to": "cache", "kind": "fail", "label": "cache down"}, {"from": "redirect", "to": "db", "kind": "request", "label": "12k reads/s"}], "metrics": {"hit": "0", "dbq": "12000", "p99": "180"}},
+    {"tag": "RECAP", "title": "Numbers that hold it together", "body": "Napkin math: 100 million links a month for 5 years is 6 billion rows; at about 500 bytes each that is roughly 3 TB, so shard by key or use a store that scales out. The hot working set, the top 20 percent of keys, fits in a few tens of GB across a small Redis cluster. Blocks of IDs make writes cheap, cache-aside makes reads cheap, and queues keep analytics out of the way.", "idea": "Read-heavy design: cache the hot keys, allocate IDs in blocks, and push counting off the critical path.", "caption": "Healthy again: 90 percent of reads never reach the store.", "focus": ["client", "lb", "redirect", "create", "cache", "db", "keygen", "queue", "worker"], "flows": [], "metrics": {"rps": "4000", "hit": "90", "dbq": "400", "p99": "8"}}
+  ],
+  "quiz": [
+    {"q": "Why does a block-allocation counter beat hashing the long URL to make short keys?", "options": ["Hashes cannot be encoded in base62", "Each key is unique by construction, so there are no collisions to detect and retry", "Counters produce shorter keys than any hash", "Hashing requires a separate database per key"], "answer": 1, "why": "Handing out numbers from leased blocks guarantees uniqueness without checks. Truncated hashes can collide and need retry logic."},
+    {"q": "Your analytics dashboard shows far fewer clicks than server logs after you switch redirects from 302 to 301. What is the most likely cause?", "options": ["The cache hit rate dropped", "The queue is dropping events", "Base62 keys are being truncated", "Browsers cache the 301, so repeat clicks never reach your service"], "answer": 3, "why": "A 301 is permanent and cacheable, so browsers skip your service on repeat visits and those clicks are never counted."},
+    {"q": "The cache has a 90 percent hit rate at 12,000 reads/s. Roughly how many reads per second reach the database, and what does a cache restart do?", "options": ["About 120; nothing noticeable", "About 10,800; load drops to 1,200", "About 1,200; load jumps toward 12,000 until the cache warms", "About 12,000 always; the cache only saves latency"], "answer": 2, "why": "10 percent of 12,000 is 1,200 misses. With an empty cache nearly every read misses, so the store suddenly sees up to ten times its normal load."},
+    {"q": "Why send click events through a queue instead of incrementing a counter in the database during each redirect?", "options": ["Queues guarantee the exact count in real time", "Databases cannot store counters", "It keeps a slow or contended write off the redirect path and lets a worker batch updates", "It removes the need for a cache"], "answer": 2, "why": "Redirect latency should not depend on a write. Queueing decouples the two and batching turns thousands of tiny updates into few larger ones."}
+  ],
+  "cheatsheet": [
+    {"term": "Read:write ratio", "def": "Assume about 100 reads per write. It tells you to optimise redirects and cache hard, and keep creation simple."},
+    {"term": "Key space", "def": "7 base62 characters give 62^7, about 3.5 trillion keys. 6 characters give 56 billion, which is enough for many systems."},
+    {"term": "Block allocation", "def": "Servers lease ranges of IDs (for example 1M at a time) and encode them locally. Crashes only waste unused numbers."},
+    {"term": "Cache-aside", "def": "On a read, check the cache, on a miss read the store and fill the cache. Add TTLs, jitter, and negative caching."},
+    {"term": "301 vs 302", "def": "301 is permanent and browser-cached, saving load but hiding clicks. 302 is temporary, keeps analytics and edits working."},
+    {"term": "Async analytics", "def": "Emit a click event to a queue, aggregate in batches, write totals. Counts lag by seconds but redirects stay fast."},
+    {"term": "Sizing rule", "def": "100M links/month is about 40 writes/s; at 100:1 reads are about 4,000/s average, 12,000 at a 3x peak. 5 years is about 3 TB."}
+  ],
+  "lab": {
+    "prompt": "You are the engineer for a shortener expecting 100 million new links per month and 100 redirects per link. Produce a design: API, key generation, storage, redirect path with caching, and analytics. Defend each choice with a number.",
+    "requirements": [
+      "Compute average and peak writes per second and redirects per second, stating your peak factor",
+      "Pick a key length and show the key space is large enough for 5 years",
+      "Describe how the create path makes keys unique across many servers",
+      "Describe the redirect path including cache hit and miss behaviour and TTLs",
+      "Choose 301 or 302 and justify it against analytics and edit needs",
+      "Describe how click counts are collected without slowing redirects",
+      "Explain what happens when the cache is empty and one mitigation"
+    ],
+    "hints": [
+      "100M per month divided by about 2.6M seconds per month is roughly 40 per second",
+      "Total rows after 5 years times bytes per row gives storage; compare with one server's disk",
+      "Think about what a lost ID block costs: almost nothing",
+      "The 80/20 skew in link popularity decides how big the cache must be",
+      "Ask whether the counts must be exact in real time or can lag a few seconds"
+    ],
+    "checklist": [
+      "Traffic estimates are stated with assumptions",
+      "Key space is larger than total links needed",
+      "No two servers can issue the same key",
+      "Redirect reads check the cache before the database",
+      "Analytics writes are not on the redirect critical path",
+      "A cold-cache or expired-key failure case is addressed"
+    ]
+  }
+}

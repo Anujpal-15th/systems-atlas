@@ -1,0 +1,69 @@
+{
+  "slug": "consistent-hashing",
+  "title": "Consistent Hashing",
+  "subtitle": "Watch a cache cluster gain and lose nodes, and see why a hash ring moves a quarter of the keys instead of three quarters.",
+  "minutes": 12,
+  "level": "Intermediate",
+  "learn": [
+    "Why hash(key) mod N reshuffles almost every key when N changes",
+    "How a hash ring maps keys and nodes onto one circle and walks clockwise",
+    "Why adding or removing a node moves only about 1/N of the keys",
+    "How virtual nodes even out load and handle uneven machines",
+    "Where rings show up: cache clients and Dynamo-style stores"
+  ],
+  "nodes": [
+    {"id": "client", "label": "App / cache client", "kind": "client", "x": 8, "y": 50},
+    {"id": "ring", "label": "Hash ring lookup", "kind": "service", "x": 32, "y": 50},
+    {"id": "a", "label": "Cache A", "kind": "cache", "x": 68, "y": 14},
+    {"id": "b", "label": "Cache B", "kind": "cache", "x": 68, "y": 36},
+    {"id": "c", "label": "Cache C", "kind": "cache", "x": 68, "y": 58},
+    {"id": "d", "label": "Cache D (new)", "kind": "cache", "x": 68, "y": 80},
+    {"id": "db", "label": "Database", "kind": "db", "x": 92, "y": 50}
+  ],
+  "edges": [
+    {"from": "client", "to": "ring"},
+    {"from": "ring", "to": "a"},
+    {"from": "ring", "to": "b"},
+    {"from": "ring", "to": "c"},
+    {"from": "ring", "to": "d"},
+    {"from": "a", "to": "b"},
+    {"from": "b", "to": "c"},
+    {"from": "c", "to": "d"},
+    {"from": "a", "to": "db"},
+    {"from": "b", "to": "db"},
+    {"from": "c", "to": "db"},
+    {"from": "d", "to": "db"}
+  ],
+  "metrics": [
+    {"id": "moved", "label": "Keys moved", "unit": "%"},
+    {"id": "hit", "label": "Hit rate", "unit": "%"},
+    {"id": "hot", "label": "Busiest node", "unit": "% of avg"}
+  ],
+  "steps": [
+    {"tag": "QUESTION", "title": "Which cache holds this key?", "body": "Your site keeps 30 million cached items on three cache servers, A, B and C, because no single machine has the memory. Every client must agree, with no coordination, on which server owns which key. If two clients disagree, one will write a value the other can never find. How do you split keys so everyone agrees, and so growing the cluster later does not hurt?", "idea": "Partitioning needs a rule that every client computes identically, and that survives the cluster changing size.", "caption": "Three caches, one shared rule needed.", "focus": ["client", "a", "b", "c"], "flows": [], "metrics": {"moved": "0", "hit": "95", "hot": "100"}},
+    {"tag": "FLOW", "title": "The simple rule: hash mod N", "body": "The obvious answer is server = hash(key) mod 3. A good hash spreads keys evenly, so each server gets about a third, and every client computes the same answer. The key user:42 might hash to 7, and 7 mod 3 is 1, so it lives on B. This works well for as long as the number of servers never changes.", "idea": "hash(key) mod N is stateless and even, but it bakes the server count into every key's address.", "caption": "user:42 hashes to B; hit rate is a healthy 95%.", "focus": ["client", "ring", "b"], "flows": [{"from": "client", "to": "ring", "kind": "request", "label": "GET user:42"}, {"from": "ring", "to": "b", "kind": "request", "label": "7 mod 3 = B"}, {"from": "b", "to": "ring", "kind": "response", "label": "hit"}, {"from": "ring", "to": "client", "kind": "response", "label": "value"}], "metrics": {"moved": "0", "hit": "95", "hot": "100"}},
+    {"tag": "PROBLEM", "title": "Add one server, lose most of the cache", "body": "Traffic grows, so you add Cache D and change the rule to mod 4. Now 7 mod 4 is 3, not 1. A key stays put only if its hash gives the same answer under both moduli, which is about one key in four. Roughly 75% of keys now map to a server that does not hold them. They all miss at once and stampede the database.", "idea": "With mod N, going from N to N+1 servers remaps about N/(N+1) of all keys, so scaling out causes a cache wipe.", "caption": "75% of lookups miss and fall through to the database.", "focus": ["ring", "d", "db"], "flows": [{"from": "ring", "to": "d", "kind": "request", "label": "7 mod 4 = D"}, {"from": "d", "to": "db", "kind": "fail", "label": "miss, query"}], "metrics": {"moved": "75", "hit": "25", "hot": "100"}},
+    {"tag": "CONCEPT", "title": "Put servers and keys on a ring", "body": "Consistent hashing hashes both servers and keys into the same range, say 0 to 2^32, and bends that range into a circle. Each server sits at the point where its name hashes. To find a key's owner, hash the key, then walk clockwise until you hit the first server. Every client can build the same ring from the same server list, so no coordination is needed.", "idea": "A key belongs to the first node clockwise from its hash, so ownership depends on neighbours, not on the total count.", "caption": "user:42 lands between A and B and walks clockwise to B.", "focus": ["client", "ring", "b"], "flows": [{"from": "client", "to": "ring", "kind": "request", "label": "hash(user:42)"}, {"from": "ring", "to": "b", "kind": "request", "label": "next clockwise"}, {"from": "b", "to": "ring", "kind": "response", "label": "hit"}, {"from": "ring", "to": "client", "kind": "response", "label": "value"}], "metrics": {"moved": "0", "hit": "95", "hot": "100"}},
+    {"tag": "ADD NODE", "title": "A new node steals one arc", "body": "Cache D joins and hashes to a point on the ring, between C and A. Only the keys on the arc just before D, which used to walk past to A, now stop at D. Every other key still reaches the same server as before. With four nodes that arc covers about a quarter of the keys, so 25% move, and D can fetch them from A or let them refill.", "idea": "Adding a node moves only the keys it takes over, about 1/N of the total, and they all come from one neighbour.", "caption": "Only the keys between C and D move to D.", "focus": ["c", "d", "a"], "flows": [{"from": "c", "to": "d", "kind": "replicate", "label": "hand over arc"}, {"from": "ring", "to": "d", "kind": "request", "label": "new keys"}], "metrics": {"moved": "25", "hit": "80", "hot": "100"}},
+    {"tag": "REMOVE NODE", "title": "A failed node hands off to its successor", "body": "Now Cache B crashes. Its keys do not scatter everywhere. Walking clockwise from B's old arc, the next node, C, becomes the owner. Keys owned by A, C and D are untouched, so their cached data stays warm. Only B's share of about a quarter misses once, then refills from the database.", "idea": "Removing a node affects only the keys it owned; every other node keeps its data.", "caption": "B's keys fall to C; A and D are unaffected.", "focus": ["b", "c", "db"], "flows": [{"from": "ring", "to": "b", "kind": "fail", "label": "B is down"}, {"from": "ring", "to": "c", "kind": "request", "label": "B's keys"}, {"from": "c", "to": "db", "kind": "request", "label": "refill"}], "metrics": {"moved": "25", "hit": "75", "hot": "100"}},
+    {"tag": "PROBLEM", "title": "Random arcs are uneven", "body": "Hashing four server names onto a circle gives arcs of random length, so one node can easily own 40% of the ring while another owns 10%. Worse, when a node dies its whole arc lands on one successor, which may double its load and then also fail. With one point per server, a hot node can run about twice the average.", "idea": "With one point per server, ring positions are luck, and a dead node's load goes to a single neighbour.", "caption": "C absorbs all of B's load and runs far above average.", "focus": ["c"], "flows": [{"from": "ring", "to": "c", "kind": "request", "label": "2x traffic"}], "metrics": {"moved": "25", "hit": "75", "hot": "190"}},
+    {"tag": "FIX", "title": "Virtual nodes smooth the load", "body": "Instead of one point, each physical server gets many virtual nodes (vnodes), for example 128 points, each hashed from a name like C#17. The server owns many small arcs scattered around the ring. Load averages out to within roughly 10% of equal, and when a server dies its arcs pass to many different neighbours. A bigger machine can simply be given more vnodes.", "idea": "Many small arcs per server turn random imbalance into a near-even split, and spread a failure across all survivors.", "caption": "Each server owns many scattered arcs; load is nearly even.", "focus": ["a", "b", "c", "d"], "flows": [{"from": "ring", "to": "a", "kind": "request", "label": "vnodes A#1..128"}, {"from": "ring", "to": "b", "kind": "request", "label": "vnodes B#1..128"}, {"from": "ring", "to": "c", "kind": "request", "label": "vnodes C#1..128"}, {"from": "ring", "to": "d", "kind": "request", "label": "vnodes D#1..128"}], "metrics": {"moved": "25", "hit": "78", "hot": "110"}},
+    {"tag": "IN PRACTICE", "title": "Caches and Dynamo-style stores", "body": "Cache clients such as memcached libraries use a ring so adding a server does not flush everything. Dynamo-style databases, such as Cassandra, Riak and DynamoDB's design ancestors, go further: a key is stored on the next several distinct servers clockwise, typically 3, giving replication on top of partitioning. Any node can then rebuild the ring and route a request, with no central router.", "idea": "The same ring that places keys also picks replicas: the next few distinct nodes clockwise.", "caption": "A key is copied to the next nodes clockwise.", "focus": ["a", "b", "c"], "flows": [{"from": "a", "to": "b", "kind": "replicate", "label": "replica 2"}, {"from": "b", "to": "c", "kind": "replicate", "label": "replica 3"}], "metrics": {"moved": "25", "hit": "78", "hot": "110"}},
+    {"tag": "RECAP", "title": "Stable ownership under change", "body": "Mod N is simple but remaps about N/(N+1) of keys when the count changes. A hash ring maps keys and nodes to one circle, so a key belongs to the next node clockwise and a topology change moves only about 1/N of the keys. Virtual nodes fix uneven arcs and let big machines carry more. Rebalancing is limited, not free: moved keys still need to be copied or refilled.", "idea": "Consistent hashing makes cluster membership changes local instead of global.", "caption": "Ring plus vnodes: small, even, local moves.", "focus": ["client", "ring", "a", "b", "c", "d", "db"], "flows": [], "metrics": {"moved": "25", "hit": "80", "hot": "110"}}
+  ],
+  "quiz": [
+    {"q": "A cluster using hash(key) mod N grows from 4 to 5 servers. About what fraction of keys now map to a different server?", "options": ["About 20%", "About 50%", "About 80%", "About 100% exactly"], "answer": 2, "why": "A key stays only if its hash gives the same remainder mod 4 and mod 5, roughly 1 in 5. So about 4/5, or 80%, move. It is not exactly 100% because some hashes coincide."},
+    {"q": "On a hash ring with 5 equal nodes, a sixth is added. Roughly what share of keys move, and where do they come from?", "options": ["About 1/6 of keys, taken from neighbouring nodes on the ring", "About 5/6 of keys, from every node equally", "About 1/6 of keys, all from the new node's own old data", "None, because ownership is already set"], "answer": 0, "why": "The new node takes the arcs just before its points, about 1/6 of the ring. Those keys come from the nodes that were next clockwise, and every other key keeps its owner."},
+    {"q": "Why do virtual nodes help when a physical server fails?", "options": ["They make the hash function faster", "They stop the server from ever failing", "They reduce the number of replicas needed", "Its many small arcs are inherited by many different survivors, not one neighbour"], "answer": 3, "why": "With one point per server, a dead node's whole arc goes to one successor, which can overload. With many vnodes the arcs are scattered, so the extra load is spread across most surviving nodes."},
+    {"q": "A store uses a ring and replicates each key to the next 3 vnodes clockwise. A subtle bug: all 3 turn out to be vnodes of the same physical machine. What went wrong?", "options": ["Replica choice must skip vnodes of an already chosen physical node", "The ring has too many vnodes", "Replication should always use mod N instead", "Three replicas is too many for any ring"], "answer": 0, "why": "Replicas on one machine die together, so replication is useless. Dynamo-style systems walk the ring and take the next distinct physical nodes, skipping extra vnodes of the same machine."}
+  ],
+  "cheatsheet": [
+    {"term": "hash mod N", "def": "Simple partitioning, server = hash(key) mod N. Even, but changing N remaps about N/(N+1) of keys."},
+    {"term": "Hash ring", "def": "A circular hash space. Nodes and keys both hash onto it; a key belongs to the first node clockwise."},
+    {"term": "Keys moved on change", "def": "Adding or removing one node moves about 1/N of the keys, and only to or from its ring neighbours."},
+    {"term": "Virtual node (vnode)", "def": "One of many ring points owned by a physical server, such as 100 to 256 per node. Evens out load and spreads failure."},
+    {"term": "Weighted vnodes", "def": "Give larger machines more vnodes so their share of the ring matches their capacity."},
+    {"term": "Preference list", "def": "In Dynamo-style stores, the next N distinct physical nodes clockwise from a key's position, used as its replicas."},
+    {"term": "Still your job", "def": "Moved keys must be copied or refilled, hot keys stay hot (a ring spreads keys, not traffic per key), and clients need a consistent node list."}
+  ]
+}

@@ -1,0 +1,93 @@
+{
+  "slug": "design-file-sync",
+  "title": "Design File Sync (Dropbox-like)",
+  "subtitle": "Edit one spot in a 100 MB file and watch only 4 MB travel, then see how your other laptop learns about it.",
+  "minutes": 14,
+  "level": "Intermediate",
+  "learn": [
+    "How files are split into content-hashed blocks, and why identical blocks are stored once",
+    "Why file metadata and file bytes live in two different stores",
+    "How a device finds out what changed, using a cursor instead of trusting notifications",
+    "How delta sync moves only changed blocks in both directions",
+    "How to detect a conflict with base versions and resolve it without losing data"
+  ],
+  "nodes": [
+    {"id": "laptop", "label": "Laptop A", "kind": "client", "x": 10, "y": 50},
+    {"id": "api", "label": "Sync API", "kind": "service", "x": 36, "y": 50},
+    {"id": "meta", "label": "Metadata DB", "kind": "db", "x": 63, "y": 20},
+    {"id": "blocks", "label": "Block store", "kind": "storage", "x": 63, "y": 80},
+    {"id": "notify", "label": "Notify service", "kind": "queue", "x": 63, "y": 50},
+    {"id": "phone", "label": "Laptop B", "kind": "client", "x": 90, "y": 50}
+  ],
+  "edges": [
+    {"from": "laptop", "to": "api"},
+    {"from": "laptop", "to": "blocks"},
+    {"from": "api", "to": "meta"},
+    {"from": "api", "to": "notify"},
+    {"from": "notify", "to": "phone"},
+    {"from": "phone", "to": "api"},
+    {"from": "phone", "to": "blocks"}
+  ],
+  "metrics": [
+    {"id": "blocks", "label": "Blocks to send", "unit": "blocks"},
+    {"id": "sent", "label": "Uploaded", "unit": "MB"},
+    {"id": "saved", "label": "Saved", "unit": "%"}
+  ],
+  "steps": [
+    {"tag": "QUESTION", "title": "One small edit, one big file", "body": "You fix a typo in a 100 MB slide deck on Laptop A. Laptop B should show the fix within seconds. The naive plan is to upload all 100 MB and make B download all 100 MB. Multiply that by millions of users saving files all day and the bandwidth bill is absurd. We want to move only what changed.", "idea": "Sync is a bandwidth problem first: send the change, not the file.", "caption": "A 100 MB file changed on Laptop A.", "focus": ["laptop"], "flows": [], "metrics": {}},
+    {"tag": "CHUNKING", "title": "Cut the file into blocks", "body": "The sync client splits the file into fixed 4 MiB blocks, so 100 MB becomes about 25 blocks. It computes a SHA-256 hash of each block; the hash is the block's name, because identical bytes always give the same hash. The file is now just an ordered list of 25 hashes. This all happens locally, before any network call.", "idea": "A file becomes an ordered list of content hashes, and a block's name is its content.", "caption": "Laptop A hashes 25 blocks locally.", "focus": ["laptop"], "flows": [], "metrics": {"blocks": "25", "saved": "0"}},
+    {"tag": "DEDUP", "title": "Ask which blocks are missing", "body": "Laptop A sends the 25 hashes to the Sync API. The API checks the metadata database to see which hashes already exist in the block store. Only one hash is unknown, because the edit changed just one block; the other 24 are unchanged from the previous version. The same check also dedups across files and users: a block the system already holds is never uploaded again.", "idea": "Because blocks are named by content, the server can say exactly which ones it still needs.", "caption": "Server replies: need 1 of 25 blocks.", "focus": ["laptop", "api", "meta"], "flows": [{"from": "laptop", "to": "api", "kind": "request", "label": "25 hashes"}, {"from": "api", "to": "meta", "kind": "request", "label": "which exist?"}, {"from": "meta", "to": "api", "kind": "response", "label": "24 known"}, {"from": "api", "to": "laptop", "kind": "response", "label": "send 1 block"}], "metrics": {"blocks": "1", "sent": "0", "saved": "96"}},
+    {"tag": "UPLOAD", "title": "Upload only the changed block", "body": "Laptop A uploads the single 4 MiB block straight to the block store, usually with a short-lived signed URL the API handed out, so file bytes never pass through the API servers. Blocks are immutable: written once under their hash, never modified. That makes retries safe, since re-uploading the same block just writes identical bytes.", "idea": "Immutable, content-addressed blocks make uploads idempotent and cacheable.", "caption": "One 4 MiB block reaches the block store.", "focus": ["laptop", "blocks"], "flows": [{"from": "laptop", "to": "blocks", "kind": "request", "label": "block 7f3a (4 MB)"}, {"from": "blocks", "to": "laptop", "kind": "response", "label": "stored"}], "metrics": {"blocks": "0", "sent": "4", "saved": "96"}},
+    {"tag": "METADATA", "title": "Commit the new version", "body": "Now the client tells the API: file /deck.pptx version 8 is this list of 25 hashes, built on top of version 7. The metadata database records it in one atomic write. Metadata is small, relational, and needs strong consistency; blocks are huge, dumb, and need cheap durable storage. Committing only after all blocks exist means no version ever points at a missing block.", "idea": "Keep tiny, consistent metadata apart from huge, immutable bytes, and commit metadata last.", "caption": "Metadata DB records version 8.", "focus": ["laptop", "api", "meta"], "flows": [{"from": "laptop", "to": "api", "kind": "request", "label": "commit v8 on v7"}, {"from": "api", "to": "meta", "kind": "request", "label": "write v8"}, {"from": "meta", "to": "api", "kind": "response", "label": "ok"}, {"from": "api", "to": "laptop", "kind": "response", "label": "v8 saved"}], "metrics": {}},
+    {"tag": "NOTIFY", "title": "Tell the other devices", "body": "After the commit, the API publishes a tiny event to the notify service: something changed in this user's folder. Laptop B holds a long-lived connection (long poll or WebSocket) to it and receives a ping. The ping carries no file data and may be lost, delayed, or duplicated. It is only a nudge to go ask for changes.", "idea": "Notifications are a cheap hint to wake a device up, not the source of truth.", "caption": "A small ping reaches Laptop B.", "focus": ["api", "notify", "phone"], "flows": [{"from": "api", "to": "notify", "kind": "async", "label": "folder changed"}, {"from": "notify", "to": "phone", "kind": "async", "label": "ping"}], "metrics": {}},
+    {"tag": "DELTA SYNC", "title": "Laptop B pulls the delta", "body": "Laptop B asks the API for changes since its cursor, a position number it saved after its last sync. The API answers that deck.pptx is now version 8 with a new hash list. B compares it to the list it already has, finds one hash it lacks, and downloads just that block, then reassembles the file locally. If the ping had been lost, B would still catch up on its next poll or reconnect, because the cursor makes the question safe to repeat.", "idea": "A cursor turns sync into 'give me everything after N', which is repeatable and loss-tolerant.", "caption": "B downloads one block, not 100 MB.", "focus": ["phone", "api", "blocks"], "flows": [{"from": "phone", "to": "api", "kind": "request", "label": "changes after 981"}, {"from": "api", "to": "phone", "kind": "response", "label": "v8 hash list"}, {"from": "phone", "to": "blocks", "kind": "request", "label": "block 7f3a"}, {"from": "blocks", "to": "phone", "kind": "response", "label": "4 MB"}], "metrics": {"sent": "4", "saved": "96"}},
+    {"tag": "WHAT IF", "title": "Both laptops edited offline", "body": "Suppose B was offline and edited the same file from version 7, while A already committed version 8. When B reconnects and commits 'new version on top of 7', the API sees the current head is 8, not 7, and rejects it with a conflict. Last-writer-wins by timestamp would silently destroy one person's work, and device clocks are unreliable. Instead the server keeps v8 and B's edit is saved as a separate 'conflicted copy' for a human to merge.", "idea": "Detect conflicts by comparing base version to head; resolve by keeping both rather than guessing.", "caption": "Commit on stale base v7 is rejected.", "focus": ["phone", "api", "meta"], "flows": [{"from": "phone", "to": "api", "kind": "request", "label": "commit on v7"}, {"from": "api", "to": "meta", "kind": "request", "label": "head is v8?"}, {"from": "api", "to": "phone", "kind": "fail", "label": "409 conflict"}], "metrics": {}},
+    {"tag": "TRADE-OFF", "title": "How big should a block be?", "body": "Small blocks dedup and delta better but mean more hashes, more metadata rows, and more requests. Big blocks are cheap to track but resend more on each edit. About 4 MiB is a common middle ground. One weakness: fixed boundaries break when bytes are inserted near the start, because every later block shifts. Content-defined chunking, which picks cut points from the data itself, fixes that at the cost of more client CPU.", "idea": "Block size trades metadata overhead against bytes resent; fixed cuts are simple, content-defined cuts survive insertions.", "caption": "Block size balances metadata and bandwidth.", "focus": ["meta", "blocks"], "flows": [], "metrics": {}},
+    {"tag": "RECAP", "title": "Only the change travels", "body": "The client chunks and hashes, the API dedups against known hashes, only missing blocks are uploaded to the block store, and a final atomic metadata commit publishes the version. A small notification wakes other devices, which pull changes after their cursor and fetch only new blocks. Conflicts are caught by base-version checks and kept as separate copies.", "idea": "Hash blocks, store each once, commit metadata last, sync by cursor, and never silently overwrite.", "caption": "A 100 MB edit cost about 4 MB each way.", "focus": ["laptop", "api", "meta", "blocks", "notify", "phone"], "flows": [], "metrics": {"blocks": "0", "sent": "4", "saved": "96"}}
+  ],
+  "quiz": [
+    {"q": "A 1 GB file is stored as fixed 4 MiB blocks. You overwrite some bytes in the middle without changing the file length, touching one block. About how much must be uploaded?", "options": ["The whole 1 GB, since the file changed", "About 1 MiB, the size of the edit", "About 4 MiB, the one affected block", "About 256 MiB, a quarter of the blocks"], "answer": 2, "why": "Only the block containing the edit gets a new hash. The other 255 blocks hash the same and are already stored, so one 4 MiB block moves."},
+    {"q": "Why does the client commit the new file version to the metadata database only after the blocks are uploaded?", "options": ["So no committed version can reference a block that does not exist yet", "Because the metadata database is faster than the block store", "To make the upload bytes pass through the API", "To avoid needing hashes at all"], "answer": 0, "why": "If metadata were committed first, another device could read a version whose blocks are missing. Blocks first, pointer last makes the commit the visible switch."},
+    {"q": "The notification service drops the ping for Laptop B during a brief outage. What keeps B from staying stale forever?", "options": ["The notify service stores pings permanently and replays them to B", "The Sync API pushes the whole file to B on every commit", "B's clock detects the newer file timestamp", "B asks for changes after its saved cursor when it reconnects or polls"], "answer": 3, "why": "Notifications are only hints. The cursor query returns every change after the last position B saw, so a missed ping delays sync but cannot lose a change."},
+    {"q": "Two devices edit the same file offline from version 7. Which handling best avoids losing work?", "options": ["Keep whichever edit has the later device timestamp", "Reject the late commit as a conflict and keep both versions, saving the second as a conflicted copy", "Lock the file for every user all the time", "Merge the raw bytes automatically"], "answer": 1, "why": "Device clocks drift, so timestamp wins can destroy data, and generic byte merges corrupt binary formats. Detecting a stale base and keeping both copies is safe and simple."}
+  ],
+  "cheatsheet": [
+    {"term": "Block / chunk", "def": "A fixed-size slice of a file (about 4 MiB here). The unit of upload, storage, and dedup."},
+    {"term": "Content-addressed storage", "def": "Blocks are stored under the hash of their bytes, so equal content has one name and is stored once."},
+    {"term": "Dedup", "def": "Skipping storage or upload of a block the system already holds, within a file, across files, or across users."},
+    {"term": "Dedup caveat", "def": "Cross-user dedup can leak whether someone else has a given file ('already uploaded' reveals it). Mitigate by dedup within an account or checking proof of possession."},
+    {"term": "Metadata store", "def": "Small, consistent records: paths, versions, ordered block-hash lists, sharing. Needs transactions and sharding by account."},
+    {"term": "Block store", "def": "Cheap, durable object storage for immutable blocks, with replication or erasure coding. Clients reach it through signed URLs."},
+    {"term": "Cursor", "def": "A per-device position in the change log. 'Changes after cursor N' is safe to repeat and survives lost notifications."},
+    {"term": "Conflict handling", "def": "Commit carries its base version; if head moved on, reject and keep both copies instead of last-writer-wins."}
+  ],
+  "lab": {
+    "prompt": "Design a Dropbox-like file sync service for 100 million registered users, about 20 million active per day, averaging 20 file changes per day each. Sketch the client, the services, the two stores, and the data model, then explain what happens when two devices edit the same file offline.",
+    "requirements": [
+      "Edits to large files upload only changed data, not the whole file",
+      "A new version becomes visible to other devices only when all of its blocks are durably stored",
+      "Other devices learn of changes within a few seconds when online and catch up after being offline",
+      "Never silently lose a user's edit, even in a conflict",
+      "Identical content is stored once",
+      "Handle roughly 400 million file changes per day, about 4,600 commits per second on average and several times that at peak"
+    ],
+    "hints": [
+      "Divide daily commits by 86,400 seconds, then multiply by a peak factor of 3 or more",
+      "Decide what the metadata row for a file version holds: version number, base version, ordered hash list",
+      "Think about what the per-user change log and its cursor look like, and what shards it",
+      "Let clients upload to the block store with signed URLs so the API tier stays light",
+      "Ask what a client must send with a commit so the server can detect a stale base",
+      "Consider the privacy risk of cross-user dedup and what you would do about it"
+    ],
+    "checklist": [
+      "Client chunking and hashing step with a stated block size",
+      "Hash-existence check that returns only the missing blocks",
+      "Separate metadata store and block store with reasons",
+      "Blocks-first, metadata-commit-last ordering",
+      "Per-user change log with a cursor for delta sync",
+      "Notification path treated as a hint, with a polling fallback",
+      "Base-version conflict check and a keep-both resolution",
+      "Block garbage collection plan for blocks no version references"
+    ]
+  }
+}
