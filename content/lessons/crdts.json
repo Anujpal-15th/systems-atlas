@@ -12,49 +12,465 @@
     "The idea behind collaborative text editing, and where CRDTs stop working"
   ],
   "nodes": [
-    {"id": "alice", "label": "Alice's phone", "kind": "client", "x": 15, "y": 25},
-    {"id": "ra", "label": "Replica A", "kind": "region", "x": 55, "y": 25},
-    {"id": "bob", "label": "Bob's laptop", "kind": "client", "x": 15, "y": 75},
-    {"id": "rb", "label": "Replica B", "kind": "region", "x": 55, "y": 75}
+    {
+      "id": "alice",
+      "label": "Alice's phone",
+      "kind": "client",
+      "x": 15,
+      "y": 25
+    },
+    {
+      "id": "ra",
+      "label": "Replica A",
+      "kind": "region",
+      "x": 55,
+      "y": 25
+    },
+    {
+      "id": "bob",
+      "label": "Bob's laptop",
+      "kind": "client",
+      "x": 15,
+      "y": 75
+    },
+    {
+      "id": "rb",
+      "label": "Replica B",
+      "kind": "region",
+      "x": 55,
+      "y": 75
+    }
   ],
   "edges": [
-    {"from": "alice", "to": "ra"},
-    {"from": "bob", "to": "rb"},
-    {"from": "ra", "to": "rb", "label": "sync link"}
+    {
+      "from": "alice",
+      "to": "ra"
+    },
+    {
+      "from": "bob",
+      "to": "rb"
+    },
+    {
+      "from": "ra",
+      "to": "rb",
+      "label": "sync link"
+    }
   ],
   "metrics": [
-    {"id": "a", "label": "Replica A", "unit": "likes"},
-    {"id": "b", "label": "Replica B", "unit": "likes"},
-    {"id": "truth", "label": "True total", "unit": "likes"},
-    {"id": "lost", "label": "Lost updates", "unit": "writes"}
+    {
+      "id": "a",
+      "label": "Replica A",
+      "unit": "likes"
+    },
+    {
+      "id": "b",
+      "label": "Replica B",
+      "unit": "likes"
+    },
+    {
+      "id": "truth",
+      "label": "True total",
+      "unit": "likes"
+    },
+    {
+      "id": "lost",
+      "label": "Lost updates",
+      "unit": "writes"
+    }
   ],
   "steps": [
-    {"tag": "QUESTION", "title": "Two copies, one cable cut", "body": "A post has 10 likes, stored on Replica A and Replica B so each user writes to a nearby copy. Now the link between them drops, or one user goes offline in a tunnel. Both replicas must keep accepting writes, because refusing them would make the app unusable. When the link returns, the copies will have diverged. What should the merged value be?", "idea": "If replicas accept writes independently, conflicts are guaranteed; the only question is how you resolve them.", "caption": "Both replicas start at 10 likes.", "focus": ["ra", "rb"], "flows": [{"from": "ra", "to": "rb", "kind": "replicate", "label": "10 likes"}], "metrics": {"a": "10", "b": "10", "truth": "10", "lost": "0"}},
-    {"tag": "CONFLICT", "title": "Concurrent writes", "body": "While partitioned, Alice taps like once on Replica A, so A stores 11. Bob taps like twice on Replica B, so B stores 12. Neither write knew about the other, which is what concurrent means: neither happened before the other. The honest total is 13, but each replica now holds a different number and the sync link is down.", "idea": "Concurrent means neither write had seen the other, not that they happened at the same instant.", "caption": "A shows 11, B shows 12, truth is 13.", "focus": ["alice", "ra", "bob", "rb"], "flows": [{"from": "alice", "to": "ra", "kind": "request", "label": "like +1"}, {"from": "bob", "to": "rb", "kind": "request", "label": "like +2"}, {"from": "ra", "to": "rb", "kind": "fail", "label": "partitioned"}], "metrics": {"a": "11", "b": "12", "truth": "13"}},
-    {"tag": "LWW", "title": "Last write wins", "body": "The simplest rule: every write carries a timestamp, and on sync the replica with the newest timestamp overwrites the other. Here B wrote last, so both settle on 12. The copies agree, but Alice's like is gone and nobody was told. LWW also trusts wall clocks, and clocks on different machines can disagree by tens of milliseconds or more, so the winner may not even be the truly later write.", "idea": "LWW always converges, but it throws away one side of every conflict, so it is only safe when losing a write is fine.", "caption": "Sync keeps B's value; Alice's like is lost.", "focus": ["ra", "rb"], "flows": [{"from": "rb", "to": "ra", "kind": "replicate", "label": "12 @ t=10:04"}], "metrics": {"a": "12", "b": "12", "lost": "1"}},
-    {"tag": "CONCEPT", "title": "Merge instead of overwrite", "body": "A CRDT (conflict-free replicated data type) is a data structure designed so that any two copies can be merged without a coordinator. The merge function must be commutative (order of the two inputs does not matter), associative (grouping does not matter), and idempotent (merging the same state twice changes nothing). If those hold, replicas that receive the same updates end up identical, in any order, with duplicates.", "idea": "A CRDT turns conflict resolution into a math property of the merge function, so no write is arbitrarily discarded.", "caption": "Replicas now exchange state and merge it.", "focus": ["ra", "rb"], "flows": [{"from": "ra", "to": "rb", "kind": "replicate", "label": "state"}, {"from": "rb", "to": "ra", "kind": "replicate", "label": "state"}], "metrics": {}},
-    {"tag": "G-COUNTER", "title": "A counter that cannot lose", "body": "Instead of one number, a G-counter (grow-only counter) keeps one slot per replica. Start at {A:5, B:5}, total 10. Alice's like bumps A's slot to 6. Bob's two likes bump B's slot to 7. Each replica only ever writes its own slot. Merge takes the maximum of each slot: {A:6, B:7}. The value is the sum, 13, which is the true total.", "idea": "Give each replica its own slot and merge with max; the counter's value is the sum of the slots.", "caption": "Slots merge to {A:6, B:7}, total 13.", "focus": ["ra", "rb"], "flows": [{"from": "ra", "to": "rb", "kind": "replicate", "label": "{A:6,B:5}"}, {"from": "rb", "to": "ra", "kind": "replicate", "label": "{A:5,B:7}"}], "metrics": {"a": "13", "b": "13", "truth": "13", "lost": "0"}},
-    {"tag": "IDEMPOTENT", "title": "Duplicates and reordering are safe", "body": "Networks retry, duplicate and reorder messages. Replica B receives A's state a second time, late, after it already merged. Taking the max of values it already has changes nothing, so the result stays 13. This is why CRDT sync can use simple at-least-once delivery with no deduplication. A G-counter cannot go down; a PN-counter uses two G-counters, one for increments and one for decrements, and subtracts.", "idea": "Idempotent merge means replaying old state is harmless, so sync can be sloppy and still correct.", "caption": "A duplicate state message changes nothing.", "focus": ["ra", "rb"], "flows": [{"from": "ra", "to": "rb", "kind": "replicate", "label": "{A:6,B:5} again"}], "metrics": {"a": "13", "b": "13", "truth": "13"}},
-    {"tag": "OR-SET", "title": "A set with add and remove", "body": "Sets are harder: Alice removes milk from a shared cart on A while Bob, unaware, adds milk on B. An observed-remove set (OR-set) tags every add with a unique id. A remove deletes only the tags the remover has seen. Bob's add carries a brand new tag Alice never saw, so after merge milk stays in the cart. This is called add-wins semantics.", "idea": "Unique tags let a remove cancel only the adds it knew about, so a concurrent add survives.", "caption": "Remove cancels the old tag; the new add stays.", "focus": ["alice", "ra", "bob", "rb"], "flows": [{"from": "alice", "to": "ra", "kind": "request", "label": "remove milk"}, {"from": "bob", "to": "rb", "kind": "request", "label": "add milk #t9"}, {"from": "rb", "to": "ra", "kind": "replicate", "label": "milk {#t9}"}], "metrics": {}},
-    {"tag": "COLLAB", "title": "Collaborative text editing", "body": "Editors like Google Docs-style tools need two people typing in the same sentence without clobbering each other. Sequence CRDTs such as the ones in Yjs and Automerge give every character a unique id and a position defined relative to its neighbours, not an index. Concurrent inserts land in a deterministic order on every replica, and deletes leave a tombstone marker. The cost is metadata that grows with edit history.", "idea": "Identify each character by a stable id instead of a shifting index, and concurrent edits can merge deterministically.", "caption": "Concurrent inserts merge into one document.", "focus": ["alice", "ra", "bob", "rb"], "flows": [{"from": "alice", "to": "ra", "kind": "request", "label": "insert 'big '"}, {"from": "bob", "to": "rb", "kind": "request", "label": "insert 'red '"}, {"from": "ra", "to": "rb", "kind": "replicate", "label": "ops"}, {"from": "rb", "to": "ra", "kind": "replicate", "label": "ops"}], "metrics": {}},
-    {"tag": "TRADE-OFF", "title": "What CRDTs cannot do", "body": "Merge rules work for data where combining is meaningful: counters, sets, text, flags. They cannot enforce a global rule like a balance that must stay at or above zero, or a username that must be unique, because two replicas can each approve a valid-looking write that is invalid together. Those cases need coordination, such as consensus or a single owner, and you pay latency for it.", "idea": "CRDTs give availability and convergence; invariants that span replicas still need coordination.", "caption": "Two approvals that conflict cannot be merged away.", "focus": ["ra", "rb"], "flows": [{"from": "ra", "to": "rb", "kind": "fail", "label": "both approve"}], "metrics": {}},
-    {"tag": "RECAP", "title": "Pick the merge rule on purpose", "body": "Concurrent writes are unavoidable once replicas accept writes independently. LWW is simple but drops data and trusts clocks. CRDTs define a merge that is commutative, associative and idempotent, so every replica converges: G-counters take per-slot max, OR-sets let adds beat concurrent removes, and sequence CRDTs merge text. Use them when losing writes is unacceptable and coordination is too costly.", "idea": "Choose the conflict rule deliberately; the default of overwrite loses data.", "caption": "Both replicas converge on 13 with nothing lost.", "focus": ["alice", "ra", "bob", "rb"], "flows": [], "metrics": {"a": "13", "b": "13", "truth": "13", "lost": "0"}}
+    {
+      "tag": "QUESTION",
+      "title": "Two copies, one cable cut",
+      "body": "A post has 10 likes, stored on Replica A and Replica B so each user writes to a nearby copy. Now the link between them drops, or one user goes offline in a tunnel. Both replicas must keep accepting writes, because refusing them would make the app unusable. When the link returns, the copies will have diverged. What should the merged value be?",
+      "idea": "If replicas accept writes independently, concurrent writes to the same data will eventually happen; the only question is how you resolve them.",
+      "caption": "Both replicas start at 10 likes.",
+      "focus": [
+        "ra",
+        "rb"
+      ],
+      "flows": [
+        {
+          "from": "ra",
+          "to": "rb",
+          "kind": "replicate",
+          "label": "10 likes"
+        }
+      ],
+      "metrics": {
+        "a": "10",
+        "b": "10",
+        "truth": "10",
+        "lost": "0"
+      }
+    },
+    {
+      "tag": "CONFLICT",
+      "title": "Concurrent writes",
+      "body": "While partitioned, Alice taps like once on Replica A, so A stores 11. Bob taps like twice on Replica B, so B stores 12. Neither write knew about the other, which is what concurrent means: neither happened before the other. The honest total is 13, but each replica now holds a different number and the sync link is down.",
+      "idea": "Concurrent means neither write had seen the other, not that they happened at the same instant.",
+      "caption": "A shows 11, B shows 12, truth is 13.",
+      "focus": [
+        "alice",
+        "ra",
+        "bob",
+        "rb"
+      ],
+      "flows": [
+        {
+          "from": "alice",
+          "to": "ra",
+          "kind": "request",
+          "label": "like +1"
+        },
+        {
+          "from": "bob",
+          "to": "rb",
+          "kind": "request",
+          "label": "like +2"
+        },
+        {
+          "from": "ra",
+          "to": "rb",
+          "kind": "fail",
+          "label": "partitioned"
+        }
+      ],
+      "metrics": {
+        "a": "11",
+        "b": "12",
+        "truth": "13"
+      }
+    },
+    {
+      "tag": "LWW",
+      "title": "Last write wins",
+      "body": "The simplest rule: every write carries a timestamp, and on sync the replica with the newest timestamp overwrites the other. Here B wrote last, so both settle on 12. The copies agree, but Alice's like is gone and nobody was told. LWW is fine when only the latest value matters, such as a profile photo, a last-seen time or a cache entry. LWW also trusts wall clocks, and clocks on different machines can disagree by tens of milliseconds or more, so the winner may not even be the truly later write (Clocks & Ordering covers why).",
+      "idea": "LWW always converges, but it throws away one side of every conflict, so it is only safe when losing a write is fine.",
+      "caption": "Sync keeps B's value; Alice's like is lost.",
+      "focus": [
+        "ra",
+        "rb"
+      ],
+      "flows": [
+        {
+          "from": "rb",
+          "to": "ra",
+          "kind": "replicate",
+          "label": "12 @ t=10:04"
+        }
+      ],
+      "metrics": {
+        "a": "12",
+        "b": "12",
+        "lost": "1"
+      }
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "Merge instead of overwrite",
+      "body": "A CRDT (conflict-free replicated data type) is a data structure designed so that any two copies can be merged without a coordinator. The merge function must be commutative (order of the two inputs does not matter), associative (grouping does not matter), and idempotent (merging the same state twice changes nothing). If those hold, replicas that receive the same updates end up identical, in any order, with duplicates.",
+      "idea": "A CRDT turns conflict resolution into a math property of the merge function, so no write is arbitrarily discarded.",
+      "caption": "Replicas now exchange state and merge it.",
+      "focus": [
+        "ra",
+        "rb"
+      ],
+      "flows": [
+        {
+          "from": "ra",
+          "to": "rb",
+          "kind": "replicate",
+          "label": "state"
+        },
+        {
+          "from": "rb",
+          "to": "ra",
+          "kind": "replicate",
+          "label": "state"
+        }
+      ],
+      "metrics": {}
+    },
+    {
+      "tag": "G-COUNTER",
+      "title": "A counter that cannot lose",
+      "body": "Instead of one number, a G-counter (grow-only counter) keeps one slot per replica. Start at {A:5, B:5}, total 10. Alice's like bumps A's slot to 6. Bob's two likes bump B's slot to 7. Each replica only ever writes its own slot. Merge takes the maximum of each slot: {A:6, B:7}. The value is the sum, 13, which is the true total.",
+      "idea": "Give each replica its own slot and merge with max; the counter's value is the sum of the slots.",
+      "caption": "Slots merge to {A:6, B:7}, total 13.",
+      "focus": [
+        "ra",
+        "rb"
+      ],
+      "flows": [
+        {
+          "from": "ra",
+          "to": "rb",
+          "kind": "replicate",
+          "label": "{A:6,B:5}"
+        },
+        {
+          "from": "rb",
+          "to": "ra",
+          "kind": "replicate",
+          "label": "{A:5,B:7}"
+        }
+      ],
+      "metrics": {
+        "a": "13",
+        "b": "13",
+        "truth": "13",
+        "lost": "0"
+      }
+    },
+    {
+      "tag": "IDEMPOTENT",
+      "title": "Duplicates and reordering are safe",
+      "body": "Networks retry, duplicate and reorder messages. Replica B receives A's state a second time, late, after it already merged. Taking the max of values it already has changes nothing, so the result stays 13. This is why state-based CRDT sync can use simple at-least-once delivery with no deduplication; op-based CRDTs need more care about delivery order. A G-counter cannot go down; a PN-counter uses two G-counters, one for increments and one for decrements, and subtracts.",
+      "idea": "Idempotent merge means replaying old state is harmless, so state-based sync tolerates duplicates and reordering.",
+      "caption": "A duplicate state message changes nothing.",
+      "focus": [
+        "ra",
+        "rb"
+      ],
+      "flows": [
+        {
+          "from": "ra",
+          "to": "rb",
+          "kind": "replicate",
+          "label": "{A:6,B:5} again"
+        }
+      ],
+      "metrics": {
+        "a": "13",
+        "b": "13",
+        "truth": "13"
+      }
+    },
+    {
+      "tag": "OR-SET",
+      "title": "A set with add and remove",
+      "body": "A shared cart already holds milk, added earlier with tag #t1 and synced to both replicas. While partitioned, Alice removes milk on A, which deletes tag #t1. Bob, unaware, adds milk again on B with a brand new tag #t9. An observed-remove set (OR-set) tags every add with a unique id, and a remove deletes only the tags the remover has seen. After merge #t1 is gone but #t9 remains, so milk stays in the cart. This is called add-wins semantics. (The likes tiles are from the earlier example.)",
+      "idea": "Unique tags let a remove cancel only the adds it knew about, so a concurrent add survives.",
+      "caption": "Remove cancels the old tag; the new add stays.",
+      "focus": [
+        "alice",
+        "ra",
+        "bob",
+        "rb"
+      ],
+      "flows": [
+        {
+          "from": "alice",
+          "to": "ra",
+          "kind": "request",
+          "label": "remove #t1"
+        },
+        {
+          "from": "bob",
+          "to": "rb",
+          "kind": "request",
+          "label": "add milk #t9"
+        },
+        {
+          "from": "ra",
+          "to": "rb",
+          "kind": "replicate",
+          "label": "remove #t1"
+        },
+        {
+          "from": "rb",
+          "to": "ra",
+          "kind": "replicate",
+          "label": "milk {#t9}"
+        }
+      ],
+      "metrics": {}
+    },
+    {
+      "tag": "COLLAB",
+      "title": "Collaborative text editing",
+      "body": "Shared-document editors need two people typing in the same sentence without clobbering each other. Sequence CRDTs such as the ones in Yjs and Automerge give every character a unique id and a position defined relative to its neighbours, not an index. Concurrent inserts land in a deterministic order on every replica, and deletes leave a tombstone marker. The cost is metadata that grows with edit history. An older approach, operational transformation, rewrites operations through a central server; sequence CRDTs avoid that need.",
+      "idea": "Identify each character by a stable id instead of a shifting index, and concurrent edits can merge deterministically.",
+      "caption": "Concurrent inserts merge into one document.",
+      "focus": [
+        "alice",
+        "ra",
+        "bob",
+        "rb"
+      ],
+      "flows": [
+        {
+          "from": "alice",
+          "to": "ra",
+          "kind": "request",
+          "label": "insert 'big '"
+        },
+        {
+          "from": "bob",
+          "to": "rb",
+          "kind": "request",
+          "label": "insert 'red '"
+        },
+        {
+          "from": "ra",
+          "to": "rb",
+          "kind": "replicate",
+          "label": "ops"
+        },
+        {
+          "from": "rb",
+          "to": "ra",
+          "kind": "replicate",
+          "label": "ops"
+        }
+      ],
+      "metrics": {}
+    },
+    {
+      "tag": "TRADE-OFF",
+      "title": "What CRDTs cannot do",
+      "body": "Merge rules work for data where combining is meaningful: counters, sets, text, flags. They cannot enforce a global rule like a balance that must stay at or above zero, or a username that must be unique, because two replicas can each approve a valid-looking write that is invalid together: a balance of 100 allows a withdrawal of 80 on A and another of 80 on B, but together they leave -60. Those cases need coordination, such as consensus or a single owner, and you pay latency for it. Bounded-counter designs hand each replica a budget in advance, which is coordination done ahead of time.",
+      "idea": "CRDTs give availability and convergence; invariants that span replicas still need coordination.",
+      "caption": "Two approvals that conflict cannot be merged away.",
+      "focus": [
+        "alice",
+        "ra",
+        "bob",
+        "rb"
+      ],
+      "flows": [
+        {
+          "from": "alice",
+          "to": "ra",
+          "kind": "request",
+          "label": "withdraw 80"
+        },
+        {
+          "from": "bob",
+          "to": "rb",
+          "kind": "request",
+          "label": "withdraw 80"
+        },
+        {
+          "from": "ra",
+          "to": "rb",
+          "kind": "fail",
+          "label": "balance -60"
+        }
+      ],
+      "metrics": {}
+    },
+    {
+      "tag": "RECAP",
+      "title": "Pick the merge rule on purpose",
+      "body": "Concurrent writes are inevitable once replicas accept writes independently. LWW is simple but drops data and trusts clocks. CRDTs define a merge that is commutative, associative and idempotent, so every replica converges: G-counters take per-slot max, OR-sets let adds beat concurrent removes, and sequence CRDTs merge text. Use them when losing writes is unacceptable and coordination is too costly.",
+      "idea": "Choose the conflict rule deliberately; the default of overwrite loses data.",
+      "caption": "Both replicas converge on 13 with nothing lost.",
+      "focus": [
+        "alice",
+        "ra",
+        "bob",
+        "rb"
+      ],
+      "flows": [],
+      "metrics": {
+        "a": "13",
+        "b": "13",
+        "truth": "13",
+        "lost": "0"
+      }
+    }
   ],
   "quiz": [
-    {"q": "Two replicas of a like counter each receive a different update while partitioned. After sync using last-write-wins, what happens?", "options": ["Both updates are combined into the sum", "One replica's update is discarded and the copies agree", "The replicas stay different until an admin picks one", "The older timestamp wins because it was first"], "answer": 1, "why": "LWW keeps the value with the newest timestamp and overwrites the other, so the copies converge but one write is silently lost."},
-    {"q": "A G-counter is at {A:6, B:5} on one replica and {A:5, B:7} on another. What does a merge produce?", "options": ["{A:5, B:5}, total 10", "{A:6, B:7}, total 13", "{A:11, B:12}, total 23", "{A:6, B:5}, because it arrived first"], "answer": 1, "why": "Merge takes the maximum of each replica's own slot, giving {A:6, B:7}. Adding slots would double count updates that both sides already saw."},
-    {"q": "Why is it safe for CRDT sync to deliver the same state message twice?", "options": ["The network guarantees exactly-once delivery", "Each message is encrypted with a nonce", "The merge is idempotent, so reapplying known state changes nothing", "Replicas ignore messages older than one minute"], "answer": 2, "why": "Idempotence is part of the merge contract. Taking max or union with state you already have yields the same state."},
-    {"q": "In an OR-set, one user removes an item while another concurrently adds the same item. Why does the item survive?", "options": ["Adds always have a later wall-clock time", "The remove only deletes the unique tags it had observed, and the new add has a tag it never saw", "The set locks the item during removal", "Removes are ignored if the network is partitioned"], "answer": 1, "why": "Each add gets a unique tag. A remove cancels only the tags it knew about, so a concurrent add with a fresh tag is preserved."},
-    {"q": "You must guarantee a bank balance never drops below zero across replicas. Which statement is true?", "options": ["A PN-counter enforces the limit automatically", "A CRDT alone cannot enforce it; you need coordination for that invariant", "LWW with synchronized clocks enforces it", "Use a G-counter for withdrawals"], "answer": 1, "why": "Two replicas can each approve a withdrawal that is valid alone but overdraws together. Cross-replica invariants need coordination such as consensus or a single owner."}
+    {
+      "q": "Two replicas of a like counter each receive a different update while partitioned. After sync using last-write-wins, what happens?",
+      "options": [
+        "Both updates are combined into the sum",
+        "One replica's update is discarded and the copies agree",
+        "The replicas stay different until an admin picks one",
+        "The older timestamp wins because it was first"
+      ],
+      "answer": 1,
+      "why": "LWW keeps the value with the newest timestamp and overwrites the other, so the copies converge but one write is silently lost."
+    },
+    {
+      "q": "A G-counter is at {A:6, B:5} on one replica and {A:5, B:7} on another. What does a merge produce?",
+      "options": [
+        "{A:5, B:5}, total 10",
+        "{A:11, B:12}, total 23",
+        "{A:6, B:5}, because it arrived first",
+        "{A:6, B:7}, total 13"
+      ],
+      "answer": 3,
+      "why": "Merge takes the maximum of each replica's own slot, giving {A:6, B:7}. Adding slots would double count updates that both sides already saw."
+    },
+    {
+      "q": "Why is it safe for CRDT sync to deliver the same state message twice?",
+      "options": [
+        "The network guarantees exactly-once delivery",
+        "Each message is encrypted with a nonce",
+        "The merge is idempotent, so reapplying known state changes nothing",
+        "Replicas ignore messages older than one minute"
+      ],
+      "answer": 2,
+      "why": "Idempotence is part of the merge contract. Taking max or union with state you already have yields the same state."
+    },
+    {
+      "q": "In an OR-set, one user removes an item while another concurrently adds the same item. Why does the item survive?",
+      "options": [
+        "The remove only deletes the unique tags it had observed, and the new add has a tag it never saw",
+        "Adds always have a later wall-clock time",
+        "The set locks the item during removal",
+        "Removes are ignored if the network is partitioned"
+      ],
+      "answer": 0,
+      "why": "Each add gets a unique tag. A remove cancels only the tags it knew about, so a concurrent add with a fresh tag is preserved."
+    },
+    {
+      "q": "You must guarantee a bank balance never drops below zero across replicas. Which statement is true?",
+      "options": [
+        "A PN-counter enforces the limit automatically",
+        "A CRDT alone cannot enforce it; you need coordination for that invariant",
+        "LWW with synchronized clocks enforces it",
+        "Use a G-counter for withdrawals"
+      ],
+      "answer": 1,
+      "why": "Two replicas can each approve a withdrawal that is valid alone but overdraws together. Cross-replica invariants need coordination such as consensus or a single owner."
+    }
   ],
   "cheatsheet": [
-    {"term": "Concurrent writes", "def": "Writes where neither had seen the other when it was made. They are not about exact simultaneity, only missing knowledge."},
-    {"term": "Last-write-wins (LWW)", "def": "Keep the write with the newest timestamp and drop the rest. Simple and convergent, but loses data and depends on clocks."},
-    {"term": "CRDT", "def": "A data type whose merge is commutative, associative and idempotent, so replicas converge without a coordinator."},
-    {"term": "G-counter", "def": "Grow-only counter with one slot per replica. Merge is per-slot max; the value is the sum. Add a second one to make a PN-counter."},
-    {"term": "OR-set", "def": "Observed-remove set. Each add has a unique tag and a remove deletes only the tags it saw, so concurrent adds survive."},
-    {"term": "State-based vs op-based", "def": "State-based CRDTs ship full or delta state and merge it. Op-based ones ship operations and need reliable, causally ordered delivery."},
-    {"term": "Tombstone", "def": "A marker left in place of a deleted item so concurrent operations still resolve. It makes metadata grow until garbage collected."},
-    {"term": "Where CRDTs fail", "def": "Global invariants like non-negative balances or unique usernames still need coordination such as consensus."}
+    {
+      "term": "Concurrent writes",
+      "def": "Writes where neither had seen the other when it was made. They are not about exact simultaneity, only missing knowledge."
+    },
+    {
+      "term": "Last-write-wins (LWW)",
+      "def": "Keep the write with the newest timestamp and drop the rest. Simple and convergent, but loses data and depends on clocks."
+    },
+    {
+      "term": "CRDT",
+      "def": "A data type whose state merge is commutative, associative and idempotent (op-based variants have equivalent delivery rules), so replicas converge without a coordinator."
+    },
+    {
+      "term": "G-counter",
+      "def": "Grow-only counter with one slot per replica. Merge is per-slot max; the value is the sum. Add a second one to make a PN-counter."
+    },
+    {
+      "term": "OR-set",
+      "def": "Observed-remove set. Each add has a unique tag and a remove deletes only the tags it saw, so concurrent adds survive."
+    },
+    {
+      "term": "State-based vs op-based",
+      "def": "State-based CRDTs ship full or delta state and merge it. Op-based ones ship operations and need reliable, causally ordered delivery."
+    },
+    {
+      "term": "Tombstone",
+      "def": "A marker left in place of a deleted item so concurrent operations still resolve. It makes metadata grow until garbage collected."
+    },
+    {
+      "term": "Where CRDTs fail",
+      "def": "Global invariants like non-negative balances or unique usernames still need coordination such as consensus."
+    }
   ]
 }

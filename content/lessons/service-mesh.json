@@ -12,55 +12,519 @@
     "What a mesh costs in latency, memory and operational complexity"
   ],
   "nodes": [
-    {"id": "orders", "label": "Orders service", "kind": "service", "x": 8, "y": 42},
-    {"id": "scorders", "label": "Orders sidecar", "kind": "gateway", "x": 31, "y": 42},
-    {"id": "scpay1", "label": "Payments sidecar A", "kind": "gateway", "x": 58, "y": 18},
-    {"id": "pay1", "label": "Payments pod A", "kind": "service", "x": 85, "y": 18},
-    {"id": "scpay2", "label": "Payments sidecar B", "kind": "gateway", "x": 58, "y": 66},
-    {"id": "pay2", "label": "Payments pod B", "kind": "service", "x": 85, "y": 66},
-    {"id": "ctl", "label": "Control plane", "kind": "server", "x": 31, "y": 88}
+    {
+      "id": "orders",
+      "label": "Orders service",
+      "kind": "service",
+      "x": 8,
+      "y": 42
+    },
+    {
+      "id": "scorders",
+      "label": "Orders sidecar",
+      "kind": "gateway",
+      "x": 31,
+      "y": 42
+    },
+    {
+      "id": "scpay1",
+      "label": "Payments sidecar A",
+      "kind": "gateway",
+      "x": 58,
+      "y": 18
+    },
+    {
+      "id": "pay1",
+      "label": "Payments pod A",
+      "kind": "service",
+      "x": 85,
+      "y": 18
+    },
+    {
+      "id": "scpay2",
+      "label": "Payments sidecar B",
+      "kind": "gateway",
+      "x": 58,
+      "y": 66
+    },
+    {
+      "id": "pay2",
+      "label": "Payments pod B",
+      "kind": "service",
+      "x": 85,
+      "y": 66
+    },
+    {
+      "id": "ctl",
+      "label": "Control plane",
+      "kind": "server",
+      "x": 31,
+      "y": 88
+    }
   ],
   "edges": [
-    {"from": "orders", "to": "scorders"},
-    {"from": "scorders", "to": "scpay1"},
-    {"from": "scorders", "to": "scpay2"},
-    {"from": "scpay1", "to": "pay1"},
-    {"from": "scpay2", "to": "pay2"},
-    {"from": "ctl", "to": "scorders"},
-    {"from": "ctl", "to": "scpay1"},
-    {"from": "ctl", "to": "scpay2"}
+    {
+      "from": "orders",
+      "to": "scorders"
+    },
+    {
+      "from": "scorders",
+      "to": "scpay1"
+    },
+    {
+      "from": "scorders",
+      "to": "scpay2"
+    },
+    {
+      "from": "scpay1",
+      "to": "pay1"
+    },
+    {
+      "from": "scpay2",
+      "to": "pay2"
+    },
+    {
+      "from": "ctl",
+      "to": "scorders"
+    },
+    {
+      "from": "ctl",
+      "to": "scpay1"
+    },
+    {
+      "from": "ctl",
+      "to": "scpay2"
+    }
   ],
   "metrics": [
-    {"id": "success", "label": "Success", "unit": "%"},
-    {"id": "latency", "label": "Call latency", "unit": "ms"},
-    {"id": "tries", "label": "Attempts", "unit": "x"},
-    {"id": "ram", "label": "Proxy RAM", "unit": "MB/pod"}
+    {
+      "id": "success",
+      "label": "Success",
+      "unit": "%"
+    },
+    {
+      "id": "latency",
+      "label": "Call latency",
+      "unit": "ms"
+    },
+    {
+      "id": "tries",
+      "label": "Attempts",
+      "unit": "x"
+    },
+    {
+      "id": "ram",
+      "label": "Proxy RAM",
+      "unit": "MB/pod"
+    }
   ],
   "steps": [
-    {"tag": "QUESTION", "title": "Every service needs the same plumbing", "body": "Orders calls Payments over the network. Someone must encrypt that call, prove who is calling, set a timeout, retry safely, and record metrics. If each team writes this in its own language and library, you get 40 slightly different versions, and fixing one bug means redeploying everything. Can we move that plumbing out of the application?", "idea": "Cross-cutting network behavior is repeated in every service unless you pull it into shared infrastructure.", "caption": "Orders must call Payments, and nothing yet handles the plumbing.", "focus": ["orders", "pay1", "pay2"], "flows": [], "metrics": {}},
-    {"tag": "CONCEPT", "title": "A sidecar proxy beside each pod", "body": "A sidecar is a small proxy process (Envoy is the common one) that runs in the same pod as the app and shares its network. Traffic rules redirect the app's outbound calls to the proxy, so the app just makes a plain call and never knows. The proxy then does the networking work on its behalf. The app code does not change.", "idea": "A sidecar intercepts traffic at the network level, so any language gets the same behavior with no code changes.", "caption": "Orders makes a plain call; its sidecar catches it.", "focus": ["orders", "scorders"], "flows": [{"from": "orders", "to": "scorders", "kind": "request", "label": "POST /charge"}], "metrics": {"ram": "60"}},
-    {"tag": "CONCEPT", "title": "Control plane vs data plane", "body": "The sidecars together are the data plane: they carry every real request. A separate control plane (for example Istiod) does not touch requests. It watches which pods exist, holds your policies, and pushes routes, endpoint lists and certificates to every proxy. Think of it as the planner, with the proxies as the workers.", "idea": "The data plane moves traffic; the control plane only tells the data plane how to behave.", "caption": "The control plane pushes config and certs to each proxy.", "focus": ["ctl", "scorders", "scpay1", "scpay2"], "flows": [{"from": "ctl", "to": "scorders", "kind": "async", "label": "routes + cert"}, {"from": "ctl", "to": "scpay1", "kind": "async", "label": "routes + cert"}, {"from": "ctl", "to": "scpay2", "kind": "async", "label": "routes + cert"}], "metrics": {}},
-    {"tag": "SECURITY", "title": "mTLS: both sides prove who they are", "body": "Normal TLS only proves the server's identity. In mutual TLS (mTLS) the client presents a certificate too. The control plane issues each workload a short-lived certificate (often valid around 24 hours) tied to its identity, such as the orders service account. The sidecars handshake, check each other, and encrypt the link, so Payments can trust that the caller really is Orders.", "idea": "mTLS gives every hop encryption plus a verified service identity, and short-lived certs limit damage from a leak.", "caption": "Sidecars handshake and verify identities.", "focus": ["scorders", "scpay1"], "flows": [{"from": "scorders", "to": "scpay1", "kind": "handshake", "label": "mTLS hello + cert"}, {"from": "scpay1", "to": "scorders", "kind": "handshake", "label": "cert + keys"}], "metrics": {}},
-    {"tag": "FLOW", "title": "A request through two proxies", "body": "With the encrypted link up, the call travels app, sidecar, sidecar, app. The proxies pick a healthy Payments endpoint from the list the control plane gave them, record a trace span and metrics, and forward the request. Each proxy hop typically adds on the order of 1 ms; here the whole call takes about 14 ms, 2 of them added by the mesh.", "idea": "The mesh sits on the request path, so every call crosses two extra proxy hops.", "caption": "Request flows orders, sidecar, sidecar, payments and back.", "focus": ["orders", "scorders", "scpay1", "pay1"], "flows": [{"from": "orders", "to": "scorders", "kind": "request", "label": "POST /charge"}, {"from": "scorders", "to": "scpay1", "kind": "request", "label": "mTLS"}, {"from": "scpay1", "to": "pay1", "kind": "request", "label": "POST /charge"}, {"from": "pay1", "to": "scpay1", "kind": "response", "label": "200"}, {"from": "scpay1", "to": "scorders", "kind": "response", "label": "200"}, {"from": "scorders", "to": "orders", "kind": "response", "label": "200"}], "metrics": {"success": "100", "latency": "14", "tries": "1"}},
-    {"tag": "WHAT IF", "title": "Payments pod A stalls", "body": "Now pod A hangs, perhaps stuck on a garbage-collection pause. Without a limit, Orders would wait indefinitely and its threads would pile up. The mesh config sets a per-try timeout of 250 ms. When it expires, the Orders sidecar cancels that attempt itself, with no code in the Orders app.", "idea": "A per-try timeout in the proxy turns an open-ended hang into a bounded, known cost.", "caption": "The attempt to pod A times out after 250 ms.", "focus": ["scorders", "scpay1", "pay1"], "flows": [{"from": "scorders", "to": "scpay1", "kind": "request", "label": "POST /charge"}, {"from": "scpay1", "to": "pay1", "kind": "fail", "label": "no reply"}, {"from": "scorders", "to": "scpay1", "kind": "fail", "label": "timeout 250ms"}], "metrics": {"success": "0", "latency": "250", "tries": "1"}},
-    {"tag": "RETRY", "title": "Retry on a different pod", "body": "The mesh retries once, and the load balancer in the proxy picks pod B this time. It succeeds, so the user sees a slower but successful call: 250 ms of waiting plus about 14 ms. Retries are only safe for idempotent calls, so you opt in per route, and a retry budget (for example at most 20% extra requests) stops a retry storm from burying a struggling service.", "idea": "Retries hide transient failures, but only if the call is safe to repeat and the volume is capped.", "caption": "Second attempt goes to pod B and succeeds.", "focus": ["scorders", "scpay2", "pay2"], "flows": [{"from": "scorders", "to": "scpay2", "kind": "request", "label": "retry #1"}, {"from": "scpay2", "to": "pay2", "kind": "request", "label": "POST /charge"}, {"from": "pay2", "to": "scpay2", "kind": "response", "label": "200"}, {"from": "scpay2", "to": "scorders", "kind": "response", "label": "200"}], "metrics": {"success": "100", "latency": "264", "tries": "2"}},
-    {"tag": "TRADE-OFF", "title": "What the mesh costs", "body": "Every pod now runs an extra proxy. Each sidecar commonly uses tens of MB of memory (roughly 50 to 100 MB is a rule of thumb) and some CPU, so 1,000 pods can burn 50 to 100 GB of RAM just on proxies. Calls gain about 2 to 4 ms across two hops, and your team must now understand, upgrade and debug a whole new layer. Newer ambient or node-level designs aim to cut that per-pod cost.", "idea": "A mesh buys uniform security and reliability at the price of latency, memory and operational complexity.", "caption": "Each pod now carries a proxy, plus extra hops.", "focus": ["orders", "scorders", "scpay1", "scpay2"], "flows": [], "metrics": {"ram": "80", "latency": "16"}},
-    {"tag": "WHAT IF", "title": "The control plane goes down", "body": "Suppose the control plane crashes. The proxies already hold their routes, endpoint lists and certificates in memory, so live traffic keeps flowing. What breaks is change: no new pods get discovered, policy edits do not apply, and certificates cannot renew. A short outage is tolerable; one longer than the certificate lifetime would eventually break mTLS.", "idea": "Because the planes are separate, a control plane outage degrades changes, not existing traffic.", "caption": "Config pushes fail, but requests still succeed.", "focus": ["ctl", "scorders", "scpay1"], "flows": [{"from": "ctl", "to": "scorders", "kind": "fail", "label": "unreachable"}, {"from": "orders", "to": "scorders", "kind": "request", "label": "POST /charge"}, {"from": "scorders", "to": "scpay1", "kind": "request", "label": "cached config"}, {"from": "scpay1", "to": "scorders", "kind": "response", "label": "200"}], "metrics": {"success": "100", "latency": "16", "tries": "1"}},
-    {"tag": "RECAP", "title": "Plumbing as infrastructure", "body": "A service mesh puts a sidecar proxy beside every service. The data plane of proxies carries traffic, applying mTLS, per-try timeouts and budgeted retries uniformly. The control plane distributes config and certificates. You gain consistency and security without app changes, and you pay in extra hops, memory per pod, and one more system to run.", "idea": "Use a mesh when many services need uniform security and resilience, and the overhead is worth that consistency.", "caption": "Control plane configures, data plane carries traffic.", "focus": ["orders", "scorders", "scpay1", "pay1", "scpay2", "pay2", "ctl"], "flows": [], "metrics": {}}
+    {
+      "tag": "QUESTION",
+      "title": "Every service needs the same plumbing",
+      "body": "Orders calls Payments over the network. Someone must encrypt that call, prove who is calling, set a timeout, retry safely, and record metrics. If each team writes this in its own language and library, you get 40 slightly different versions, and fixing one bug means redeploying everything. Can we move that plumbing out of the application?",
+      "idea": "Cross-cutting network behavior is repeated in every service unless you pull it into shared infrastructure.",
+      "caption": "Orders must call Payments; the greyed boxes are what the mesh will add.",
+      "focus": [
+        "orders",
+        "pay1",
+        "pay2"
+      ],
+      "flows": [],
+      "metrics": {}
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "A sidecar proxy beside each pod",
+      "body": "A sidecar is a small proxy process (Envoy is the common one) that runs in the same pod as the app and shares its network. Traffic rules redirect the app's outbound calls to the proxy, so the app just makes a plain call and never knows. The proxy then does the networking work on its behalf. The app code does not change.",
+      "idea": "A sidecar intercepts traffic at the network level, so any language gets the same behavior with no code changes.",
+      "caption": "Orders makes a plain call; its sidecar catches it.",
+      "focus": [
+        "orders",
+        "scorders"
+      ],
+      "flows": [
+        {
+          "from": "orders",
+          "to": "scorders",
+          "kind": "request",
+          "label": "GET /payment/42"
+        }
+      ],
+      "metrics": {
+        "ram": "80"
+      }
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "Control plane vs data plane",
+      "body": "The sidecars together are the data plane: they carry every real request. A separate control plane (for example Istiod) does not touch requests. It watches which pods exist, holds your policies, and pushes routes, endpoint lists and certificates to every proxy. Think of it as the planner, with the proxies as the workers.",
+      "idea": "The data plane moves traffic; the control plane only tells the data plane how to behave.",
+      "caption": "The control plane pushes config and certs to each proxy.",
+      "focus": [
+        "ctl",
+        "scorders",
+        "scpay1",
+        "scpay2"
+      ],
+      "flows": [
+        {
+          "from": "ctl",
+          "to": "scorders",
+          "kind": "async",
+          "label": "routes + cert"
+        },
+        {
+          "from": "ctl",
+          "to": "scpay1",
+          "kind": "async",
+          "label": "routes + cert"
+        },
+        {
+          "from": "ctl",
+          "to": "scpay2",
+          "kind": "async",
+          "label": "routes + cert"
+        }
+      ],
+      "metrics": {}
+    },
+    {
+      "tag": "SECURITY",
+      "title": "mTLS: both sides prove who they are",
+      "body": "Normal TLS only proves the server's identity. In mutual TLS (mTLS) the client presents a certificate too. The control plane issues each workload a short-lived certificate (often valid around 24 hours) tied to its identity, such as the orders service account. The sidecars handshake, check each other, and encrypt the link, so Payments can trust that the caller really is Orders.",
+      "idea": "mTLS gives every hop encryption plus a verified service identity, and short-lived certs limit damage from a leak.",
+      "caption": "Sidecars handshake and verify identities.",
+      "focus": [
+        "scorders",
+        "scpay1"
+      ],
+      "flows": [
+        {
+          "from": "scorders",
+          "to": "scpay1",
+          "kind": "handshake",
+          "label": "mTLS hello + cert"
+        },
+        {
+          "from": "scpay1",
+          "to": "scorders",
+          "kind": "handshake",
+          "label": "cert + key share"
+        }
+      ],
+      "metrics": {}
+    },
+    {
+      "tag": "FLOW",
+      "title": "A request through two proxies",
+      "body": "With the encrypted link up, the call travels app, sidecar, sidecar, app. The proxies pick a healthy Payments endpoint from the list the control plane gave them, record a trace span and metrics, and forward the request. Each proxy hop typically adds about 1 to 2 ms; here the call takes about 14 ms, with roughly 2 to 4 of them added by the mesh.",
+      "idea": "The mesh sits on the request path, so every call crosses two extra proxy hops.",
+      "caption": "Request flows orders, sidecar, sidecar, payments and back.",
+      "focus": [
+        "orders",
+        "scorders",
+        "scpay1",
+        "pay1"
+      ],
+      "flows": [
+        {
+          "from": "orders",
+          "to": "scorders",
+          "kind": "request",
+          "label": "GET /payment/42"
+        },
+        {
+          "from": "scorders",
+          "to": "scpay1",
+          "kind": "request",
+          "label": "mTLS"
+        },
+        {
+          "from": "scpay1",
+          "to": "pay1",
+          "kind": "request",
+          "label": "GET /payment/42"
+        },
+        {
+          "from": "pay1",
+          "to": "scpay1",
+          "kind": "response",
+          "label": "200"
+        },
+        {
+          "from": "scpay1",
+          "to": "scorders",
+          "kind": "response",
+          "label": "200"
+        },
+        {
+          "from": "scorders",
+          "to": "orders",
+          "kind": "response",
+          "label": "200"
+        }
+      ],
+      "metrics": {
+        "success": "100",
+        "latency": "14",
+        "tries": "1"
+      }
+    },
+    {
+      "tag": "WHAT IF",
+      "title": "Payments pod A stalls",
+      "body": "Now pod A hangs, perhaps stuck on a garbage-collection pause. Without a limit, Orders would wait indefinitely and its threads would pile up. The mesh config sets a per-try timeout of 250 ms. When it expires, the Orders sidecar cancels that attempt itself, with no code in the Orders app.",
+      "idea": "A per-try timeout in the proxy turns an open-ended hang into a bounded, known cost.",
+      "caption": "The attempt to pod A times out after 250 ms.",
+      "focus": [
+        "scorders",
+        "scpay1",
+        "pay1"
+      ],
+      "flows": [
+        {
+          "from": "scorders",
+          "to": "scpay1",
+          "kind": "request",
+          "label": "GET /payment/42"
+        },
+        {
+          "from": "scpay1",
+          "to": "pay1",
+          "kind": "fail",
+          "label": "no reply"
+        },
+        {
+          "from": "scorders",
+          "to": "scpay1",
+          "kind": "fail",
+          "label": "timeout 250ms"
+        }
+      ],
+      "metrics": {
+        "latency": "250",
+        "tries": "1"
+      }
+    },
+    {
+      "tag": "RETRY",
+      "title": "Retry on a different pod",
+      "body": "The mesh retries once, and the mesh is configured to avoid the failed pod (Istio does this by default), so the retry lands on pod B. It succeeds, so the user sees a slower but successful call: 250 ms of waiting plus about 14 ms. This read is safe to repeat; a charge would be safe only with an idempotency key so Payments can drop a duplicate. Retries are only safe for idempotent calls, so you opt in per route, and a retry budget (for example at most 20% extra requests) stops a retry storm from burying a struggling service.",
+      "idea": "Retries hide transient failures, but only if the call is safe to repeat and the volume is capped.",
+      "caption": "Second attempt goes to pod B and succeeds.",
+      "focus": [
+        "scorders",
+        "scpay2",
+        "pay2"
+      ],
+      "flows": [
+        {
+          "from": "scorders",
+          "to": "scpay2",
+          "kind": "request",
+          "label": "retry #1"
+        },
+        {
+          "from": "scpay2",
+          "to": "pay2",
+          "kind": "request",
+          "label": "GET /payment/42"
+        },
+        {
+          "from": "pay2",
+          "to": "scpay2",
+          "kind": "response",
+          "label": "200"
+        },
+        {
+          "from": "scpay2",
+          "to": "scorders",
+          "kind": "response",
+          "label": "200"
+        }
+      ],
+      "metrics": {
+        "success": "100",
+        "latency": "264",
+        "tries": "2"
+      }
+    },
+    {
+      "tag": "TRADE-OFF",
+      "title": "What the mesh costs",
+      "body": "Every pod now runs an extra proxy. Each sidecar commonly uses tens of MB of memory (roughly 50 to 100 MB is a rule of thumb) and some CPU, so 1,000 pods can burn 50 to 100 GB of RAM just on proxies. Calls gain about 2 to 4 ms across two hops, and your team must now understand, upgrade and debug a whole new layer. Newer designs such as Istio ambient mode (GA since late 2024) move the proxy to a per-node component to cut per-pod cost.",
+      "idea": "A mesh buys uniform security and reliability at the price of latency, memory and operational complexity.",
+      "caption": "Each pod now carries a proxy, plus extra hops.",
+      "focus": [
+        "orders",
+        "scorders",
+        "scpay1",
+        "scpay2"
+      ],
+      "flows": [],
+      "metrics": {
+        "ram": "80",
+        "latency": "14",
+        "tries": "1"
+      }
+    },
+    {
+      "tag": "WHAT IF",
+      "title": "The control plane goes down",
+      "body": "Suppose the control plane crashes. The proxies already hold their routes, endpoint lists and certificates in memory, so live traffic keeps flowing. What breaks is change: no new pods get discovered, policy edits do not apply, and certificates cannot renew. A short outage is tolerable; one longer than the certificate lifetime would eventually break mTLS.",
+      "idea": "Because the planes are separate, a control plane outage degrades changes, not existing traffic.",
+      "caption": "Config pushes fail, but requests still succeed.",
+      "focus": [
+        "ctl",
+        "orders",
+        "scorders",
+        "scpay1",
+        "pay1"
+      ],
+      "flows": [
+        {
+          "from": "ctl",
+          "to": "scorders",
+          "kind": "fail",
+          "label": "unreachable"
+        },
+        {
+          "from": "orders",
+          "to": "scorders",
+          "kind": "request",
+          "label": "GET /payment/42"
+        },
+        {
+          "from": "scorders",
+          "to": "scpay1",
+          "kind": "request",
+          "label": "cached config"
+        },
+        {
+          "from": "scpay1",
+          "to": "pay1",
+          "kind": "request",
+          "label": "GET /payment/42"
+        },
+        {
+          "from": "pay1",
+          "to": "scpay1",
+          "kind": "response",
+          "label": "200"
+        },
+        {
+          "from": "scpay1",
+          "to": "scorders",
+          "kind": "response",
+          "label": "200"
+        },
+        {
+          "from": "scorders",
+          "to": "orders",
+          "kind": "response",
+          "label": "200"
+        }
+      ],
+      "metrics": {
+        "success": "100",
+        "latency": "14",
+        "tries": "1"
+      }
+    },
+    {
+      "tag": "RECAP",
+      "title": "Plumbing as infrastructure",
+      "body": "A service mesh puts a sidecar proxy beside every service. The data plane of proxies carries traffic, applying mTLS, per-try timeouts and budgeted retries uniformly. The control plane distributes config and certificates. You gain consistency and security without app changes, and you pay in extra hops, memory per pod, and one more system to run.",
+      "idea": "Use a mesh when many services need uniform security and resilience, and the overhead is worth that consistency.",
+      "caption": "Control plane configures, data plane carries traffic.",
+      "focus": [
+        "orders",
+        "scorders",
+        "scpay1",
+        "pay1",
+        "scpay2",
+        "pay2",
+        "ctl"
+      ],
+      "flows": [],
+      "metrics": {}
+    }
   ],
   "quiz": [
-    {"q": "The control plane in a service mesh crashes. What happens to requests already flowing between services?", "options": ["All requests fail immediately because proxies need live instructions", "They keep working using the config and certificates the proxies already hold", "They are routed through the control plane instead", "They continue unencrypted until it recovers"], "answer": 1, "why": "The control plane only distributes configuration. Proxies cache it and keep carrying traffic; only changes and cert renewals are blocked."},
-    {"q": "What does mTLS add compared with ordinary TLS from a browser to a server?", "options": ["Stronger encryption algorithms", "It removes the handshake round trips", "The client also presents a certificate, so the server knows which service is calling", "It lets proxies read plaintext without keys"], "answer": 2, "why": "In mTLS both sides authenticate. That gives the receiving service a verified caller identity it can write policies against, not just an encrypted pipe."},
-    {"q": "A mesh retries failed calls to Payments up to 3 times. Why might that make an overloaded Payments service worse?", "options": ["Retries disable mTLS", "Retries always go to the same pod", "Sidecars cannot time out a request they retry", "Retries multiply load: if every caller retries, traffic can triple exactly when the service is struggling"], "answer": 3, "why": "Unbounded retries amplify load into a retry storm. A retry budget and retrying only idempotent routes keep the amplification small."},
-    {"q": "A team with 3 services in one language asks whether to adopt a full mesh. Which reasoning is best?", "options": ["Yes, a mesh is always required for microservices", "Probably not yet: a shared client library may give the same timeouts and retries with far less overhead and operational burden", "No, because sidecars cannot work with only 3 services", "Yes, because meshes remove all network latency"], "answer": 1, "why": "A mesh pays off with many services, mixed languages and a security need for uniform mTLS. For a few services the added hops, memory and complexity often outweigh the benefit."}
+    {
+      "q": "The control plane in a service mesh crashes. What happens to requests already flowing between services?",
+      "options": [
+        "All requests fail immediately because proxies need live instructions",
+        "They keep working using the config and certificates the proxies already hold",
+        "They are routed through the control plane instead",
+        "They continue unencrypted until it recovers"
+      ],
+      "answer": 1,
+      "why": "The control plane only distributes configuration. Proxies cache it and keep carrying traffic; only changes and cert renewals are blocked."
+    },
+    {
+      "q": "What does mTLS add compared with ordinary TLS from a browser to a server?",
+      "options": [
+        "Stronger encryption algorithms",
+        "It removes the handshake round trips",
+        "The client also presents a certificate, so the server knows which service is calling",
+        "It lets proxies read plaintext without keys"
+      ],
+      "answer": 2,
+      "why": "In mTLS both sides authenticate. That gives the receiving service a verified caller identity it can write policies against, not just an encrypted pipe."
+    },
+    {
+      "q": "A mesh makes up to 3 attempts per call to Payments. Why might that make an overloaded Payments service worse?",
+      "options": [
+        "Retries disable mTLS",
+        "Retries always go to the same pod",
+        "Sidecars cannot time out a request they retry",
+        "Retries multiply load: if every caller retries, traffic can triple exactly when the service is struggling"
+      ],
+      "answer": 3,
+      "why": "Unbounded retries amplify load into a retry storm. A retry budget and retrying only idempotent routes keep the amplification small."
+    },
+    {
+      "q": "A team with 3 services in one language asks whether to adopt a full mesh. Which reasoning is best?",
+      "options": [
+        "Yes, a mesh is always required for microservices",
+        "Probably not yet: a shared client library may give the same timeouts and retries with far less overhead and operational burden",
+        "No, because sidecars cannot work with only 3 services",
+        "Yes, because meshes remove all network latency"
+      ],
+      "answer": 1,
+      "why": "A mesh pays off with many services, mixed languages and a security need for uniform mTLS. For a few services the added hops, memory and complexity often outweigh the benefit."
+    }
   ],
   "cheatsheet": [
-    {"term": "Sidecar proxy", "def": "A proxy container in the same pod as the app that intercepts its network traffic and applies mesh policy without code changes."},
-    {"term": "Data plane", "def": "The proxies that carry real requests and enforce mTLS, timeouts, retries and emit metrics."},
-    {"term": "Control plane", "def": "The component that watches the cluster, stores policy and pushes routes, endpoints and certificates to the proxies."},
-    {"term": "mTLS", "def": "Mutual TLS: both client and server present certificates, giving encryption plus verified service identity on each hop."},
-    {"term": "Per-try timeout", "def": "A limit on a single attempt, so a hung pod costs a bounded time before the proxy retries elsewhere."},
-    {"term": "Retry budget", "def": "A cap on extra traffic from retries (for example 20% of requests) to prevent retry storms. Retry only idempotent calls."},
-    {"term": "Mesh overhead", "def": "Rule of thumb: about 1 to 2 ms per proxy hop, and tens of MB of RAM per sidecar. Measure in your own cluster."}
+    {
+      "term": "Sidecar proxy",
+      "def": "A proxy container in the same pod as the app that intercepts its network traffic and applies mesh policy without code changes."
+    },
+    {
+      "term": "Data plane",
+      "def": "The proxies that carry real requests and enforce mTLS, timeouts, retries and emit metrics."
+    },
+    {
+      "term": "Control plane",
+      "def": "The component that watches the cluster, stores policy and pushes routes, endpoints and certificates to the proxies."
+    },
+    {
+      "term": "mTLS",
+      "def": "Mutual TLS: both client and server present certificates, giving encryption plus verified service identity on each hop."
+    },
+    {
+      "term": "Per-try timeout",
+      "def": "A limit on a single attempt, so a hung pod costs a bounded time before the proxy retries elsewhere."
+    },
+    {
+      "term": "Retry budget",
+      "def": "A cap on extra traffic from retries (for example 20% of requests) to prevent retry storms. Retry only idempotent calls."
+    },
+    {
+      "term": "Mesh overhead",
+      "def": "Rule of thumb: about 1 to 2 ms per proxy hop, and tens of MB of RAM per sidecar. Measure in your own cluster."
+    }
   ]
 }

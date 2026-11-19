@@ -12,51 +12,492 @@
     "Which failures are safe to retry and which are not"
   ],
   "nodes": [
-    {"id": "client", "label": "Mobile client", "kind": "client", "x": 8, "y": 50},
-    {"id": "checkout", "label": "Checkout service", "kind": "service", "x": 32, "y": 50},
-    {"id": "payment", "label": "Payment API", "kind": "service", "x": 57, "y": 50},
-    {"id": "db", "label": "Payments DB", "kind": "db", "x": 84, "y": 50},
-    {"id": "others", "label": "Other callers", "kind": "client", "x": 57, "y": 14},
-    {"id": "cache", "label": "Cached price list", "kind": "cache", "x": 32, "y": 86}
+    {
+      "id": "client",
+      "label": "Mobile client",
+      "kind": "client",
+      "x": 8,
+      "y": 50
+    },
+    {
+      "id": "checkout",
+      "label": "Checkout service",
+      "kind": "service",
+      "x": 32,
+      "y": 50
+    },
+    {
+      "id": "payment",
+      "label": "Payment API",
+      "kind": "service",
+      "x": 57,
+      "y": 50
+    },
+    {
+      "id": "db",
+      "label": "Payments DB",
+      "kind": "db",
+      "x": 84,
+      "y": 50
+    },
+    {
+      "id": "others",
+      "label": "Other callers",
+      "kind": "client",
+      "x": 57,
+      "y": 14
+    }
   ],
   "edges": [
-    {"from": "client", "to": "checkout"},
-    {"from": "checkout", "to": "payment"},
-    {"from": "payment", "to": "db"},
-    {"from": "others", "to": "payment"},
-    {"from": "checkout", "to": "cache"}
+    {
+      "from": "client",
+      "to": "checkout"
+    },
+    {
+      "from": "checkout",
+      "to": "payment"
+    },
+    {
+      "from": "payment",
+      "to": "db"
+    },
+    {
+      "from": "others",
+      "to": "payment"
+    }
   ],
   "metrics": [
-    {"id": "timeout", "label": "Timeout", "unit": "ms"},
-    {"id": "attempts", "label": "Attempts", "unit": "tries"},
-    {"id": "load", "label": "Payment load", "unit": "req/s"},
-    {"id": "ok", "label": "Success", "unit": "%"}
+    {
+      "id": "timeout",
+      "label": "Timeout",
+      "unit": "ms"
+    },
+    {
+      "id": "attempts",
+      "label": "Max attempts",
+      "unit": "tries"
+    },
+    {
+      "id": "load",
+      "label": "Payment load",
+      "unit": "req/s"
+    },
+    {
+      "id": "ok",
+      "label": "Success",
+      "unit": "%"
+    }
   ],
   "steps": [
-    {"tag": "QUESTION", "title": "The payment API gets flaky", "body": "A checkout service calls a payment API. Normally it answers in about 80 ms, and the 99th percentile (p99, the slowest 1 in 100 calls) is 400 ms. Today about 30 percent of calls fail or hang for a moment. What should checkout do: wait forever, give up at once, or try again? Each choice has a cost, and this lesson walks through them.", "idea": "Any call over a network can be slow, fail, or never answer, so the caller needs a plan for each case.", "caption": "Checkout depends on a payment API that now fails 3 calls in 10.", "focus": ["checkout", "payment"], "flows": [{"from": "checkout", "to": "payment", "kind": "request", "label": "charge $42"}, {"from": "payment", "to": "checkout", "kind": "fail", "label": "502 / no reply"}], "metrics": {"timeout": "none", "attempts": "1", "load": "600", "ok": "70"}},
-    {"tag": "CONCEPT", "title": "Set a timeout first", "body": "With no timeout, a hung call holds a thread and a connection until the OS gives up, often after minutes. Enough hung calls and checkout itself runs out of threads. A timeout caps the wait. A common rule of thumb is to set it a little above the dependency's p99, so 500 ms here, then adjust from real data. Too low and you abort calls that would have worked.", "idea": "A timeout turns an unbounded wait into a bounded one; base it on measured p99, not on hope.", "caption": "Checkout stops waiting at 500 ms and frees its thread.", "focus": ["checkout", "payment"], "flows": [{"from": "checkout", "to": "payment", "kind": "request", "label": "charge $42"}, {"from": "payment", "to": "checkout", "kind": "fail", "label": "timeout @500ms"}], "metrics": {"timeout": "500", "attempts": "1", "ok": "70"}},
-    {"tag": "CONCEPT", "title": "Retry the transient failure", "body": "Many failures are brief: a dropped packet, a server restarting, a momentary overload. Trying again often works. If each attempt fails 30 percent of the time and failures are independent, three attempts all fail only 0.3 x 0.3 x 0.3, about 3 percent. Success climbs from 70 to roughly 97 percent. This only holds when the cause is temporary. A dead dependency fails every time.", "idea": "Retries convert short-lived faults into successes, but only if the next attempt has a real chance of working.", "caption": "A second attempt reaches the Payment API and succeeds.", "focus": ["checkout", "payment"], "flows": [{"from": "checkout", "to": "payment", "kind": "request", "label": "attempt 1"}, {"from": "payment", "to": "checkout", "kind": "fail", "label": "503"}, {"from": "checkout", "to": "payment", "kind": "request", "label": "attempt 2"}, {"from": "payment", "to": "checkout", "kind": "response", "label": "200 OK"}], "metrics": {"attempts": "3", "load": "780", "ok": "97"}},
-    {"tag": "CONCEPT", "title": "Back off exponentially", "body": "Retrying instantly hammers a service that is already struggling. Exponential backoff waits longer after each failure: for example 100 ms, 200 ms, 400 ms, 800 ms, doubling until a cap such as 2 seconds. The growing gap gives the dependency room to recover. It also keeps one stubborn caller from spending its whole effort on a service that is down.", "idea": "Doubling the wait after every failure gives a struggling service breathing room.", "caption": "Each retry waits twice as long as the previous one.", "focus": ["checkout", "payment"], "flows": [{"from": "checkout", "to": "payment", "kind": "request", "label": "try 1"}, {"from": "checkout", "to": "payment", "kind": "request", "label": "after 100 ms"}, {"from": "checkout", "to": "payment", "kind": "request", "label": "after 200 ms"}, {"from": "checkout", "to": "payment", "kind": "request", "label": "after 400 ms"}], "metrics": {"attempts": "4"}},
-    {"tag": "CONCEPT", "title": "Add jitter", "body": "Suppose the payment API blips for one second and 5,000 callers all fail together. With plain backoff they all retry at exactly 100 ms, then all at 200 ms, arriving in synchronized waves. Jitter adds randomness. With full jitter each caller sleeps a random time between 0 and its current backoff value, so the retries spread into a smooth trickle instead of spikes.", "idea": "Jitter breaks up synchronized retry waves; always add it to backoff.", "caption": "Many callers retry at random moments instead of all at once.", "focus": ["others", "checkout", "payment"], "flows": [{"from": "others", "to": "payment", "kind": "request", "label": "retry +37 ms"}, {"from": "checkout", "to": "payment", "kind": "request", "label": "retry +91 ms"}, {"from": "others", "to": "payment", "kind": "request", "label": "retry +64 ms"}, {"from": "payment", "to": "checkout", "kind": "response", "label": "200 OK"}], "metrics": {"load": "700", "ok": "97"}},
-    {"tag": "WHAT IF", "title": "The retry storm", "body": "Now the payment API is truly overloaded: it slows down and capacity halves. Callers time out and retry. Worse, both the client app and checkout each allow 3 attempts, so one user tap can become up to 9 calls to payment. Normal load of 600 requests per second balloons to about 5,400, which slows payment further and causes more retries. The helper has become the attacker.", "idea": "Retries at every layer multiply: 3 attempts across 2 layers is up to 9 calls per user action.", "caption": "Layered retries pile load onto the already struggling Payment API.", "focus": ["client", "checkout", "payment", "others"], "flows": [{"from": "client", "to": "checkout", "kind": "request", "label": "3 tries"}, {"from": "checkout", "to": "payment", "kind": "request", "label": "3 x 3 tries"}, {"from": "others", "to": "payment", "kind": "request", "label": "more retries"}, {"from": "payment", "to": "checkout", "kind": "fail", "label": "overloaded"}], "metrics": {"attempts": "9", "load": "5400", "ok": "12"}},
-    {"tag": "TRADE-OFF", "title": "Cap it with a retry budget", "body": "A retry budget limits retries as a share of total traffic, for example no more than 10 percent of recent requests may be retries. It is usually a token bucket: each first attempt earns a fraction of a token, and each retry spends one. When the bucket is empty, the call fails right away. During a real outage load rises only about 10 percent, so the dependency can recover.", "idea": "A retry budget puts a hard ceiling on extra load no matter how many things fail.", "caption": "Once the budget is spent, checkout fails fast instead of retrying.", "focus": ["checkout", "payment", "cache"], "flows": [{"from": "checkout", "to": "payment", "kind": "request", "label": "first attempts"}, {"from": "payment", "to": "checkout", "kind": "fail", "label": "503"}, {"from": "checkout", "to": "cache", "kind": "request", "label": "budget empty"}, {"from": "cache", "to": "checkout", "kind": "response", "label": "fallback"}], "metrics": {"attempts": "1.1", "load": "660", "ok": "70"}},
-    {"tag": "CONCEPT", "title": "Retry only what is safe, within a deadline", "body": "Retry connection errors, timeouts, 429 and 503. Do not retry 400 or 404, because the same request fails again. Retrying a charge can bill twice unless the operation is idempotent, which the Idempotency lesson covers. Also give the whole user action a deadline, say 2 seconds, and pass the remaining time downstream so no layer keeps retrying after the user has left.", "idea": "Retry only transient, safe errors, and stop when the overall deadline runs out.", "caption": "The remaining time shrinks as the request moves downstream.", "focus": ["client", "checkout", "payment"], "flows": [{"from": "client", "to": "checkout", "kind": "request", "label": "deadline 2000ms"}, {"from": "checkout", "to": "payment", "kind": "request", "label": "left: 1400ms"}, {"from": "payment", "to": "checkout", "kind": "response", "label": "200 OK"}], "metrics": {"timeout": "500", "attempts": "2", "load": "660", "ok": "96"}},
-    {"tag": "RECAP", "title": "A safe retry recipe", "body": "Set a timeout near p99. Retry only transient errors, with exponential backoff and full jitter. Retry at one layer, not at every layer. Cap total retries with a budget of around 10 percent, and bound everything with an overall deadline. Done well, retries hide small faults. Done badly, they turn a small fault into an outage.", "idea": "Timeouts bound the wait, backoff and jitter space retries, and budgets and deadlines bound the damage.", "caption": "All pieces together keep the system stable when payment stumbles.", "focus": ["client", "checkout", "payment", "db", "cache"], "flows": [], "metrics": {"timeout": "500", "attempts": "1.1", "load": "660", "ok": "96"}}
+    {
+      "tag": "QUESTION",
+      "title": "The payment API gets flaky",
+      "body": "A checkout service calls a payment API. Normally it answers in about 80 ms, and the 99th percentile (p99, the slowest 1 in 100 calls) is 400 ms. Today about 30 percent of calls fail or hang for a moment. What should checkout do: wait forever, give up at once, or try again? Each choice has a cost, and this lesson walks through them.",
+      "idea": "Any call over a network can be slow, fail, or never answer, so the caller needs a plan for each case.",
+      "caption": "Checkout depends on a payment API that now fails 3 calls in 10.",
+      "focus": [
+        "checkout",
+        "payment"
+      ],
+      "flows": [
+        {
+          "from": "checkout",
+          "to": "payment",
+          "kind": "request",
+          "label": "charge $42"
+        },
+        {
+          "from": "payment",
+          "to": "checkout",
+          "kind": "fail",
+          "label": "502 / no reply"
+        }
+      ],
+      "metrics": {
+        "timeout": "none",
+        "attempts": "1",
+        "load": "600",
+        "ok": "70"
+      }
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "Set a timeout first",
+      "body": "With no timeout, a hung call holds a thread and a connection until the OS gives up, often after minutes. Enough hung calls and checkout itself runs out of threads. A timeout caps the wait. A common rule of thumb is to set the request timeout a little above the dependency's p99, so 500 ms here, then adjust from real data. Too low and you abort calls that would have worked. Set a short connect timeout (for example 100-200 ms) separately from the request timeout, and keep a caller's timeout longer than its callee's. The per-attempt timeout times your attempt count, plus backoff, must fit inside the overall deadline.",
+      "idea": "A timeout turns an unbounded wait into a bounded one; base it on measured p99, not on hope.",
+      "caption": "Checkout stops waiting at 500 ms and frees its thread.",
+      "focus": [
+        "checkout",
+        "payment"
+      ],
+      "flows": [
+        {
+          "from": "checkout",
+          "to": "payment",
+          "kind": "request",
+          "label": "charge $42"
+        },
+        {
+          "from": "payment",
+          "to": "checkout",
+          "kind": "fail",
+          "label": "timeout @500ms"
+        }
+      ],
+      "metrics": {
+        "timeout": "500",
+        "attempts": "1",
+        "ok": "70"
+      }
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "Retry the transient failure",
+      "body": "Many failures are brief: a dropped packet, a server restarting, a momentary overload. Trying again often works (retrying a charge safely needs idempotency, covered later). If each attempt fails 30 percent of the time and failures are independent, three attempts all fail only 0.3 x 0.3 x 0.3, about 3 percent. Success climbs from 70 to roughly 97 percent. This only holds when the cause is temporary. A dead dependency fails every time.",
+      "idea": "Retries convert short-lived faults into successes, but only if the next attempt has a real chance of working.",
+      "caption": "A second attempt reaches the Payment API and succeeds.",
+      "focus": [
+        "checkout",
+        "payment"
+      ],
+      "flows": [
+        {
+          "from": "checkout",
+          "to": "payment",
+          "kind": "request",
+          "label": "attempt 1"
+        },
+        {
+          "from": "payment",
+          "to": "checkout",
+          "kind": "fail",
+          "label": "503"
+        },
+        {
+          "from": "checkout",
+          "to": "payment",
+          "kind": "request",
+          "label": "attempt 2"
+        },
+        {
+          "from": "payment",
+          "to": "checkout",
+          "kind": "response",
+          "label": "200 OK"
+        }
+      ],
+      "metrics": {
+        "attempts": "3",
+        "load": "834",
+        "ok": "97"
+      }
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "Back off exponentially",
+      "body": "Retrying instantly hammers a service that is already struggling. Exponential backoff waits longer after each failure: for example 100 ms, 200 ms, 400 ms, 800 ms, doubling until a cap such as 2 seconds. The growing gap gives the dependency room to recover. Pair backoff with a maximum number of attempts, since waiting longer alone does not stop a caller from retrying forever.",
+      "idea": "Doubling the wait after every failure gives a struggling service breathing room.",
+      "caption": "Each retry waits twice as long as the previous one.",
+      "focus": [
+        "checkout",
+        "payment"
+      ],
+      "flows": [
+        {
+          "from": "checkout",
+          "to": "payment",
+          "kind": "request",
+          "label": "try 1"
+        },
+        {
+          "from": "checkout",
+          "to": "payment",
+          "kind": "request",
+          "label": "after 100 ms"
+        },
+        {
+          "from": "checkout",
+          "to": "payment",
+          "kind": "request",
+          "label": "after 200 ms"
+        },
+        {
+          "from": "checkout",
+          "to": "payment",
+          "kind": "request",
+          "label": "after 400 ms"
+        }
+      ],
+      "metrics": {
+        "attempts": "4",
+        "load": "852"
+      }
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "Add jitter",
+      "body": "Suppose the payment API blips for one second and 5,000 callers all fail together. With plain backoff they all retry at exactly 100 ms, then all at 200 ms, arriving in synchronized waves. Jitter adds randomness. With full jitter each caller sleeps a random time between 0 and its current backoff value, so the retries spread into a smooth trickle instead of spikes.",
+      "idea": "Jitter breaks up synchronized retry waves; always add it to backoff.",
+      "caption": "Many callers retry at random moments instead of all at once.",
+      "focus": [
+        "others",
+        "checkout",
+        "payment"
+      ],
+      "flows": [
+        {
+          "from": "others",
+          "to": "payment",
+          "kind": "request",
+          "label": "retry +37 ms"
+        },
+        {
+          "from": "checkout",
+          "to": "payment",
+          "kind": "request",
+          "label": "retry +91 ms"
+        },
+        {
+          "from": "others",
+          "to": "payment",
+          "kind": "request",
+          "label": "retry +64 ms"
+        },
+        {
+          "from": "payment",
+          "to": "checkout",
+          "kind": "response",
+          "label": "200 OK"
+        }
+      ],
+      "metrics": {
+        "ok": "97"
+      }
+    },
+    {
+      "tag": "WHAT IF",
+      "title": "The retry storm",
+      "body": "Now the payment API is truly overloaded: it slows down and capacity halves. Callers time out and retry. Worse, both the client app and checkout each allow 3 attempts, so one user tap can become up to 9 calls to payment. In the worst case, normal load of 600 requests per second could balloon to as much as 5,400, and other callers add their own retries on top. That extra load slows payment further and causes more retries. The helper has become the attacker.",
+      "idea": "Retries at every layer multiply: 3 attempts across 2 layers is up to 9 calls per user action.",
+      "caption": "Layered retries pile load onto the already struggling Payment API.",
+      "focus": [
+        "client",
+        "checkout",
+        "payment",
+        "others"
+      ],
+      "flows": [
+        {
+          "from": "client",
+          "to": "checkout",
+          "kind": "request",
+          "label": "3 tries"
+        },
+        {
+          "from": "checkout",
+          "to": "payment",
+          "kind": "request",
+          "label": "3 x 3 tries"
+        },
+        {
+          "from": "others",
+          "to": "payment",
+          "kind": "request",
+          "label": "more retries"
+        },
+        {
+          "from": "payment",
+          "to": "checkout",
+          "kind": "fail",
+          "label": "overloaded"
+        }
+      ],
+      "metrics": {
+        "attempts": "9",
+        "load": "5400"
+      }
+    },
+    {
+      "tag": "TRADE-OFF",
+      "title": "Cap it with a retry budget",
+      "body": "A retry budget limits retries as a share of total traffic, for example no more than 10 percent of recent requests may be retries. It is usually a token bucket: each first attempt earns a fraction of a token, and each retry spends one. When the bucket is empty, the call fails right away. During a real outage load rises only about 10 percent, so the dependency can recover.",
+      "idea": "A retry budget puts a hard ceiling on extra load no matter how many things fail.",
+      "caption": "Once the budget is spent, checkout fails fast instead of retrying.",
+      "focus": [
+        "client",
+        "checkout",
+        "payment"
+      ],
+      "flows": [
+        {
+          "from": "checkout",
+          "to": "payment",
+          "kind": "request",
+          "label": "first attempts"
+        },
+        {
+          "from": "payment",
+          "to": "checkout",
+          "kind": "fail",
+          "label": "503"
+        },
+        {
+          "from": "checkout",
+          "to": "client",
+          "kind": "fail",
+          "label": "fail fast"
+        }
+      ],
+      "metrics": {
+        "attempts": "1 + 10%",
+        "load": "660",
+        "ok": "70"
+      }
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "Retry only what is safe, within a deadline",
+      "body": "Retry connection errors, timeouts, 502, 503, 504 and 429, and honour a Retry-After hint on 429 or 503. Do not retry 400, 403 or 404, because the same request fails again. A timeout on a write leaves it unknown whether the work happened, so retrying a charge can bill twice unless the operation is idempotent or carries an idempotency key (the Idempotency lesson covers this). Also give the whole user action a deadline, say 2 seconds, and pass the remaining time downstream so no layer keeps retrying after the user has left. Three 500 ms attempts plus backoff is about 1.7 s, which nearly fills that deadline.",
+      "idea": "Retry only transient, safe errors, and stop when the overall deadline runs out.",
+      "caption": "The remaining time shrinks as the request moves downstream.",
+      "focus": [
+        "client",
+        "checkout",
+        "payment"
+      ],
+      "flows": [
+        {
+          "from": "client",
+          "to": "checkout",
+          "kind": "request",
+          "label": "deadline 2000ms"
+        },
+        {
+          "from": "checkout",
+          "to": "payment",
+          "kind": "request",
+          "label": "left: 1400ms"
+        },
+        {
+          "from": "payment",
+          "to": "checkout",
+          "kind": "response",
+          "label": "200 OK"
+        }
+      ],
+      "metrics": {
+        "timeout": "500",
+        "attempts": "1 + 10%",
+        "load": "660",
+        "ok": "76"
+      }
+    },
+    {
+      "tag": "RECAP",
+      "title": "A safe retry recipe",
+      "body": "Set a timeout near p99. Retry only transient errors, with exponential backoff and full jitter. Retry at one layer, not at every layer. Cap total retries with a budget of around 10 percent, and bound everything with an overall deadline. Done well, retries hide small faults. Done badly, they turn a small fault into an outage.",
+      "idea": "Timeouts bound the wait, backoff and jitter space retries, and budgets and deadlines bound the damage.",
+      "caption": "All pieces together keep the system stable when payment stumbles.",
+      "focus": [
+        "client",
+        "checkout",
+        "payment",
+        "db"
+      ],
+      "flows": [],
+      "metrics": {
+        "timeout": "500",
+        "attempts": "1 + 10%",
+        "load": "660",
+        "ok": "76"
+      }
+    }
   ],
   "quiz": [
-    {"q": "Backoff starts at 100 ms and doubles each time, with full jitter. Roughly how long might a caller wait before its 3rd retry?", "options": ["Exactly 400 ms", "A random time between 0 and 400 ms", "A random time between 400 and 800 ms", "A random time between 0 and 100 ms"], "answer": 1, "why": "The delays are 100, 200, then 400 ms before the 3rd retry. Full jitter picks a random value between 0 and that ceiling."},
-    {"q": "A user taps Pay. The app, the checkout service, and the payment gateway each make up to 3 attempts. What is the worst-case number of calls reaching the payment gateway's backend?", "options": ["3", "9", "12", "27"], "answer": 3, "why": "Attempts multiply across layers: 3 x 3 x 3 = 27. This is why retries should usually happen at only one layer."},
-    {"q": "Which failure is the best candidate for an automatic retry?", "options": ["A 503 response from an idempotent GET request", "A 400 response saying the card number is malformed", "A 404 for an order id that does not exist", "A 403 because the API key is revoked"], "answer": 0, "why": "A 503 is often temporary, so a later attempt may succeed. The other errors are caused by the request or credentials and will fail the same way every time."},
-    {"q": "Traffic is 1,000 requests per second and the dependency is completely down. With a retry budget of 10 percent, about how many calls per second does it receive?", "options": ["3,000", "2,000", "1,100", "4,000"], "answer": 2, "why": "Every first attempt still goes out (1,000) and retries are capped at 10 percent of that (about 100), for roughly 1,100. Without a budget, 3 attempts each would send about 3,000."},
-    {"q": "Why does a timeout set far below the dependency's p99 cause trouble?", "options": ["It makes backoff delays too long", "It disables jitter", "It aborts calls that would have succeeded and triggers extra retries", "It prevents the connection from being reused"], "answer": 2, "why": "If the timeout is under p99, a large share of healthy but slow calls get cancelled and retried, which adds load and wastes the work already done."}
+    {
+      "q": "Backoff starts at 100 ms and doubles each time, with full jitter. Roughly how long might a caller wait before its 3rd retry?",
+      "options": [
+        "Exactly 400 ms",
+        "A random time between 0 and 400 ms",
+        "A random time between 400 and 800 ms",
+        "A random time between 0 and 100 ms"
+      ],
+      "answer": 1,
+      "why": "The delays are 100, 200, then 400 ms before the 3rd retry. Full jitter picks a random value between 0 and that ceiling."
+    },
+    {
+      "q": "A user taps Pay. The app, the checkout service and the payment API each make up to 3 attempts to the layer below it, ending at the payments database. How many calls can reach the database in the worst case?",
+      "options": [
+        "3",
+        "9",
+        "12",
+        "27"
+      ],
+      "answer": 3,
+      "why": "Attempts multiply across layers: 3 x 3 x 3 = 27. This is why retries should usually happen at only one layer."
+    },
+    {
+      "q": "Which failure is the best candidate for an automatic retry?",
+      "options": [
+        "A 503 response from an idempotent GET request",
+        "A 400 response saying the card number is malformed",
+        "A 404 for an order id that does not exist",
+        "A 403 because the API key is revoked"
+      ],
+      "answer": 0,
+      "why": "A 503 is often temporary, so a later attempt may succeed. The other errors are caused by the request or credentials and will fail the same way every time."
+    },
+    {
+      "q": "Traffic is 1,000 requests per second and the dependency is completely down. With a retry budget of 10 percent, at most about how many calls per second can it receive?",
+      "options": [
+        "3,000",
+        "2,000",
+        "1,100",
+        "4,000"
+      ],
+      "answer": 2,
+      "why": "Retries are capped at about 10 percent of first attempts, so the total cannot exceed roughly 1,100 (1,000 first attempts plus about 100 retries). Without a budget, 3 attempts each would send about 3,000."
+    },
+    {
+      "q": "Why does a timeout set far below the dependency's p99 cause trouble?",
+      "options": [
+        "It makes backoff delays too long",
+        "It disables jitter",
+        "It aborts calls that would have succeeded and triggers extra retries",
+        "It prevents the connection from being reused"
+      ],
+      "answer": 2,
+      "why": "If the timeout is under p99, a large share of healthy but slow calls get cancelled and retried, which adds load and wastes the work already done."
+    }
   ],
   "cheatsheet": [
-    {"term": "Timeout", "def": "Maximum time to wait for a reply. Set slightly above the dependency's measured p99, and set one on every network call."},
-    {"term": "Exponential backoff", "def": "Wait base x 2^n before retry n, up to a cap. Example: 100, 200, 400, 800 ms, capped near 2 s."},
-    {"term": "Full jitter", "def": "Sleep a random time between 0 and the current backoff ceiling. Spreads out synchronized retries from many callers."},
-    {"term": "Retry storm", "def": "Retries add load to a struggling service, which fails more calls, which causes more retries. Layered retries multiply it."},
-    {"term": "Retry budget", "def": "A cap on retries as a share of traffic, often about 10 percent. Past the cap, fail fast instead of retrying."},
-    {"term": "Deadline", "def": "One time limit for the whole user action, passed downstream so each layer knows how much time is left."},
-    {"term": "Safe to retry", "def": "Timeouts, connection errors, 429, 503, and idempotent operations. Never blindly retry 4xx client errors or non-idempotent writes."}
+    {
+      "term": "Timeout",
+      "def": "Maximum time to wait for a reply. Set the request timeout slightly above the dependency's measured p99, use a shorter connect timeout, and set both on every network call. Attempts x timeout plus backoff must fit the deadline."
+    },
+    {
+      "term": "Exponential backoff",
+      "def": "Wait base x 2^(n-1) before retry n (n = 1, 2, 3...), up to a cap. Example: 100, 200, 400, 800 ms, capped near 2 s."
+    },
+    {
+      "term": "Full jitter",
+      "def": "Sleep a random time between 0 and the current backoff ceiling. Spreads out synchronized retries from many callers."
+    },
+    {
+      "term": "Retry storm",
+      "def": "Retries add load to a struggling service, which fails more calls, which causes more retries. Layered retries multiply it."
+    },
+    {
+      "term": "Retry budget",
+      "def": "A cap on retries as a share of traffic, often about 10 percent. Past the cap, fail fast instead of retrying."
+    },
+    {
+      "term": "Deadline",
+      "def": "One time limit for the whole user action, passed downstream so each layer knows how much time is left."
+    },
+    {
+      "term": "Safe to retry",
+      "def": "Retry timeouts, connection errors, 429 (honour Retry-After), 502, 503 and 504 only when the operation is idempotent or carries an idempotency key. Do not retry other 4xx errors such as 400, 403 and 404."
+    }
   ]
 }

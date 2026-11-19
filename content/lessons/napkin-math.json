@@ -15,8 +15,8 @@
     {"id": "users", "label": "10M daily users", "kind": "user", "x": 10, "y": 50},
     {"id": "cdn", "label": "CDN", "kind": "cdn", "x": 35, "y": 18},
     {"id": "api", "label": "API servers", "kind": "server", "x": 38, "y": 58},
-    {"id": "cache", "label": "Cache", "kind": "cache", "x": 88, "y": 52},
-    {"id": "db", "label": "Database", "kind": "db", "x": 65, "y": 28},
+    {"id": "cache", "label": "Cache", "kind": "cache", "x": 65, "y": 28},
+    {"id": "db", "label": "Database", "kind": "db", "x": 88, "y": 28},
     {"id": "store", "label": "Photo storage", "kind": "storage", "x": 65, "y": 80}
   ],
   "edges": [
@@ -57,7 +57,7 @@
     {
       "tag": "CONCEPT",
       "title": "From DAU to QPS",
-      "body": "Reads per day: 10M users x 100 views = 1 billion. Divide by about 86,400 seconds and you get roughly 12,000 reads per second on average. Uploads: 10% of users, one photo each, is 1M per day, about 12 writes per second. The read-to-write ratio is around 1000 to 1, which says this system should be built around fast reads.",
+      "body": "Reads per day: 10M users x 100 views = 1 billion. Divide by about 86,400 seconds and you get roughly 12,000 reads per second (queries per second, or QPS) on average. Assume each view makes one API call for photo metadata, while the image bytes themselves come from the CDN. Uploads: 10% of users, one photo each, is 1M per day, about 12 writes per second. The read-to-write ratio is around 1000 to 1, which says this system should be built around fast reads.",
       "idea": "QPS = (DAU x actions per user per day) / 86,400. The read/write ratio shapes the design.",
       "caption": "About 12,000 reads per second hit the system on average.",
       "focus": ["users", "api"],
@@ -77,7 +77,7 @@
     {
       "tag": "CONCEPT",
       "title": "Storage grows every day",
-      "body": "One million uploads a day at about 2 MB each is 2 TB per day. Over 365 days that is roughly 730 TB, close to three quarters of a petabyte, before replication. Keeping 3 copies for durability makes it about 2.2 PB. Notice that thumbnails and metadata are tiny by comparison: the raw photos dominate the bill.",
+      "body": "One million uploads a day at about 2 MB each is 2 TB per day. Over 365 days that is roughly 730 TB, close to three quarters of a petabyte, before replication. Keeping 3 copies for durability makes it about 2.2 PB. Databases usually keep 3 full copies; large object stores often use erasure coding, which costs closer to 1.5x. Resized copies and metadata add maybe 10 to 30 percent on top, so the original photos still dominate; we ignore them for a napkin estimate.",
       "idea": "Storage per year = writes per day x size per item x 365, then multiply by the replication factor.",
       "caption": "Uploads pile up in object storage at 2 TB per day.",
       "focus": ["api", "store"],
@@ -87,7 +87,7 @@
     {
       "tag": "CONCEPT",
       "title": "Bandwidth: watch bits and bytes",
-      "body": "Each view serves a resized image of about 200 KB. A billion views a day is 200 TB, or about 2.3 GB per second. Network links are quoted in bits, so multiply by 8: roughly 18 Gbps on average and 55 Gbps at peak. That is far too much for the origin, which is why a CDN serves most of these bytes from the edge.",
+      "body": "Each view serves a resized image of about 200 KB. A billion views a day is 200 TB, or about 2.3 GB per second. Network links are quoted in bits, so multiply by 8: roughly 18 Gbps on average and 55 Gbps at peak. That is far too much for the origin. A CDN (content delivery network) keeps copies of popular files on servers near users, so it serves most of these bytes from the edge. Egress is data leaving your system.",
       "idea": "Bandwidth = QPS x bytes per response. Multiply bytes by 8 to compare with link speeds in bits.",
       "caption": "About 18 Gbps leaves the system, mostly served from CDN caches.",
       "focus": ["users", "cdn", "store"],
@@ -97,17 +97,17 @@
     {
       "tag": "CONCEPT",
       "title": "Latency numbers to remember",
-      "body": "Rough orders of magnitude: reading from memory takes about 100 nanoseconds, an SSD random read about 100 microseconds, a round trip inside one data center about 0.5 ms, a spinning-disk seek about 10 ms, and a round trip across continents about 150 ms. Each step is roughly 10 to 1000 times slower than the last, so avoid slow tiers on the hot path.",
+      "body": "Rough orders of magnitude: reading from memory takes about 100 nanoseconds, an SSD random read about 100 microseconds, a round trip inside one data center about 0.5 ms, a spinning-disk seek about 10 ms, and a round trip across continents about 150 ms. Going down the list, each tier is roughly 5 to 1000 times slower than the one before, so keep slow tiers off the hot path.",
       "idea": "Memory is about 1000x faster than SSD, and a cross-continent round trip is about 300x slower than one inside a data center.",
       "caption": "A cache lookup is cheaper than a database or storage read.",
       "focus": ["api", "cache", "db"],
-      "flows": [{"from": "api", "to": "cache", "kind": "request", "label": "~0.5 ms"}, {"from": "cache", "to": "api", "kind": "response", "label": "hit"}, {"from": "api", "to": "db", "kind": "request", "label": "~5 ms miss"}],
+      "flows": [{"from": "api", "to": "cache", "kind": "request", "label": "~0.5 ms"}, {"from": "cache", "to": "api", "kind": "response", "label": "hit"}, {"from": "api", "to": "db", "kind": "request", "label": "~10 ms disk"}],
       "metrics": {}
     },
     {
       "tag": "TRADE-OFF",
       "title": "Turning numbers into decisions",
-      "body": "Suppose one API server handles about 2,000 requests per second. Peak 36,000 needs 18 servers, so plan around 25 for headroom. A single database comfortably serves a few thousand simple reads per second, say 5,000. To keep misses under that, the cache must hit at least 85 percent of the time: 15 percent of 36,000 is 5,400, so aim for 90 percent or more.",
+      "body": "Suppose one API server handles about 2,000 requests per second. Peak 36,000 needs 18 servers, so plan around 25 for headroom. A single database comfortably serves a few thousand simple reads per second, say 5,000. A lookup is a hit when the answer is already in the cache; a miss falls through to the database. At most 5,000 of the 36,000 lookups (about 14 percent) can reach the database, so the cache must hit roughly 86 percent of the time. At exactly 85 percent you would send 5,400 misses, slightly over, so aim for 90 percent or more.",
       "idea": "Divide the estimate by what one machine can do; the quotient tells you how many machines or what cache hit rate you need.",
       "caption": "The cache absorbs reads so the database sees only misses.",
       "focus": ["api", "cache", "db"],
@@ -150,7 +150,7 @@
     },
     {
       "q": "You serve 1.2 GB per second on average and your network link is 10 Gbps. What does the napkin math say?",
-      "options": ["It barely fits on average and cannot handle peak, since 1.2 GB/s is about 9.6 Gbps", "It fits easily, since 1.2 is far smaller than 10", "It fits only if you compress to bits", "It is fine as long as peak is under 2x"],
+      "options": ["It barely fits on average and cannot absorb peak", "It fits easily, since 1.2 is far smaller than 10", "It fits, since 10 Gbps is 10 GB/s", "It is fine as long as peak is under 2x"],
       "answer": 0,
       "why": "Link speeds are in bits: 1.2 GB/s x 8 = 9.6 Gbps, already about 96 percent of the link. Any peak above average would saturate it."
     },
@@ -164,8 +164,8 @@
   "cheatsheet": [
     {"term": "Seconds per day", "def": "86,400, rounded to about 100,000 (10^5). So 1 million events per day is about 12 per second."},
     {"term": "Powers of two", "def": "2^10 is about 1 thousand (KB), 2^20 about 1 million (MB), 2^30 about 1 billion (GB), 2^40 about 1 trillion (TB), 2^50 about 1 quadrillion (PB)."},
-    {"term": "QPS formula", "def": "Average QPS = DAU x actions per user per day / 86,400. Peak QPS = average x 2 to 5 (rule of thumb; 3 is a common default)."},
-    {"term": "Storage formula", "def": "Per year = items per day x bytes per item x 365. Multiply by the replication factor, usually 3, for the real footprint."},
+    {"term": "QPS formula", "def": "QPS = queries (requests) per second. Average QPS = DAU x actions per user per day / 86,400. Peak QPS = average x 2 to 5 (rule of thumb; 3 is a common default)."},
+    {"term": "Storage formula", "def": "Per year = items per day x bytes per item x 365. Multiply by the replication factor, usually 3 for databases, about 1.5 for erasure-coded object storage, for the real footprint."},
     {"term": "Bandwidth", "def": "QPS x bytes per response gives bytes per second. Multiply by 8 for bits per second, which is how network links are rated."},
     {"term": "Latency ladder", "def": "Memory about 100 ns, SSD read about 100 us, same-data-center round trip about 0.5 ms, disk seek about 10 ms, cross-continent round trip about 150 ms."},
     {"term": "Capacity check", "def": "Divide peak load by what one machine handles to get a server count, then add headroom. Do the same for a database against cache miss rate."}

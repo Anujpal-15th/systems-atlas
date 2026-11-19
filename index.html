@@ -3,10 +3,13 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="description" content="Systems Atlas: an interactive, step-by-step system design course with animated diagrams, practice quizzes, design labs and cheatsheets.">
+<meta name="theme-color" content="#f3ede1">
 <title>Systems Atlas · Learn System Design</title>
 <link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="preload" href="fonts/jbm-400.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="fonts/jbm-800.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="styles.css">
 <script src="theme.js"></script>
 <script src="course.js" defer></script>
@@ -15,23 +18,23 @@
 <body>
 <a class="skip" href="#main">Skip to content</a>
 <header class="top">
-  <button id="menu" class="icon-btn" aria-label="Course menu" aria-controls="sidebar" aria-expanded="false">☰</button>
-  <a class="brand" href="#/">Systems <b>Atlas</b></a>
+  <button id="menu" class="icon-btn" aria-label="Course menu" aria-controls="sidebar" aria-expanded="false" data-icon="menu"></button>
+  <a class="brand" href="#/" aria-label="Systems Atlas home"><img src="favicon.svg" alt="" width="26" height="26"><span>Systems <b>Atlas</b></span></a>
   <nav class="views" aria-label="Sections">
-    <a href="#/" data-view="learn">Learn</a>
-    <a href="#/practice" data-view="practice">Practice</a>
-    <a href="#/lab" data-view="lab">Design Lab</a>
-    <a href="#/cheatsheets" data-view="cheatsheets">Cheatsheets</a>
+    <a href="#/learn" data-view="learn" data-icon="book">Learn</a>
+    <a href="#/practice" data-view="practice" data-icon="target">Practice</a>
+    <a href="#/lab" data-view="lab" data-icon="flask">Design Lab</a>
+    <a href="#/cheatsheets" data-view="cheatsheets" data-icon="grid">Cheatsheets</a>
   </nav>
-  <button id="search-open" class="search-btn" aria-haspopup="dialog">Search lessons &amp; terms… <kbd>Ctrl K</kbd></button>
-  <button id="theme" class="icon-btn" aria-label="Dark theme" aria-pressed="false">◐</button>
+  <button id="search-open" class="search-btn" aria-haspopup="dialog" data-icon="search"><span>Search lessons &amp; concepts…</span><kbd>Ctrl K</kbd></button>
+  <button id="theme" class="icon-btn" aria-label="Dark theme" aria-pressed="false"></button>
 </header>
 <div class="shell">
-  <aside id="sidebar" class="panel sidebar" aria-label="Course">
-    <nav class="views views-mobile" aria-label="Sections"><a href="#/" data-view="learn">Learn</a><a href="#/practice" data-view="practice">Practice</a><a href="#/lab" data-view="lab">Design Lab</a><a href="#/cheatsheets" data-view="cheatsheets">Cheatsheets</a></nav>
-    <div class="side-head"><b>Course</b><span id="progress-text"></span></div>
-    <div class="bar" aria-hidden="true"><i id="progress-bar"></i></div>
-    <div id="course"></div>
+  <aside id="sidebar" class="sidebar" aria-label="Course">
+    <nav class="views views-mobile" aria-label="Sections"><a href="#/learn" data-view="learn" data-icon="book">Learn</a><a href="#/practice" data-view="practice" data-icon="target">Practice</a><a href="#/lab" data-view="lab" data-icon="flask">Design Lab</a><a href="#/cheatsheets" data-view="cheatsheets" data-icon="grid">Cheatsheets</a></nav>
+    <div class="side-head"><a href="#/" data-icon="folder">Course</a><span id="lesson-count"></span></div>
+    <div id="course" class="tree"></div>
+    <a class="progress-card" href="#/"><span>Progress</span><b id="progress-text"></b><span class="bar"><i id="progress-bar"></i></span></a>
   </aside>
   <main id="main" tabindex="-1"></main>
 </div>
@@ -39,6 +42,7 @@
 <dialog id="search" aria-label="Search">
   <div class="search-row"><input id="q" type="search" placeholder="Try: cache, quorum, kafka, p99" aria-label="Search lessons and terms" autocomplete="off"><button id="search-close" class="icon-btn" aria-label="Close search">✕</button></div>
   <div id="results" role="list"></div>
+  <p class="search-hint"><kbd>↑</kbd><kbd>↓</kbd> move · <kbd>Enter</kbd> open · <kbd>Esc</kbd> close</p>
 </dialog>
 </body>
 </html>

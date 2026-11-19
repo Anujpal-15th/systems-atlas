@@ -12,52 +12,444 @@
     "How to choose between containers and functions for a given workload"
   ],
   "nodes": [
-    {"id": "client", "label": "Client", "kind": "user", "x": 8, "y": 50},
-    {"id": "gw", "label": "Gateway / router", "kind": "gateway", "x": 29, "y": 50},
-    {"id": "sched", "label": "Scheduler", "kind": "service", "x": 54, "y": 14},
-    {"id": "pod", "label": "Container pod", "kind": "server", "x": 54, "y": 50},
-    {"id": "fn", "label": "Function runtime", "kind": "worker", "x": 54, "y": 86},
-    {"id": "db", "label": "Database", "kind": "db", "x": 88, "y": 50}
+    {
+      "id": "client",
+      "label": "Client",
+      "kind": "user",
+      "x": 8,
+      "y": 50
+    },
+    {
+      "id": "gw",
+      "label": "Gateway / router",
+      "kind": "gateway",
+      "x": 29,
+      "y": 50
+    },
+    {
+      "id": "sched",
+      "label": "Scheduler",
+      "kind": "service",
+      "x": 54,
+      "y": 14
+    },
+    {
+      "id": "pod",
+      "label": "Container pod",
+      "kind": "server",
+      "x": 54,
+      "y": 50
+    },
+    {
+      "id": "fn",
+      "label": "Function runtime",
+      "kind": "worker",
+      "x": 54,
+      "y": 86
+    },
+    {
+      "id": "db",
+      "label": "Database",
+      "kind": "db",
+      "x": 88,
+      "y": 50
+    }
   ],
   "edges": [
-    {"from": "client", "to": "gw"},
-    {"from": "gw", "to": "pod"},
-    {"from": "gw", "to": "fn"},
-    {"from": "sched", "to": "pod"},
-    {"from": "pod", "to": "db"},
-    {"from": "fn", "to": "db"}
+    {
+      "from": "client",
+      "to": "gw"
+    },
+    {
+      "from": "gw",
+      "to": "pod"
+    },
+    {
+      "from": "gw",
+      "to": "fn"
+    },
+    {
+      "from": "sched",
+      "to": "pod"
+    },
+    {
+      "from": "pod",
+      "to": "db"
+    },
+    {
+      "from": "fn",
+      "to": "db"
+    }
   ],
   "metrics": [
-    {"id": "latency", "label": "Latency", "unit": "ms"},
-    {"id": "pods", "label": "Running pods", "unit": ""},
-    {"id": "fns", "label": "Warm functions", "unit": ""}
+    {
+      "id": "latency",
+      "label": "Latency",
+      "unit": "ms"
+    },
+    {
+      "id": "pods",
+      "label": "Running pods",
+      "unit": ""
+    },
+    {
+      "id": "fns",
+      "label": "Warm functions",
+      "unit": ""
+    }
   ],
   "steps": [
-    {"tag": "QUESTION", "title": "Who runs your code, and when?", "body": "Your API handler is ready. Someone has to start it on a machine, give it CPU and memory, restart it when it crashes, and add copies when traffic grows. You can hand that job to a container orchestrator, which keeps your code running all the time, or to a functions platform, which runs it only while a request is in flight. Same code, very different trade-offs.", "idea": "Containers and functions are two answers to the same question: who owns starting and stopping your process?", "caption": "One client, two ways to run the same handler.", "focus": ["client", "gw"], "flows": [], "metrics": {"latency": "0", "pods": "0", "fns": "0"}},
-    {"tag": "CONCEPT", "title": "A container is a packaged process", "body": "A container bundles your app with its libraries and runs as an ordinary process that the kernel isolates with namespaces and cgroups. It shares the host kernel, so it starts in well under a second and costs megabytes, not the gigabytes of a full virtual machine. You describe it once as an image, and it runs the same on a laptop or a cluster.", "idea": "A container is an isolated process plus its dependencies, not a small virtual machine.", "caption": "Pod holds your container image, ready to serve.", "focus": ["pod"], "flows": [], "metrics": {}},
-    {"tag": "ORCHESTRATE", "title": "The scheduler places pods", "body": "You tell Kubernetes the desired state: run 3 replicas of this image, each needing 0.5 CPU and 512 MB. The scheduler looks at every node's free resources and picks a fit for each new pod. After that, controllers run a loop forever: compare what is running with what you asked for, and fix the difference by starting or killing pods.", "idea": "You declare the desired state; control loops keep reconciling reality toward it, including replacing crashed pods.", "caption": "Scheduler assigns pods to nodes with spare capacity.", "focus": ["sched", "pod"], "flows": [{"from": "sched", "to": "pod", "kind": "async", "label": "place replica"}], "metrics": {"pods": "3"}},
-    {"tag": "FLOW", "title": "Steady traffic on warm pods", "body": "A request arrives at the gateway, which routes it to one of the running pods. The process is already loaded and has its database connections open, so the handler just runs. A typical simple request here takes about 25 ms. The cost is that those 3 pods are paid for every hour, busy or idle.", "idea": "Always-on containers give predictable low latency, and you pay for capacity whether or not it is used.", "caption": "Request served by an already-running pod.", "focus": ["client", "gw", "pod", "db"], "flows": [{"from": "client", "to": "gw", "kind": "request", "label": "GET /orders"}, {"from": "gw", "to": "pod", "kind": "request", "label": "route"}, {"from": "pod", "to": "db", "kind": "request", "label": "query"}, {"from": "db", "to": "pod", "kind": "response", "label": "rows"}, {"from": "pod", "to": "gw", "kind": "response", "label": "200 OK"}, {"from": "gw", "to": "client", "kind": "response", "label": "200 OK"}], "metrics": {"latency": "25"}},
-    {"tag": "CONCEPT", "title": "Functions run only on demand", "body": "With functions-as-a-service you upload a handler, not a server. The platform runs it per event and bills by the millisecond of execution, and when nothing is happening it runs zero copies and costs nothing. Each running copy usually handles one request at a time, so 200 simultaneous requests means up to 200 copies. The platform does the scaling, within limits like a maximum concurrency and run time.", "idea": "Functions scale to zero and out per request, and you are billed for execution time rather than idle capacity.", "caption": "Function runtime holds no copies while idle.", "focus": ["fn"], "flows": [], "metrics": {"fns": "0"}},
-    {"tag": "WHAT IF", "title": "The first request: a cold start", "body": "A request arrives and no copy of the function exists. The platform must find a host, create a sandbox, download your code, start the language runtime, and run your initialisation code. This is a cold start. Depending on runtime and package size it often adds roughly 100 ms to a couple of seconds, on top of the 25 ms of real work, and only that unlucky request pays it.", "idea": "A cold start is the setup tax paid by a request that arrives when no warm copy is available.", "caption": "Sandbox is built before the handler can run.", "focus": ["gw", "fn", "db"], "flows": [{"from": "client", "to": "gw", "kind": "request", "label": "GET /orders"}, {"from": "gw", "to": "fn", "kind": "handshake", "label": "create sandbox"}, {"from": "fn", "to": "db", "kind": "request", "label": "new connection"}, {"from": "db", "to": "fn", "kind": "response", "label": "rows"}, {"from": "fn", "to": "gw", "kind": "response", "label": "200 OK"}, {"from": "gw", "to": "client", "kind": "response", "label": "200 OK"}], "metrics": {"latency": "850", "fns": "1"}},
-    {"tag": "FLOW", "title": "Warm reuse and the fan-out", "body": "After a request the platform keeps the sandbox alive for some minutes, so the next request skips setup and runs in about 30 ms. But a burst of 100 concurrent requests needs 100 copies, and each new one cold starts. Those copies also each open a database connection, which can exhaust a database that allows a few hundred. Connection pooling proxies and limits on maximum concurrency exist for this reason.", "idea": "Warm copies are fast, but bursts create many cold starts and can overwhelm downstream dependencies like databases.", "caption": "Warm copy answers fast; scale-out multiplies DB connections.", "focus": ["gw", "fn", "db"], "flows": [{"from": "gw", "to": "fn", "kind": "request", "label": "reuse warm copy"}, {"from": "fn", "to": "db", "kind": "request", "label": "query"}, {"from": "db", "to": "fn", "kind": "response", "label": "rows"}, {"from": "fn", "to": "db", "kind": "fail", "label": "too many conns"}], "metrics": {"latency": "30", "fns": "100"}},
-    {"tag": "TRADE-OFF", "title": "Shrinking cold starts", "body": "Cold starts are reduced, not removed. Keep the package small, avoid heavy work at startup, pick a fast-starting runtime, and lazily load rarely used libraries. You can also pay for provisioned or minimum instances that stay warm, and some platforms snapshot an initialised runtime and restore it. Each fix trades money or complexity for latency, so the more you keep warm, the closer you drift toward an always-on container.", "idea": "You can buy down cold starts with warm capacity, which erodes the cost advantage of scale to zero.", "caption": "Keeping copies warm costs money but removes the wait.", "focus": ["fn", "pod"], "flows": [{"from": "gw", "to": "fn", "kind": "async", "label": "keep 5 warm"}], "metrics": {"latency": "40", "fns": "5"}},
-    {"tag": "RECAP", "title": "Choosing between them", "body": "Pick containers for steady, high-volume, latency-sensitive services, long-lived connections like websockets, and anything needing custom runtimes or long jobs. Pick functions for spiky or rare traffic, event glue like resizing an image after upload, and small teams who do not want to run a cluster. Many systems use both, with a container core and functions around the edges.", "idea": "Steady and latency-critical favours containers; spiky, rare, or event-driven favours functions; mixing is normal.", "caption": "Same gateway, two backends, chosen per workload.", "focus": [], "flows": [{"from": "gw", "to": "pod", "kind": "request", "label": "steady API"}, {"from": "gw", "to": "fn", "kind": "request", "label": "spiky events"}], "metrics": {}}
+    {
+      "tag": "QUESTION",
+      "title": "Who runs your code, and when?",
+      "body": "Your API handler is ready. Someone has to start it on a machine, give it CPU and memory, restart it when it crashes, and add copies when traffic grows. You can hand that job to a container orchestrator, which keeps your code running all the time, or to a functions platform, which runs it only while a request is in flight. Same code, very different trade-offs.",
+      "idea": "Containers and functions are two answers to the same question: who owns starting and stopping your process?",
+      "caption": "One client, two ways to run the same handler.",
+      "focus": [
+        "client",
+        "gw"
+      ],
+      "flows": [],
+      "metrics": {
+        "latency": "0",
+        "pods": "0",
+        "fns": "0"
+      }
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "A container is a packaged process",
+      "body": "A container bundles your app with its libraries and runs as an ordinary process that the kernel isolates with namespaces and cgroups, kernel features that limit what a process can see and use. The process itself starts in well under a second once the image is on the machine, and it costs megabytes, not the gigabytes of a full virtual machine. Kubernetes wraps one or more containers in a pod, the smallest unit it schedules.",
+      "idea": "A container is an isolated process plus its dependencies, not a small virtual machine.",
+      "caption": "Pod holds your container image, ready to serve.",
+      "focus": [
+        "pod"
+      ],
+      "flows": [],
+      "metrics": {}
+    },
+    {
+      "tag": "ORCHESTRATE",
+      "title": "The scheduler places pods",
+      "body": "You tell Kubernetes the desired state: run 3 replicas of this image, each requesting 0.5 CPU and 512 MB. The scheduler looks at every node (a machine in the cluster) and its unreserved capacity, and picks a fit for each new pod. Controllers then loop forever: compare what is running with what you asked for, and fix the difference by starting or killing pods.",
+      "idea": "You declare the desired state; control loops keep reconciling reality toward it, including replacing crashed pods.",
+      "caption": "Scheduler assigns pods to nodes with spare capacity.",
+      "focus": [
+        "sched",
+        "pod"
+      ],
+      "flows": [
+        {
+          "from": "sched",
+          "to": "pod",
+          "kind": "async",
+          "label": "assign to node"
+        }
+      ],
+      "metrics": {
+        "pods": "3"
+      }
+    },
+    {
+      "tag": "FLOW",
+      "title": "Steady traffic on warm pods",
+      "body": "A request arrives at the gateway, which routes it to one of the running pods. The process is already loaded with its database connections open, so the handler just runs. In this example we assume a simple request takes about 25 ms. Those 3 pods are paid for every hour, busy or idle. Adding pods is not instant: the scheduler must place each one, the node must pull the image, and the pod must pass health checks, so scaling up takes seconds to minutes.",
+      "idea": "Always-on containers give predictable low latency, and you pay for capacity whether or not it is used.",
+      "caption": "Request served by an already-running pod.",
+      "focus": [
+        "client",
+        "gw",
+        "pod",
+        "db"
+      ],
+      "flows": [
+        {
+          "from": "client",
+          "to": "gw",
+          "kind": "request",
+          "label": "GET /orders"
+        },
+        {
+          "from": "gw",
+          "to": "pod",
+          "kind": "request",
+          "label": "route"
+        },
+        {
+          "from": "pod",
+          "to": "db",
+          "kind": "request",
+          "label": "query"
+        },
+        {
+          "from": "db",
+          "to": "pod",
+          "kind": "response",
+          "label": "rows"
+        },
+        {
+          "from": "pod",
+          "to": "gw",
+          "kind": "response",
+          "label": "200 OK"
+        },
+        {
+          "from": "gw",
+          "to": "client",
+          "kind": "response",
+          "label": "200 OK"
+        }
+      ],
+      "metrics": {
+        "latency": "25"
+      }
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "Functions run only on demand",
+      "body": "With functions-as-a-service you upload a handler, not a server. The platform runs it per event and bills for the time your code runs, in milliseconds on most platforms. When nothing is happening it runs zero copies and costs nothing. On platforms like AWS Lambda each running copy handles one request at a time, so 200 simultaneous requests means up to 200 copies (some platforms let one instance serve many). Scaling is automatic, within limits like maximum concurrency and run time.",
+      "idea": "Functions scale to zero and out per request, and you are billed for execution time rather than idle capacity.",
+      "caption": "Function runtime holds no copies while idle.",
+      "focus": [
+        "fn"
+      ],
+      "flows": [],
+      "metrics": {
+        "fns": "0"
+      }
+    },
+    {
+      "tag": "WHAT IF",
+      "title": "The first request: a cold start",
+      "body": "A request arrives and no copy of the function exists. The platform must find a host, create a sandbox, download your code, start the language runtime, and run your initialisation code, including a new database connection. This is a cold start. Typical setup is 100 ms to a couple of seconds, and heavy runtimes like Java can take several seconds without snapshotting. Here we assume about 800 ms of setup, so this request takes roughly 850 ms. Only that unlucky request pays it.",
+      "idea": "A cold start is the setup tax paid by a request that arrives when no warm copy is available.",
+      "caption": "Sandbox is built before the handler can run.",
+      "focus": [
+        "gw",
+        "fn",
+        "db"
+      ],
+      "flows": [
+        {
+          "from": "client",
+          "to": "gw",
+          "kind": "request",
+          "label": "GET /orders"
+        },
+        {
+          "from": "gw",
+          "to": "fn",
+          "kind": "handshake",
+          "label": "create sandbox"
+        },
+        {
+          "from": "fn",
+          "to": "db",
+          "kind": "request",
+          "label": "new connection"
+        },
+        {
+          "from": "db",
+          "to": "fn",
+          "kind": "response",
+          "label": "rows"
+        },
+        {
+          "from": "fn",
+          "to": "gw",
+          "kind": "response",
+          "label": "200 OK"
+        },
+        {
+          "from": "gw",
+          "to": "client",
+          "kind": "response",
+          "label": "200 OK"
+        }
+      ],
+      "metrics": {
+        "latency": "850",
+        "fns": "1"
+      }
+    },
+    {
+      "tag": "FLOW",
+      "title": "Warm reuse and the fan-out",
+      "body": "After a request the platform keeps the sandbox alive for some minutes, so the next request skips setup and runs in about 30 ms (a little more than the pod because of platform routing). But a burst of 500 concurrent requests needs up to 500 copies, and each new one cold starts. If each copy opens its own database connection, that can exceed a database limit of a few hundred. Connection pooling proxies and concurrency limits exist for this reason.",
+      "idea": "Warm copies are fast, but bursts create many cold starts and can overwhelm downstream dependencies like databases.",
+      "caption": "Warm copy answers in ~30 ms; a 500-copy burst overruns the DB connection limit.",
+      "focus": [
+        "gw",
+        "fn",
+        "db"
+      ],
+      "flows": [
+        {
+          "from": "gw",
+          "to": "fn",
+          "kind": "request",
+          "label": "reuse warm copy"
+        },
+        {
+          "from": "fn",
+          "to": "db",
+          "kind": "request",
+          "label": "query"
+        },
+        {
+          "from": "db",
+          "to": "fn",
+          "kind": "response",
+          "label": "rows"
+        },
+        {
+          "from": "fn",
+          "to": "db",
+          "kind": "fail",
+          "label": "conn limit hit"
+        }
+      ],
+      "metrics": {
+        "latency": "30",
+        "fns": "500"
+      }
+    },
+    {
+      "tag": "TRADE-OFF",
+      "title": "Shrinking cold starts",
+      "body": "Cold starts are reduced, not removed. Keep the package small, avoid heavy work at startup, pick a fast-starting runtime, and lazily load rarely used libraries. You can also pay for provisioned or minimum instances that stay warm, and some platforms snapshot an initialised runtime and restore it. Each fix trades money or complexity for latency, so the more you keep warm, the closer you drift toward an always-on container.",
+      "idea": "You can buy down cold starts with warm capacity, which erodes the cost advantage of scale to zero.",
+      "caption": "Keeping copies warm costs money but removes the wait.",
+      "focus": [
+        "fn",
+        "pod"
+      ],
+      "flows": [
+        {
+          "from": "gw",
+          "to": "fn",
+          "kind": "request",
+          "label": "hits warm copy"
+        }
+      ],
+      "metrics": {
+        "latency": "30",
+        "fns": "5"
+      }
+    },
+    {
+      "tag": "RECAP",
+      "title": "Choosing between them",
+      "body": "Pick containers for steady, high-volume, latency-sensitive services, long-lived connections like websockets, and anything needing long jobs or tight control of the environment. Pick functions for spiky or rare traffic, event glue like resizing an image after upload, and small teams who do not want to run a cluster. Serverless container platforms blur the line by running container images that scale to zero. Many systems use both, with a container core and functions around the edges.",
+      "idea": "Steady and latency-critical favours containers; spiky, rare, or event-driven favours functions; mixing is normal.",
+      "caption": "Same gateway, two backends, chosen per workload.",
+      "focus": [],
+      "flows": [
+        {
+          "from": "gw",
+          "to": "pod",
+          "kind": "request",
+          "label": "steady API"
+        },
+        {
+          "from": "gw",
+          "to": "fn",
+          "kind": "request",
+          "label": "spiky events"
+        }
+      ],
+      "metrics": {}
+    }
   ],
   "quiz": [
-    {"q": "You declare 3 replicas in Kubernetes and one node dies, taking a pod with it. What happens?", "options": ["The service stays at 2 pods until an operator intervenes", "A controller notices 2 running versus 3 desired and the scheduler places a replacement", "All pods restart to keep versions consistent", "The gateway queues requests until the node returns"], "answer": 1, "why": "Orchestrators run reconciliation loops that compare actual and desired state. The missing pod is recreated on a node with free capacity without human action."},
-    {"q": "A function handles 5 requests a day and each runs 200 ms. A container serving it runs 24/7. Which statement is most likely true?", "options": ["The container is cheaper because it avoids all startup cost", "The function is cheaper because you pay only for the tiny execution time", "They cost the same because both reserve one CPU", "The function cannot run this workload at all"], "answer": 1, "why": "At very low volume, idle capacity dominates. Scale to zero means almost nothing is billed, and the occasional cold start rarely matters for such traffic."},
-    {"q": "Which request pays the cold start penalty?", "options": ["Every request to a function", "Only the first request after deploying", "A request that arrives when no warm copy is free, such as after idle time or during a burst", "Requests with large payloads"], "answer": 2, "why": "Cold starts occur whenever a new copy must be created: after idle expiry, on scale-out for concurrent requests, or after a new deploy."},
-    {"q": "A traffic spike takes your functions from 5 to 400 concurrent copies and the database starts refusing connections. What is the best fix?", "options": ["Give each function more memory", "Cap function concurrency and put a connection pooler or proxy in front of the database", "Switch the database to a different region", "Increase the cold start timeout"], "answer": 1, "why": "Each copy opens its own connections, so scale-out multiplies them. Limiting concurrency and pooling connections protects the database."},
-    {"q": "A voice-chat service holds open connections for an hour each and needs steady low latency. What fits best?", "options": ["Functions, because they scale to zero", "Containers, because long-lived connections and steady load suit always-on processes", "Functions, because a cold start only happens once", "Neither can handle persistent connections"], "answer": 1, "why": "Functions have run-time limits and are billed per execution time, so hour-long connections are costly or impossible. Always-on containers handle them naturally."}
+    {
+      "q": "You declare 3 replicas in Kubernetes and one node dies, taking a pod with it. What happens?",
+      "options": [
+        "The service stays at 2 pods until an operator steps in to fix it",
+        "All pods restart together to keep versions consistent",
+        "A controller sees 2 running versus 3 desired and the scheduler places a replacement",
+        "The gateway queues requests until the failed node returns"
+      ],
+      "answer": 2,
+      "why": "Orchestrators run reconciliation loops that compare actual and desired state. The missing pod is recreated on a node with free capacity without human action. Detection is not instant: by default a dead node's pods are replaced after a few minutes."
+    },
+    {
+      "q": "A function handles 5 requests a day and each runs 200 ms. A container serving it runs 24/7. Which statement is most likely true?",
+      "options": [
+        "The function is cheaper because you pay only for the tiny execution time",
+        "The container is cheaper because it avoids all startup cost",
+        "They cost the same because both reserve one CPU",
+        "The function cannot run this workload at all"
+      ],
+      "answer": 0,
+      "why": "At very low volume, idle capacity dominates. Scale to zero means almost nothing is billed, and the occasional cold start rarely matters for such traffic."
+    },
+    {
+      "q": "Which request pays the cold start penalty?",
+      "options": [
+        "Every request to a function",
+        "A request that arrives when no warm copy is free, such as after idle time or a burst",
+        "Only the first request after deploying",
+        "Requests with large payloads"
+      ],
+      "answer": 1,
+      "why": "Cold starts occur whenever a new copy must be created: after idle expiry, on scale-out for concurrent requests, or after a new deploy."
+    },
+    {
+      "q": "A traffic spike takes your functions from 5 to 400 concurrent copies and the database starts refusing connections. What is the best fix?",
+      "options": [
+        "Give each function more memory so it finishes sooner",
+        "Switch the database to a different region",
+        "Increase the cold start timeout on the platform",
+        "Cap function concurrency and add a connection pooler in front of the database"
+      ],
+      "answer": 3,
+      "why": "Each copy opens its own connections, so scale-out multiplies them. Limiting concurrency and pooling connections protects the database."
+    },
+    {
+      "q": "A voice-chat service holds open connections for an hour each and needs steady low latency. What fits best?",
+      "options": [
+        "Functions, because they scale to zero when idle",
+        "Containers, because long-lived connections suit always-on processes",
+        "Functions, because a cold start only happens once ever",
+        "Neither can handle persistent connections at all"
+      ],
+      "answer": 1,
+      "why": "Functions have run-time limits and are billed for execution time, so holding hour-long connections is awkward and expensive. Always-on containers handle them naturally."
+    }
   ],
   "cheatsheet": [
-    {"term": "Container", "def": "Isolated process with its dependencies, sharing the host kernel. Starts in under a second and is far lighter than a VM."},
-    {"term": "Pod", "def": "Smallest Kubernetes unit: one or more tightly coupled containers scheduled together on one node."},
-    {"term": "Scheduler", "def": "Chooses a node for each new pod based on requested CPU and memory, spare capacity, and placement rules."},
-    {"term": "Reconciliation loop", "def": "Controllers repeatedly compare desired state with actual state and act to close the gap, such as replacing a dead pod."},
-    {"term": "Function (FaaS)", "def": "A handler run per event, billed by execution time, scaling to zero when idle. Limited run time and concurrency."},
-    {"term": "Cold start", "def": "Extra latency when a new sandbox must be created: place, fetch code, start runtime, initialise. Roughly 100 ms to seconds."},
-    {"term": "Cold start fixes", "def": "Smaller packages, light startup work, faster runtimes, provisioned warm instances, or snapshot restore."},
-    {"term": "Rule of thumb", "def": "Steady, latency-critical, long-lived connections: containers. Spiky, rare, event-driven glue: functions."}
+    {
+      "term": "Container",
+      "def": "Isolated process with its dependencies, sharing the host kernel. Starts in under a second once its image is local, and is far lighter than a VM."
+    },
+    {
+      "term": "Pod",
+      "def": "Smallest Kubernetes unit: one or more tightly coupled containers scheduled together on one node."
+    },
+    {
+      "term": "Scheduler",
+      "def": "Chooses a node for each new pod based on requested CPU and memory, spare capacity, and placement rules."
+    },
+    {
+      "term": "Reconciliation loop",
+      "def": "Controllers repeatedly compare desired state with actual state and act to close the gap, such as replacing a dead pod."
+    },
+    {
+      "term": "Function (FaaS)",
+      "def": "A handler run per event, billed by execution time, scaling to zero when idle. Limited run time and concurrency."
+    },
+    {
+      "term": "Cold start",
+      "def": "Extra latency when a new sandbox must be created: place, fetch code, start runtime, initialise. Roughly 100 ms to seconds."
+    },
+    {
+      "term": "Cold start fixes",
+      "def": "Smaller packages, light startup work, faster runtimes, provisioned warm instances, or snapshot restore."
+    },
+    {
+      "term": "Rule of thumb",
+      "def": "Steady, latency-critical, long-lived connections: containers. Spiky, rare, event-driven glue: functions."
+    }
   ]
 }

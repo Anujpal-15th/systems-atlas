@@ -1,64 +1,477 @@
 {
   "slug": "deploy-strategies",
   "title": "Deploys: Canary, Blue-Green, Flags",
-  "subtitle": "Watch the same new version ship four ways and see how much damage a bad build can do in each.",
+  "subtitle": "Watch one new version ship by rolling, blue-green, canary, flags and shadow traffic, and see how far a bad build can spread in each.",
   "minutes": 12,
   "level": "Intermediate",
   "learn": [
     "How rolling, blue-green, and canary deploys differ in cost, speed, and blast radius",
-    "Why a canary needs automatic metric checks to be worth anything",
+    "Why a canary only limits damage if automatic metric checks compare it with v1",
     "How feature flags separate deploying code from releasing a feature",
     "What a dark launch (shadow traffic) tests that staging cannot",
     "How expand/contract migrations keep the database safe while two versions run at once"
   ],
   "nodes": [
-    {"id": "users", "label": "Users", "kind": "user", "x": 8, "y": 50},
-    {"id": "router", "label": "Traffic router", "kind": "lb", "x": 30, "y": 50},
-    {"id": "old", "label": "Old version (v1)", "kind": "service", "x": 58, "y": 18},
-    {"id": "new", "label": "New version (v2)", "kind": "service", "x": 58, "y": 82},
-    {"id": "flags", "label": "Flag service", "kind": "external", "x": 30, "y": 86},
-    {"id": "db", "label": "Database", "kind": "db", "x": 88, "y": 50}
+    {
+      "id": "users",
+      "label": "Users",
+      "kind": "user",
+      "x": 8,
+      "y": 50
+    },
+    {
+      "id": "router",
+      "label": "Traffic router",
+      "kind": "lb",
+      "x": 30,
+      "y": 50
+    },
+    {
+      "id": "old",
+      "label": "Old version (v1)",
+      "kind": "service",
+      "x": 58,
+      "y": 18
+    },
+    {
+      "id": "new",
+      "label": "New version (v2)",
+      "kind": "service",
+      "x": 58,
+      "y": 82
+    },
+    {
+      "id": "flags",
+      "label": "Flag service",
+      "kind": "external",
+      "x": 30,
+      "y": 86
+    },
+    {
+      "id": "db",
+      "label": "Database",
+      "kind": "db",
+      "x": 88,
+      "y": 50
+    }
   ],
   "edges": [
-    {"from": "users", "to": "router"},
-    {"from": "router", "to": "old"},
-    {"from": "router", "to": "new"},
-    {"from": "old", "to": "db"},
-    {"from": "new", "to": "db"},
-    {"from": "flags", "to": "new"}
+    {
+      "from": "users",
+      "to": "router"
+    },
+    {
+      "from": "router",
+      "to": "old"
+    },
+    {
+      "from": "router",
+      "to": "new"
+    },
+    {
+      "from": "old",
+      "to": "db"
+    },
+    {
+      "from": "new",
+      "to": "db"
+    },
+    {
+      "from": "flags",
+      "to": "new"
+    }
   ],
   "metrics": [
-    {"id": "share", "label": "Traffic on v2", "unit": "%"},
-    {"id": "err2", "label": "v2 errors", "unit": "%"},
-    {"id": "err1", "label": "v1 errors", "unit": "%"},
-    {"id": "hit", "label": "Users hit", "unit": "%"}
+    {
+      "id": "share",
+      "label": "Traffic on v2",
+      "unit": "%"
+    },
+    {
+      "id": "err2",
+      "label": "v2 errors",
+      "unit": "%"
+    },
+    {
+      "id": "err1",
+      "label": "v1 errors",
+      "unit": "%"
+    },
+    {
+      "id": "hit",
+      "label": "Users on v2",
+      "unit": "%"
+    }
   ],
   "steps": [
-    {"tag": "QUESTION", "title": "Shipping without breaking things", "body": "Your team has a new build, v2, and 40 servers running v1 for millions of users. Every deploy is a bet that v2 behaves in production like it did in tests. Sometimes it loses. The real question is not how to deploy, but how many users see a bad build, and how fast you can undo it.", "idea": "Deploy strategy is risk management: limit how many users a bad build reaches and how fast you can undo it.", "caption": "All traffic is on v1. v2 is built and waiting.", "focus": ["users", "router", "old"], "flows": [{"from": "users", "to": "router", "kind": "request", "label": "100% traffic"}, {"from": "router", "to": "old", "kind": "request", "label": "to v1"}], "metrics": {"share": "0", "err2": "0", "err1": "0.2", "hit": "0"}},
-    {"tag": "ROLLING", "title": "Rolling: swap servers in batches", "body": "A rolling deploy replaces v1 instances with v2 a few at a time, for example 4 of 40 per batch, waiting for health checks between batches. It needs no extra capacity and is the default in most orchestrators. The catch: for the whole rollout, both versions serve traffic at once, and a bad v2 reaches users batch after batch unless a check stops it. Rolling back means rolling forward again with the old build.", "idea": "Rolling is cheap and simple, but old and new run together and rollback is slow.", "caption": "Router sends users to a mix of v1 and v2 instances.", "focus": ["router", "old", "new"], "flows": [{"from": "router", "to": "old", "kind": "request", "label": "36 of 40"}, {"from": "router", "to": "new", "kind": "request", "label": "4 of 40"}], "metrics": {"share": "10", "err2": "0.2", "err1": "0.2", "hit": "10"}},
-    {"tag": "BLUE-GREEN", "title": "Blue-green: flip a whole environment", "body": "Blue-green keeps two full environments. Blue (v1) serves users while green (v2) is started and smoke-tested with no real traffic. Then the router flips 100% of traffic to green in one step. Rollback is just flipping back, often within seconds, because blue is still running. The price is paying for roughly double capacity during the switch, and a flip still exposes everyone at once.", "idea": "Blue-green gives instant rollback at the cost of double capacity and an all-at-once switch.", "caption": "Router flips every request from v1 to v2 in one move.", "focus": ["router", "old", "new"], "flows": [{"from": "router", "to": "new", "kind": "request", "label": "flip: 100%"}, {"from": "new", "to": "router", "kind": "response", "label": "200 OK"}], "metrics": {"share": "100", "err2": "0.2", "hit": "100"}},
-    {"tag": "CANARY", "title": "Canary: a small slice first", "body": "A canary sends a small share of real traffic, say 5%, to v2 while 95% stays on v1. Automation then compares v2 against v1 on the same signals: error rate, p99 latency, saturation. If v2 stays within a set margin (for example errors within 0.1 points of v1) for 10 minutes, the share steps up to 25%, 50%, and 100%. Only real users reveal some bugs, so the canary hands them a small, bounded dose.", "idea": "A canary tests v2 on real traffic while capping the blast radius, but only if the metric comparison is automatic.", "caption": "5% of requests reach v2; both versions are measured.", "focus": ["router", "old", "new"], "flows": [{"from": "router", "to": "old", "kind": "request", "label": "95%"}, {"from": "router", "to": "new", "kind": "request", "label": "5%"}], "metrics": {"share": "5", "err2": "0.2", "err1": "0.2", "hit": "5"}},
-    {"tag": "WHAT IF", "title": "The canary catches a bad build", "body": "Suppose v2 has a bug that breaks 5% of its own requests. At 5% traffic the fleet-wide error rate barely moves, but v2's own error rate is 25 times v1's, and the comparison trips within two minutes. The router drops v2 to 0% automatically. Roughly 5% of users saw a few failed requests for two minutes. A blue-green flip or a full rolling deploy would have exposed everyone.", "idea": "Small blast radius plus automatic rollback turns an outage into a blip.", "caption": "v2 errors spike; router pulls traffic back to v1.", "focus": ["router", "new"], "flows": [{"from": "new", "to": "router", "kind": "fail", "label": "5% errors"}, {"from": "router", "to": "old", "kind": "request", "label": "back to 100%"}], "metrics": {"share": "0", "err2": "5", "err1": "0.2", "hit": "5"}},
-    {"tag": "FLAGS", "title": "Feature flags: deploy is not release", "body": "A feature flag is a runtime on/off switch checked in code, such as if flags.enabled(\"new-checkout\", user). You can ship v2 to every server with the feature off, then turn it on for staff, then 1% of users, then everyone, without another deploy. Turning it off takes seconds, not a rebuild. The cost: flags are extra code paths to test, and stale flags pile up, so remove each one once the rollout is done.", "idea": "Flags decouple deploying code from releasing a feature, giving per-user control and a seconds-long kill switch.", "caption": "v2 reads the flag service; the feature is on for a small group.", "focus": ["flags", "new"], "flows": [{"from": "flags", "to": "new", "kind": "response", "label": "new-checkout: 1%"}, {"from": "router", "to": "new", "kind": "request", "label": "all traffic"}], "metrics": {"share": "100", "err2": "0.2", "err1": "0.2", "hit": "1"}},
-    {"tag": "DARK LAUNCH", "title": "Dark launch: run it, hide the result", "body": "A dark launch sends a copy of live requests to v2 but throws away its responses, so users only see v1's answers. You learn how v2 handles real traffic shapes, data sizes, and load, such as whether it holds a p99 of 180 ms at production volume, with zero user risk. Guard against side effects: the shadow path must not send emails, charge cards, or write to shared data.", "idea": "Shadow traffic tests v2 on real load with no user impact, as long as it has no side effects.", "caption": "Requests are mirrored to v2; only v1's responses go back.", "focus": ["router", "old", "new"], "flows": [{"from": "router", "to": "old", "kind": "request", "label": "real request"}, {"from": "router", "to": "new", "kind": "async", "label": "mirrored copy"}, {"from": "old", "to": "router", "kind": "response", "label": "answer used"}], "metrics": {"share": "100", "err2": "0.3", "err1": "0.2", "hit": "0"}},
-    {"tag": "MIGRATION", "title": "The database must serve both versions", "body": "In every strategy above, v1 and v2 share one database for a while, and you cannot atomically flip a schema. So change it in phases called expand/contract. Expand: add a nullable column full_name, which v1 ignores. Deploy v2, which writes both old and new columns, and backfill old rows. Switch reads to the new column. Contract: only in a later deploy, once no v1 runs and rollback is no longer needed, drop the old columns.", "idea": "Never ship a schema change that breaks the old version; add first, migrate, and remove in a separate later deploy.", "caption": "Both versions read and write the same database.", "focus": ["old", "new", "db"], "flows": [{"from": "old", "to": "db", "kind": "request", "label": "uses name"}, {"from": "new", "to": "db", "kind": "request", "label": "writes both"}, {"from": "db", "to": "new", "kind": "response", "label": "full_name"}], "metrics": {"share": "50", "err2": "0.2", "err1": "0.2", "hit": "50"}},
-    {"tag": "RECAP", "title": "Pick by blast radius and rollback speed", "body": "Rolling is cheap but slow to undo. Blue-green undoes in seconds but costs double capacity and flips everyone. Canary limits exposure and needs good metrics. Flags give per-user control after deploy, and dark launches test load for free. Underneath all of them, expand/contract keeps the database compatible with both versions. Mature teams combine them: canary the build, flag the feature.", "idea": "Combine canary for the build, flags for the feature, and expand/contract for the data.", "caption": "Each tool limits risk at a different layer.", "focus": [], "flows": [], "metrics": {}}
+    {
+      "tag": "QUESTION",
+      "title": "Shipping without breaking things",
+      "body": "Your team has a new build, v2, and 40 servers running v1 for millions of users. Every deploy is a bet that v2 behaves in production like it did in tests. Sometimes it loses. The real question is not how to deploy, but the blast radius (how many users a bad change can reach) and how fast you can undo it.",
+      "idea": "Deploy strategy is risk management: limit how many users a bad build reaches and how fast you can undo it.",
+      "caption": "All traffic is on v1. v2 is built and waiting.",
+      "focus": [
+        "users",
+        "router",
+        "old"
+      ],
+      "flows": [
+        {
+          "from": "users",
+          "to": "router",
+          "kind": "request",
+          "label": "100% traffic"
+        },
+        {
+          "from": "router",
+          "to": "old",
+          "kind": "request",
+          "label": "to v1"
+        }
+      ],
+      "metrics": {
+        "share": "0",
+        "err2": "0",
+        "err1": "0.2",
+        "hit": "0"
+      }
+    },
+    {
+      "tag": "ROLLING",
+      "title": "Rolling: swap servers in batches",
+      "body": "A rolling deploy replaces v1 instances with v2 a few at a time, for example 4 of 40 per batch, waiting for health checks (automatic probes that a server is ready) between batches. It needs little or no spare capacity (at most a small surge) and is the default in most orchestrators. For the whole rollout both versions serve traffic, and a bad v2 reaches users batch after batch unless a check stops it. Mixed versions also share APIs, queues and caches, so keep those backward compatible too. Rolling back means rolling forward with the old build.",
+      "idea": "Rolling is cheap and simple, but old and new run together and rollback is slow.",
+      "caption": "Router sends users to a mix of v1 and v2 instances.",
+      "focus": [
+        "router",
+        "old",
+        "new"
+      ],
+      "flows": [
+        {
+          "from": "router",
+          "to": "old",
+          "kind": "request",
+          "label": "36 of 40"
+        },
+        {
+          "from": "router",
+          "to": "new",
+          "kind": "request",
+          "label": "4 of 40"
+        }
+      ],
+      "metrics": {
+        "share": "10",
+        "err2": "0.2",
+        "err1": "0.2",
+        "hit": "10"
+      }
+    },
+    {
+      "tag": "BLUE-GREEN",
+      "title": "Blue-green: flip a whole environment",
+      "body": "Blue-green keeps two full environments. Blue (v1) serves users while green (v2) is started and smoke-tested with no real traffic. Then the router flips 100% of traffic to green in one step. Rollback is just flipping back, often within seconds, because blue is still running. The price is paying for roughly double capacity during the switch, and a flip still exposes everyone at once.",
+      "idea": "Blue-green gives instant rollback at the cost of double capacity and an all-at-once switch.",
+      "caption": "Router flips every request from v1 to v2 in one move.",
+      "focus": [
+        "router",
+        "old",
+        "new"
+      ],
+      "flows": [
+        {
+          "from": "router",
+          "to": "new",
+          "kind": "request",
+          "label": "flip: 100%"
+        },
+        {
+          "from": "new",
+          "to": "router",
+          "kind": "response",
+          "label": "200 OK"
+        }
+      ],
+      "metrics": {
+        "share": "100",
+        "err2": "0.2",
+        "hit": "100",
+        "err1": "0"
+      }
+    },
+    {
+      "tag": "CANARY",
+      "title": "Canary: a small slice first",
+      "body": "A canary sends a small share of real traffic, say 5%, to v2 while 95% stays on v1, with each user kept on one version. Automation compares v2 against v1 on the same signals: error rate, p99 latency (the time the slowest 1% of requests exceed), and saturation (how close servers are to their limits). Give the comparison enough requests to be meaningful. If v2 stays within a set margin (for example errors within 0.1 points of v1) for 10 minutes, the share steps up to 25%, 50%, and 100%.",
+      "idea": "A canary tests v2 on real traffic while capping the blast radius, but only if the metric comparison is automatic.",
+      "caption": "5% of requests reach v2; both versions are measured.",
+      "focus": [
+        "router",
+        "old",
+        "new"
+      ],
+      "flows": [
+        {
+          "from": "router",
+          "to": "old",
+          "kind": "request",
+          "label": "95%"
+        },
+        {
+          "from": "router",
+          "to": "new",
+          "kind": "request",
+          "label": "5%"
+        }
+      ],
+      "metrics": {
+        "share": "5",
+        "err2": "0.2",
+        "err1": "0.2",
+        "hit": "5"
+      }
+    },
+    {
+      "tag": "WHAT IF",
+      "title": "The canary catches a bad build",
+      "body": "Suppose v2 has a bug that breaks 5% of its own requests. At 5% traffic the fleet-wide error rate only creeps from 0.2% to about 0.44%, easy to miss on a dashboard, but v2's own rate is 25 times v1's, so the comparison trips within two minutes. The router drops v2 to 0%. About 5% of requests reached v2 and 5% of those failed, roughly 0.25% of all requests, for two minutes. A blue-green flip would have sent 100% of traffic to the bad build until someone noticed, and a rolling deploy without metric checks would have kept replacing servers.",
+      "idea": "Small blast radius plus automatic rollback turns an outage into a blip.",
+      "caption": "v2 errors spike; router pulls traffic back to v1.",
+      "focus": [
+        "router",
+        "old",
+        "new"
+      ],
+      "flows": [
+        {
+          "from": "new",
+          "to": "router",
+          "kind": "fail",
+          "label": "5% errors"
+        },
+        {
+          "from": "router",
+          "to": "old",
+          "kind": "request",
+          "label": "back to 100%"
+        }
+      ],
+      "metrics": {
+        "share": "0",
+        "err2": "5",
+        "err1": "0.2",
+        "hit": "5"
+      }
+    },
+    {
+      "tag": "FLAGS",
+      "title": "Feature flags: deploy is not release",
+      "body": "A feature flag is a runtime on/off switch checked in code, such as if flags.enabled(\"new-checkout\", user). You can ship v2 to every server with the feature off, then turn it on for staff, then 1% of users, then everyone, without another deploy. Turning it off takes seconds, not a rebuild. The cost: flags are extra code paths to test, and stale flags pile up, so remove each one once the rollout is done.",
+      "idea": "Flags decouple deploying code from releasing a feature, giving per-user control and a seconds-long kill switch.",
+      "caption": "v2 reads the flag service; the feature is on for 1% of users.",
+      "focus": [
+        "router",
+        "flags",
+        "new"
+      ],
+      "flows": [
+        {
+          "from": "flags",
+          "to": "new",
+          "kind": "response",
+          "label": "new-checkout: 1%"
+        },
+        {
+          "from": "router",
+          "to": "new",
+          "kind": "request",
+          "label": "all traffic"
+        }
+      ],
+      "metrics": {
+        "share": "100",
+        "err2": "0.2",
+        "err1": "0",
+        "hit": "1"
+      }
+    },
+    {
+      "tag": "DARK LAUNCH",
+      "title": "Dark launch: run it, hide the result",
+      "body": "A dark launch (also called traffic mirroring; some teams use the term for flag-hidden features) copies live requests to v2 and discards its responses, so users see only v1's answers. You learn how v2 handles real traffic and load, such as holding a p99 of 180 ms at production volume, and can compare its answers with v1's. No user sees v2's output, though it still adds load on shared dependencies. The shadow path must not send emails, charge cards, or write shared data, and keep the mirror asynchronous and sampled so it cannot slow real requests or overload dependencies.",
+      "idea": "Shadow traffic tests v2 on real load without exposing users, as long as the mirror is isolated and has no side effects.",
+      "caption": "Mirrored copies, not served traffic; only v1's responses go back.",
+      "focus": [
+        "router",
+        "old",
+        "new"
+      ],
+      "flows": [
+        {
+          "from": "router",
+          "to": "old",
+          "kind": "request",
+          "label": "real request"
+        },
+        {
+          "from": "router",
+          "to": "new",
+          "kind": "async",
+          "label": "mirrored copy"
+        },
+        {
+          "from": "old",
+          "to": "router",
+          "kind": "response",
+          "label": "answer used"
+        }
+      ],
+      "metrics": {
+        "share": "0",
+        "err2": "0.3",
+        "err1": "0.2",
+        "hit": "0"
+      }
+    },
+    {
+      "tag": "MIGRATION",
+      "title": "The database must serve both versions",
+      "body": "Mid-rollout, say half the servers run v2 and half v1, and both share one database you cannot flip atomically. So use expand/contract in separate deploys. 1) Expand: add a nullable (may be empty) full_name column, which v1 ignores. 2) Deploy v2, which writes both columns but still reads name. 3) Once no v1 remains, backfill (fill the new column for existing rows) and check full_name is complete. 4) A later deploy switches reads to full_name. 5) Contract: drop name only when rollback to old code is off the table.",
+      "idea": "Never ship a schema change that breaks the old version; add first, migrate, and remove in a separate later deploy.",
+      "caption": "Mid-rollout: half the servers on each version share one database.",
+      "focus": [
+        "old",
+        "new",
+        "db"
+      ],
+      "flows": [
+        {
+          "from": "old",
+          "to": "db",
+          "kind": "request",
+          "label": "uses name"
+        },
+        {
+          "from": "new",
+          "to": "db",
+          "kind": "request",
+          "label": "writes both"
+        },
+        {
+          "from": "db",
+          "to": "new",
+          "kind": "response",
+          "label": "reads name"
+        }
+      ],
+      "metrics": {
+        "share": "50",
+        "err2": "0.2",
+        "err1": "0.2",
+        "hit": "50"
+      }
+    },
+    {
+      "tag": "RECAP",
+      "title": "Pick by blast radius and rollback speed",
+      "body": "Rolling is cheap but slow to undo. Blue-green undoes in seconds but costs double capacity and flips everyone. Canary limits exposure and needs good metrics. Flags give per-user control after deploy, and dark launches test load without exposing users. Underneath all of them, expand/contract keeps the database compatible with both versions. Mature teams combine them: canary the build, flag the feature.",
+      "idea": "Combine canary for the build, flags for the feature, and expand/contract for the data.",
+      "caption": "Each tool limits risk at a different layer.",
+      "focus": [],
+      "flows": [],
+      "metrics": {}
+    }
   ],
   "quiz": [
-    {"q": "Your service is stateless, you have no spare capacity budget, and a few minutes of mixed versions is fine. Which strategy fits best?", "options": ["Blue-green, because it is always safest", "Rolling deploy in small batches with health checks", "Dark launch to production", "Canary with a full duplicate fleet"], "answer": 1, "why": "Rolling needs no extra capacity. Blue-green requires roughly double the servers during the switch, which this team has ruled out."},
-    {"q": "A canary at 5% traffic shows v2's error rate at 4% and v1's at 0.2%, but the fleet-wide error rate looks normal. What should happen?", "options": ["Continue; the overall rate is fine", "Roll back, because the comparison is v2 against v1, not the fleet average", "Wait an hour for the numbers to average out", "Raise the canary to 50% to get more data"], "answer": 1, "why": "At 5% share, a broken v2 is diluted in the fleet average. The canary only works when you compare the canary group directly against the baseline."},
-    {"q": "A bug is found in a new feature already live for 100% of users behind a flag. What is the fastest fix?", "options": ["Roll the entire deploy back", "Flip the flag off", "Start a blue-green switch", "Wait for the next release train"], "answer": 1, "why": "The flag decouples release from deploy, so turning it off takes seconds and needs no new build. Other unrelated changes in the deploy stay live."},
-    {"q": "You want to rename a column from name to full_name. Which plan is safe while v1 and v2 run together?", "options": ["Rename it in the same deploy that ships v2", "Add full_name, write both, backfill, switch reads, and drop name in a later deploy", "Drop name first, then deploy v2", "Take the site down and rename it"], "answer": 1, "why": "A direct rename breaks whichever version expects the other column name. Expand/contract keeps both versions working and delays the destructive step until rollback is no longer needed."},
-    {"q": "What does a dark launch tell you that a canary does not?", "options": ["How v2 behaves under full production load with no user ever seeing its responses", "Whether users like the new feature", "Whether the database schema is correct", "Nothing; it is the same thing"], "answer": 0, "why": "A dark launch mirrors traffic and discards v2's output, so users face zero risk. A canary serves real responses to a small group of users."}
+    {
+      "q": "Your service is stateless, you have no spare capacity budget, and a few minutes of mixed versions is fine. Which strategy fits best?",
+      "options": [
+        "Blue-green, because it is always safest",
+        "Dark launch to production",
+        "Rolling deploy in small batches with health checks",
+        "Canary with a full duplicate fleet"
+      ],
+      "answer": 2,
+      "why": "Rolling needs little or no extra capacity. Blue-green requires roughly double the servers during the switch, which this team has ruled out."
+    },
+    {
+      "q": "A canary at 5% traffic shows v2's error rate at 4% and v1's at 0.2%, but the fleet-wide error rate looks normal. What should happen?",
+      "options": [
+        "Continue; the overall rate is fine",
+        "Roll back, because the comparison is v2 against v1, not the fleet average",
+        "Wait an hour for the numbers to average out",
+        "Raise the canary to 50% to get more data"
+      ],
+      "answer": 1,
+      "why": "At 5% share, a broken v2 is diluted in the fleet average. The canary only works when you compare the canary group directly against the baseline."
+    },
+    {
+      "q": "A bug is found in a new feature already live for 100% of users behind a flag. What is the fastest fix?",
+      "options": [
+        "Roll the entire deploy back",
+        "Start a blue-green switch",
+        "Wait for the next release train",
+        "Flip the flag off"
+      ],
+      "answer": 3,
+      "why": "The flag decouples release from deploy, so turning it off takes seconds and needs no new build. Other unrelated changes in the deploy stay live."
+    },
+    {
+      "q": "You want to rename a column from name to full_name. Which plan is safe while v1 and v2 run together?",
+      "options": [
+        "Add full_name, write both, backfill once v1 is gone, switch reads, and drop name in a later deploy",
+        "Rename it in the same deploy that ships v2",
+        "Drop name first, then deploy v2",
+        "Take the site down and rename it"
+      ],
+      "answer": 0,
+      "why": "A direct rename breaks whichever version expects the other column name. Expand/contract keeps both versions working and delays the destructive step until rollback is no longer needed."
+    },
+    {
+      "q": "What does a dark launch tell you that a canary does not?",
+      "options": [
+        "Whether users like the new feature",
+        "Whether the database schema is correct",
+        "How v2 behaves under production-shaped load with no user ever seeing its responses",
+        "Nothing; it is the same thing"
+      ],
+      "answer": 2,
+      "why": "A dark launch mirrors traffic and discards v2's output, so users never see its responses. A canary serves real responses to a small group of users."
+    }
   ],
   "cheatsheet": [
-    {"term": "Rolling deploy", "def": "Replace instances in batches with health checks between them. No extra capacity; old and new coexist; rollback is another rollout."},
-    {"term": "Blue-green", "def": "Two full environments; flip the router to switch. Instant rollback, about 2x capacity during the switch, all users move at once."},
-    {"term": "Canary", "def": "Send a small share (1-5%) of real traffic to the new version, compare its metrics with the old, then step up. Needs automatic checks."},
-    {"term": "Blast radius", "def": "How many users or requests a bad change can affect before it is stopped. Deploy strategy is mainly about shrinking this."},
-    {"term": "Feature flag", "def": "A runtime switch that turns code paths on per user or percentage. Decouples deploy from release; remove stale flags."},
-    {"term": "Dark launch", "def": "Mirror live traffic to the new version and discard its responses. Tests load and correctness with no user exposure; avoid side effects."},
-    {"term": "Expand/contract", "def": "Schema change in phases: add new, dual-write and backfill, switch reads, drop old in a later deploy. Keeps v1 and v2 both working."},
-    {"term": "Rule of thumb", "def": "Canary the build, flag the feature, expand/contract the schema, and always know how to roll back before you start."}
+    {
+      "term": "Rolling deploy",
+      "def": "Replace instances in batches with health checks between them. Little or no extra capacity; old and new coexist; rollback is another rollout."
+    },
+    {
+      "term": "Blue-green",
+      "def": "Two full environments; flip the router to switch. Instant rollback, about 2x capacity during the switch, all users move at once."
+    },
+    {
+      "term": "Canary",
+      "def": "Send a small share (1-5%) of real traffic to the new version, compare its metrics with the old, then step up. Needs automatic checks."
+    },
+    {
+      "term": "Blast radius",
+      "def": "How many users or requests a bad change can affect before it is stopped. Deploy strategy is mainly about shrinking this."
+    },
+    {
+      "term": "Feature flag",
+      "def": "A runtime switch that turns code paths on per user or percentage. Decouples deploy from release; remove stale flags."
+    },
+    {
+      "term": "Dark launch",
+      "def": "Also called traffic mirroring. Copy live traffic to the new version, discard its responses, compare with the old. Tests load and correctness; avoid side effects."
+    },
+    {
+      "term": "Expand/contract",
+      "def": "Schema change in phases: add new, dual-write and backfill, switch reads, drop old in a later deploy. Keeps v1 and v2 both working."
+    },
+    {
+      "term": "Rule of thumb",
+      "def": "Canary the build, flag the feature, expand/contract the schema, and always know how to roll back before you start."
+    }
   ]
 }

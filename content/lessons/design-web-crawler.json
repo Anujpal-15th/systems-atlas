@@ -12,59 +12,485 @@
     "How to shard workers by host so politeness and dedup stay simple"
   ],
   "nodes": [
-    {"id": "seeds", "label": "Seed URLs", "kind": "client", "x": 8, "y": 22},
-    {"id": "frontier", "label": "URL frontier", "kind": "queue", "x": 28, "y": 52},
-    {"id": "fetcher", "label": "Fetcher workers", "kind": "worker", "x": 50, "y": 52},
-    {"id": "dns", "label": "DNS cache", "kind": "dns", "x": 68, "y": 12},
-    {"id": "web", "label": "Websites", "kind": "external", "x": 90, "y": 28},
-    {"id": "parser", "label": "Parser + extractor", "kind": "service", "x": 72, "y": 62},
-    {"id": "dedup", "label": "Dedup filters", "kind": "cache", "x": 50, "y": 88},
-    {"id": "store", "label": "Content store", "kind": "storage", "x": 90, "y": 82}
+    {
+      "id": "seeds",
+      "label": "Seed URLs",
+      "kind": "client",
+      "x": 8,
+      "y": 22
+    },
+    {
+      "id": "frontier",
+      "label": "URL frontier",
+      "kind": "queue",
+      "x": 28,
+      "y": 52
+    },
+    {
+      "id": "fetcher",
+      "label": "Fetcher workers",
+      "kind": "worker",
+      "x": 50,
+      "y": 52
+    },
+    {
+      "id": "dns",
+      "label": "DNS cache",
+      "kind": "dns",
+      "x": 68,
+      "y": 12
+    },
+    {
+      "id": "web",
+      "label": "Websites",
+      "kind": "external",
+      "x": 90,
+      "y": 28
+    },
+    {
+      "id": "parser",
+      "label": "Parser + extractor",
+      "kind": "service",
+      "x": 72,
+      "y": 62
+    },
+    {
+      "id": "dedup",
+      "label": "Dedup filters",
+      "kind": "cache",
+      "x": 50,
+      "y": 88
+    },
+    {
+      "id": "store",
+      "label": "Content store",
+      "kind": "storage",
+      "x": 90,
+      "y": 82
+    }
   ],
   "edges": [
-    {"from": "seeds", "to": "frontier"},
-    {"from": "frontier", "to": "fetcher"},
-    {"from": "fetcher", "to": "dns"},
-    {"from": "fetcher", "to": "web"},
-    {"from": "fetcher", "to": "parser"},
-    {"from": "parser", "to": "dedup"},
-    {"from": "dedup", "to": "frontier"},
-    {"from": "parser", "to": "store"}
+    {
+      "from": "seeds",
+      "to": "frontier"
+    },
+    {
+      "from": "frontier",
+      "to": "fetcher"
+    },
+    {
+      "from": "fetcher",
+      "to": "dns"
+    },
+    {
+      "from": "fetcher",
+      "to": "web"
+    },
+    {
+      "from": "fetcher",
+      "to": "parser"
+    },
+    {
+      "from": "parser",
+      "to": "dedup"
+    },
+    {
+      "from": "dedup",
+      "to": "frontier"
+    },
+    {
+      "from": "parser",
+      "to": "store"
+    }
   ],
   "metrics": [
-    {"id": "rate", "label": "Pages/sec", "unit": "pg/s"},
-    {"id": "dns", "label": "DNS lookup", "unit": "ms"},
-    {"id": "dupes", "label": "Dup links", "unit": "%"},
-    {"id": "workers", "label": "In flight", "unit": "fetches"}
+    {
+      "id": "rate",
+      "label": "Pages/sec",
+      "unit": "pg/s"
+    },
+    {
+      "id": "dns",
+      "label": "DNS lookup",
+      "unit": "ms"
+    },
+    {
+      "id": "dupes",
+      "label": "Dup links",
+      "unit": "%"
+    },
+    {
+      "id": "workers",
+      "label": "In flight",
+      "unit": "fetches"
+    }
   ],
   "steps": [
-    {"tag": "QUESTION", "title": "Fetch a billion pages", "body": "We want to download about 1 billion pages a month for a search index. That is roughly 400 pages per second on average, and at 100 KB per page about 100 TB of raw HTML a month. The hard part is not downloading one page. It is deciding what to fetch next, never hammering one site, and not wasting work on pages we already have.", "idea": "A crawler is a loop: pick a URL, fetch it, find new URLs, repeat. Every box we add exists to keep that loop fast, polite, and non-redundant.", "caption": "Seed URLs start the loop; the frontier decides what is next.", "focus": ["seeds", "frontier"], "flows": [{"from": "seeds", "to": "frontier", "kind": "request", "label": "100 seed URLs"}], "metrics": {"rate": "0", "workers": "0", "dupes": "0"}},
-    {"tag": "FRONTIER", "title": "The URL frontier", "body": "The frontier is the to-do list of URLs, but it is more than a queue. A front section orders URLs by priority (page importance, how stale the last copy is). A back section keeps one queue per host so we can control how fast each site is hit. Billions of URLs do not fit in memory, so the bulk lives on disk with small in-memory buffers at the head.", "idea": "Two jobs, two layers: front queues pick WHAT is valuable, back queues enforce WHEN each host may be hit.", "caption": "Frontier hands a URL to a free fetcher.", "focus": ["frontier", "fetcher"], "flows": [{"from": "frontier", "to": "fetcher", "kind": "request", "label": "next URL"}], "metrics": {"workers": "1"}},
-    {"tag": "DNS", "title": "Resolve the host name", "body": "Before connecting, the fetcher needs the IP for the host. A normal lookup takes 10 to 100 ms and the system resolver often serialises requests, which would cap us far below 400 pages per second. So workers use a local DNS cache that honours TTLs and resolves many names in parallel. Most URLs share hosts we have already seen, so hit rates are high.", "idea": "DNS is a hidden bottleneck at crawl scale; cache answers locally and resolve asynchronously.", "caption": "Cached lookup returns in about 1 ms.", "focus": ["fetcher", "dns"], "flows": [{"from": "fetcher", "to": "dns", "kind": "request", "label": "A news.example?"}, {"from": "dns", "to": "fetcher", "kind": "response", "label": "198.51.100.4"}], "metrics": {"dns": "1", "workers": "2"}},
-    {"tag": "POLITE", "title": "Fetch, but politely", "body": "The fetcher first reads the site's robots.txt (cached for a day) to learn which paths are off limits and any Crawl-delay. Then it downloads the page, with a timeout so a slow server cannot pin a worker. Rule of thumb: allow one request at a time per host and wait a few seconds between them. A small site can be knocked over by a crawler that is merely fast.", "idea": "Politeness is per host: the crawler can be huge overall while each website sees a trickle.", "caption": "Fetcher requests the page, honouring robots.txt and delay.", "focus": ["fetcher", "web"], "flows": [{"from": "fetcher", "to": "web", "kind": "request", "label": "GET /article"}, {"from": "web", "to": "fetcher", "kind": "response", "label": "200 + HTML"}], "metrics": {"rate": "120", "workers": "200"}},
-    {"tag": "PARSE", "title": "Extract links and content", "body": "The parser reads the HTML, pulls out the text, and extracts every link. Relative links are resolved against the page URL, fragments like #top are dropped, and URLs are normalised: lowercase host, remove default ports, sort query parameters. Without normalisation the same page appears under many spellings and we crawl it many times.", "idea": "Normalise URLs before comparing them, or dedup will miss obvious repeats.", "caption": "Parser produces text plus a list of candidate URLs.", "focus": ["fetcher", "parser"], "flows": [{"from": "fetcher", "to": "parser", "kind": "request", "label": "raw HTML"}], "metrics": {"rate": "400"}},
-    {"tag": "DEDUP", "title": "Skip what we have seen", "body": "Each candidate URL is checked against a seen-URL set. Storing 10 billion URLs exactly costs hundreds of GB, so a Bloom filter (a compact set that never forgets an item but sometimes falsely says yes) filters most repeats in memory, with an exact store behind it when we need certainty. The page body is also hashed; an identical or near-identical hash (SimHash for near duplicates) means a mirror, so we skip storing and following it.", "idea": "Dedup happens twice: by URL before fetching (saves bandwidth) and by content after fetching (saves storage and index noise).", "caption": "Most extracted links are already known and dropped.", "focus": ["parser", "dedup"], "flows": [{"from": "parser", "to": "dedup", "kind": "request", "label": "40 links"}, {"from": "dedup", "to": "parser", "kind": "response", "label": "9 are new"}], "metrics": {"dupes": "78"}},
-    {"tag": "LOOP", "title": "New URLs return to the frontier", "body": "Only the genuinely new URLs go back into the frontier, assigned a priority and placed in their host's queue. Good page content goes to the content store (object storage, compressed), keyed by URL and fetch time so we can recrawl later. Now the loop closes. A page that changes often earns a short recrawl interval, a static page a long one.", "idea": "The frontier is both the input and the output of the loop; recrawl scheduling lives there too.", "caption": "New links feed the frontier; the page is saved.", "focus": ["dedup", "frontier", "parser", "store"], "flows": [{"from": "dedup", "to": "frontier", "kind": "async", "label": "9 new URLs"}, {"from": "parser", "to": "store", "kind": "async", "label": "page + hash"}], "metrics": {"rate": "400", "workers": "200"}},
-    {"tag": "SCALE", "title": "Distribute the workers", "body": "One machine cannot do this: 400 pages per second at about 0.5 s each means about 200 fetches in flight, and peaks reach several times that. We run many workers and shard URLs by hashing the host name, so every URL of one host goes to the same worker. That worker alone enforces the host's politeness delay, with no cross-machine locking, and keeps that host's DNS and robots.txt in a local cache.", "idea": "Shard by host, not by URL: politeness, DNS, and robots.txt all become local decisions.", "caption": "Each worker owns a slice of hosts.", "focus": ["frontier", "fetcher", "dns"], "flows": [{"from": "frontier", "to": "fetcher", "kind": "request", "label": "hash(host) % N"}, {"from": "fetcher", "to": "frontier", "kind": "async", "label": "lease + ack"}], "metrics": {"rate": "800", "workers": "400"}},
-    {"tag": "WHAT IF", "title": "A spider trap and a dead worker", "body": "Some sites generate infinite URLs, like a calendar with a next-month link forever. Defences: cap URL length, cap depth, and cap pages per host. If a worker dies mid-fetch, its URL was only leased, not removed, so the lease expires and another worker retries it. Fetches that keep failing are retried with growing delays, then given up.", "idea": "Assume the web is hostile and machines fail: use limits on crawl depth and per-host budgets, and lease URLs instead of deleting them.", "caption": "A failed fetch is retried, not lost.", "focus": ["fetcher", "web", "frontier"], "flows": [{"from": "fetcher", "to": "web", "kind": "fail", "label": "timeout"}, {"from": "fetcher", "to": "frontier", "kind": "async", "label": "retry later"}], "metrics": {"rate": "780"}},
-    {"tag": "RECAP", "title": "The whole crawl loop", "body": "Seeds fill the frontier. Workers take a URL, resolve the host from a DNS cache, fetch politely, and parse. Dedup drops repeated URLs and content, new URLs return to the frontier, pages go to storage. Shard by host so politeness stays local. Limits and leases keep traps and failures from stalling the crawl.", "idea": "Fast overall, gentle per host, and never doing the same work twice.", "caption": "A closed loop that is fast overall, gentle per host.", "focus": ["seeds", "frontier", "fetcher", "dns", "web", "parser", "dedup", "store"], "flows": [], "metrics": {"rate": "400", "dns": "1", "dupes": "78", "workers": "200"}}
+    {
+      "tag": "QUESTION",
+      "title": "Fetch a billion pages",
+      "body": "We want to download about 1 billion pages a month for a search index. That is roughly 400 pages per second on average, and at 100 KB per page about 100 TB of raw HTML a month. The hard part is not downloading one page. It is deciding what to fetch next, never hammering one site, and not wasting work on pages we already have.",
+      "idea": "A crawler is a loop: pick a URL, fetch it, find new URLs, repeat. Every box we add exists to keep that loop fast, polite, and non-redundant.",
+      "caption": "Seed URLs start the loop; the frontier decides what is next.",
+      "focus": [
+        "seeds",
+        "frontier"
+      ],
+      "flows": [
+        {
+          "from": "seeds",
+          "to": "frontier",
+          "kind": "request",
+          "label": "100 seed URLs"
+        }
+      ],
+      "metrics": {
+        "rate": "0",
+        "workers": "0",
+        "dupes": "0"
+      }
+    },
+    {
+      "tag": "FRONTIER",
+      "title": "The URL frontier",
+      "body": "The frontier is the to-do list of URLs, but more than a queue. Front queues order URLs by priority (importance, staleness). Back queues keep one queue per host; the frontier stores, for each host queue, the earliest time that host may be hit again (usually a small time-ordered heap) and only hands out URLs from hosts whose time has come. Billions of URLs do not fit in memory, so the bulk lives on disk with small in-memory buffers at the head.",
+      "idea": "Two jobs, two layers: front queues pick WHAT is valuable, back queues enforce WHEN each host may be hit.",
+      "caption": "Frontier hands a URL to a free fetcher.",
+      "focus": [
+        "frontier",
+        "fetcher"
+      ],
+      "flows": [
+        {
+          "from": "frontier",
+          "to": "fetcher",
+          "kind": "request",
+          "label": "next URL"
+        }
+      ],
+      "metrics": {
+        "workers": "1"
+      }
+    },
+    {
+      "tag": "DNS",
+      "title": "Resolve the host name",
+      "body": "Before connecting, the fetcher needs the host's IP. The default resolver call blocks a thread for the whole lookup, and every uncached lookup adds 10 to 100 ms or more. At crawl scale that wastes workers and loads the upstream resolver. So workers use a local caching resolver with async lookups, honouring TTLs (often with a minimum TTL). Most URLs share hosts we have already seen, so hit rates are high.",
+      "idea": "DNS is a hidden bottleneck at crawl scale; cache answers locally and resolve asynchronously.",
+      "caption": "Cached lookup returns in about 1 ms.",
+      "focus": [
+        "fetcher",
+        "dns"
+      ],
+      "flows": [
+        {
+          "from": "fetcher",
+          "to": "dns",
+          "kind": "request",
+          "label": "A news.example?"
+        },
+        {
+          "from": "dns",
+          "to": "fetcher",
+          "kind": "response",
+          "label": "198.51.100.4"
+        }
+      ],
+      "metrics": {
+        "dns": "1",
+        "workers": "2"
+      }
+    },
+    {
+      "tag": "POLITE",
+      "title": "Fetch, but politely",
+      "body": "The fetcher first reads the site's robots.txt (cached for a day) to learn which paths are off limits and any Crawl-delay. Then it downloads the page, with a timeout so a slow server cannot pin a worker. Rule of thumb: one request at a time per host, a few seconds apart. Many crawlers scale the delay with the server's response time, honour 429 and 503 Retry-After, and send an identifying User-Agent with a contact URL.",
+      "idea": "Politeness is per host: the crawler can be huge overall while each website sees a trickle.",
+      "caption": "Fetcher requests the page, honouring robots.txt and delay.",
+      "focus": [
+        "fetcher",
+        "web"
+      ],
+      "flows": [
+        {
+          "from": "fetcher",
+          "to": "web",
+          "kind": "request",
+          "label": "GET /article"
+        },
+        {
+          "from": "web",
+          "to": "fetcher",
+          "kind": "response",
+          "label": "200 + HTML"
+        }
+      ],
+      "metrics": {
+        "rate": "120",
+        "workers": "60"
+      }
+    },
+    {
+      "tag": "PARSE",
+      "title": "Extract links and content",
+      "body": "The parser reads the HTML, pulls out the text, and extracts every link. Relative links are resolved against the page URL, fragments like #top are dropped, and URLs are normalised: lowercase host, remove default ports, sort query parameters. Without normalisation the same page appears under many spellings and we crawl it many times.",
+      "idea": "Normalise URLs before comparing them, or dedup will miss obvious repeats.",
+      "caption": "Parser produces text plus a list of candidate URLs.",
+      "focus": [
+        "fetcher",
+        "parser"
+      ],
+      "flows": [
+        {
+          "from": "fetcher",
+          "to": "parser",
+          "kind": "request",
+          "label": "raw HTML"
+        }
+      ],
+      "metrics": {
+        "rate": "400"
+      }
+    },
+    {
+      "tag": "DEDUP",
+      "title": "Skip what we have seen",
+      "body": "Each candidate URL is checked against a seen-URL set. Storing 10 billion URLs exactly costs hundreds of GB, so a Bloom filter keeps it in memory: a 'no' means certainly new; a 'yes' is treated as seen, accepting about 1% of new URLs wrongly skipped, or confirmed against an exact store if that loss is unacceptable. The page body is also hashed; a matching exact hash, or a SimHash within a few bits of Hamming distance, marks a mirror or near-copy, so we skip storing it.",
+      "idea": "Dedup happens twice: by URL before fetching (saves bandwidth) and by content after fetching (saves storage and index noise). In a mature crawl, for example, most extracted links are repeats.",
+      "caption": "In a mature crawl, most extracted links are already known and dropped.",
+      "focus": [
+        "parser",
+        "dedup"
+      ],
+      "flows": [
+        {
+          "from": "parser",
+          "to": "dedup",
+          "kind": "request",
+          "label": "40 links"
+        },
+        {
+          "from": "dedup",
+          "to": "parser",
+          "kind": "response",
+          "label": "9 are new"
+        }
+      ],
+      "metrics": {
+        "dupes": "78"
+      }
+    },
+    {
+      "tag": "LOOP",
+      "title": "New URLs return to the frontier",
+      "body": "Only genuinely new URLs go back into the frontier, with a priority, in their host's queue. A page is stored (object storage, compressed, keyed by URL and fetch time) only if its content hash was not seen. A page that changes often earns a short recrawl interval, a static page a long one; recrawls send conditional GETs so unchanged pages cost a 304, not a full download.",
+      "idea": "The frontier is both the input and the output of the loop; recrawl scheduling lives there too.",
+      "caption": "New links feed the frontier; the page is saved.",
+      "focus": [
+        "dedup",
+        "frontier",
+        "parser",
+        "store"
+      ],
+      "flows": [
+        {
+          "from": "dedup",
+          "to": "frontier",
+          "kind": "async",
+          "label": "9 new URLs"
+        },
+        {
+          "from": "parser",
+          "to": "store",
+          "kind": "async",
+          "label": "new page + hash"
+        }
+      ],
+      "metrics": {
+        "rate": "400",
+        "workers": "200"
+      }
+    },
+    {
+      "tag": "SCALE",
+      "title": "Distribute the workers",
+      "body": "One machine could nearly hold 200 fetches in flight on paper, but not reliably. The average load is about 320 Mbps and 100 TB of storage a month, peaks reach several times that, parsing and dedup need CPU and memory, and one box is a single point of failure. So we shard URLs by host hash across many workers. Links a worker finds are forwarded to the worker owning their host, so each holds the seen-URL filter, queues and politeness state for its slice only. Use consistent hashing (see the Key-Value Store lesson) so adding a worker moves few hosts.",
+      "idea": "Shard by host, not by URL: politeness, DNS, and robots.txt all become local decisions.",
+      "caption": "Each worker owns a slice of hosts; links are forwarded to the owner.",
+      "focus": [
+        "frontier",
+        "fetcher",
+        "dedup"
+      ],
+      "flows": [
+        {
+          "from": "frontier",
+          "to": "fetcher",
+          "kind": "request",
+          "label": "assign URL"
+        },
+        {
+          "from": "dedup",
+          "to": "frontier",
+          "kind": "async",
+          "label": "to host owner"
+        },
+        {
+          "from": "fetcher",
+          "to": "frontier",
+          "kind": "async",
+          "label": "lease + ack"
+        }
+      ],
+      "metrics": {
+        "rate": "400",
+        "workers": "200"
+      }
+    },
+    {
+      "tag": "WHAT IF",
+      "title": "A spider trap and a dead worker",
+      "body": "Some sites generate infinite URLs, like a calendar with a next-month link forever. Defences: cap URL length, depth, and pages per host. If a worker dies mid-fetch, its URL was only leased, not removed, so the lease expires and it is retried. The dead worker's host range is reassigned to another worker. Fetches that keep failing are retried with growing delays, then given up.",
+      "idea": "Assume the web is hostile and machines fail: use limits on crawl depth and per-host budgets, and lease URLs instead of deleting them.",
+      "caption": "A failed fetch is retried, not lost.",
+      "focus": [
+        "fetcher",
+        "web",
+        "frontier"
+      ],
+      "flows": [
+        {
+          "from": "fetcher",
+          "to": "web",
+          "kind": "fail",
+          "label": "timeout"
+        },
+        {
+          "from": "fetcher",
+          "to": "frontier",
+          "kind": "async",
+          "label": "retry later"
+        }
+      ],
+      "metrics": {
+        "rate": "390"
+      }
+    },
+    {
+      "tag": "RECAP",
+      "title": "The whole crawl loop",
+      "body": "Seeds fill the frontier. Workers take a URL, resolve the host from a DNS cache, fetch politely, and parse. Dedup drops repeated URLs and content, new URLs return to the frontier, pages go to storage. Shard by host so politeness stays local. Limits and leases keep traps and failures from stalling the crawl.",
+      "idea": "Fast overall, gentle per host, and never doing the same work twice.",
+      "caption": "A closed loop that is fast overall, gentle per host.",
+      "focus": [
+        "seeds",
+        "frontier",
+        "fetcher",
+        "dns",
+        "web",
+        "parser",
+        "dedup",
+        "store"
+      ],
+      "flows": [],
+      "metrics": {
+        "rate": "400",
+        "dns": "1",
+        "dupes": "78",
+        "workers": "200"
+      }
+    }
   ],
   "quiz": [
-    {"q": "Your crawler is fast and healthy overall, but one small blog owner emails that your bot took their site down. Which design flaw does this most likely point to?", "options": ["No Bloom filter on the seen-URL set", "No per-host politeness limit in the frontier or fetchers", "Too few DNS cache entries", "The content store is too slow"], "answer": 1, "why": "Total crawl rate can be high while a single host must still see only a slow trickle. The per-host back queues and delays enforce that."},
-    {"q": "Why shard the crawl by hash of the host name instead of hashing the full URL?", "options": ["It makes the Bloom filter smaller", "It spreads load more evenly than hashing URLs", "One worker then owns all URLs of a host, so it can enforce politeness and cache DNS and robots.txt locally", "It removes the need for a frontier"], "answer": 2, "why": "Hashing the full URL would scatter one host across all workers, forcing them to coordinate delays. Host-based sharding keeps those decisions local."},
-    {"q": "A Bloom filter says a URL is NOT in the set. What can you conclude?", "options": ["It is definitely new, so fetch it", "It is probably new but might be a duplicate", "It was seen but the filter lost it", "Nothing; you must check the database"], "answer": 0, "why": "Bloom filters have no false negatives. A 'no' is certain; only a 'yes' might be wrong, which just costs us skipping a rare new URL."},
-    {"q": "Two different URLs return pages that are 99% identical (a mirror site). Which mechanism catches this?", "options": ["URL normalisation", "robots.txt", "Content fingerprinting such as SimHash", "DNS caching"], "answer": 2, "why": "The URLs differ, so URL dedup cannot see it. Hashing page content, with SimHash for near duplicates, detects the repeat after fetching."},
-    {"q": "A worker crashes after taking a URL from the frontier but before finishing the fetch. How do we avoid losing that URL?", "options": ["Remove the URL only after success; until then it is leased and reappears if the lease expires", "Never remove URLs from the frontier", "Ask the website to resend it", "Store every URL on the worker's local disk"], "answer": 0, "why": "Leasing gives at-least-once processing: the URL stays recoverable until the worker acknowledges completion, so a crash just delays it."}
+    {
+      "q": "Your crawler is fast and healthy overall, but one small blog owner emails that your bot took their site down. Which design flaw does this most likely point to?",
+      "options": [
+        "No Bloom filter on the seen-URL set",
+        "No per-host politeness limit in the frontier or fetchers",
+        "Too few DNS cache entries",
+        "The content store is too slow"
+      ],
+      "answer": 1,
+      "why": "Total crawl rate can be high while a single host must still see only a slow trickle. The per-host back queues and delays enforce that."
+    },
+    {
+      "q": "Why shard the crawl by hash of the host name instead of hashing the full URL?",
+      "options": [
+        "It makes the Bloom filter smaller",
+        "It spreads load more evenly than hashing URLs",
+        "One worker then owns all URLs of a host, so it can enforce politeness and cache DNS and robots.txt locally",
+        "It removes the need for a frontier"
+      ],
+      "answer": 2,
+      "why": "Hashing the full URL would scatter one host across all workers, forcing them to coordinate delays. Host-based sharding keeps those decisions local."
+    },
+    {
+      "q": "A Bloom filter says a URL is NOT in the set. What can you conclude?",
+      "options": [
+        "It is definitely new, so fetch it",
+        "It is probably new but might be a duplicate",
+        "It was seen but the filter lost it",
+        "Nothing; you must check the database"
+      ],
+      "answer": 0,
+      "why": "Bloom filters have no false negatives. A 'no' is certain; only a 'yes' might be wrong, which just costs us skipping a rare new URL."
+    },
+    {
+      "q": "Two different URLs return pages that are 99% identical (a mirror site). Which mechanism catches this?",
+      "options": [
+        "URL normalisation",
+        "robots.txt",
+        "Content fingerprinting such as SimHash",
+        "DNS caching"
+      ],
+      "answer": 2,
+      "why": "The URLs differ, so URL dedup cannot see it. Hashing page content, with SimHash for near duplicates, detects the repeat after fetching."
+    },
+    {
+      "q": "A worker crashes after taking a URL from the frontier but before finishing the fetch. How do we avoid losing that URL?",
+      "options": [
+        "Mark the URL done as soon as a worker takes it",
+        "Never remove URLs from the frontier",
+        "Ask the website to resend it",
+        "Keep the URL leased and delete it only after success"
+      ],
+      "answer": 3,
+      "why": "Leasing gives at-least-once processing: the URL stays recoverable until the worker acknowledges completion, so a crash just delays it."
+    }
   ],
   "cheatsheet": [
-    {"term": "URL frontier", "def": "The prioritised to-do list of URLs, with front queues for importance and back queues per host for politeness."},
-    {"term": "Politeness", "def": "Limiting requests per host (often one at a time with a delay) and obeying robots.txt so a site is never overloaded."},
-    {"term": "URL normalisation", "def": "Canonicalising URLs (lowercase host, drop fragments and default ports, sort query params) so duplicates compare equal."},
-    {"term": "Bloom filter", "def": "A compact probabilistic set with no false negatives but some false positives; ideal for 'have we seen this URL?'."},
-    {"term": "SimHash", "def": "A fingerprint where similar documents get similar hashes, used to spot near-duplicate pages."},
-    {"term": "Shard by host", "def": "Route all URLs of one host to one worker so politeness, DNS, and robots.txt caching need no coordination."},
-    {"term": "Spider trap", "def": "A site that generates endless URLs; counter it with depth, length, and per-host page caps."},
-    {"term": "Back-of-envelope", "def": "1B pages/month is about 400 pages/s; at 100 KB each that is roughly 100 TB of HTML per month."}
+    {
+      "term": "URL frontier",
+      "def": "The prioritised to-do list of URLs, with front queues for importance and back queues per host for politeness."
+    },
+    {
+      "term": "Politeness",
+      "def": "Limiting requests per host (often one at a time with a delay) and obeying robots.txt so a site is never overloaded."
+    },
+    {
+      "term": "URL normalisation",
+      "def": "Canonicalising URLs (lowercase host, drop fragments and default ports, sort query params) so duplicates compare equal."
+    },
+    {
+      "term": "Bloom filter",
+      "def": "A compact probabilistic set with no false negatives but some false positives; ideal for 'have we seen this URL?'."
+    },
+    {
+      "term": "SimHash",
+      "def": "A fingerprint where similar documents get similar hashes, used to spot near-duplicate pages."
+    },
+    {
+      "term": "Shard by host",
+      "def": "Route all URLs of one host to one worker so politeness, DNS, and robots.txt caching need no coordination."
+    },
+    {
+      "term": "Spider trap",
+      "def": "A site that generates endless URLs; counter it with depth, length, and per-host page caps."
+    },
+    {
+      "term": "Back-of-envelope",
+      "def": "1B pages/month is about 400 pages/s; at 100 KB each that is roughly 100 TB of HTML per month."
+    }
   ],
   "lab": {
     "prompt": "Design a crawler that fetches 1 billion pages per month, refreshes news sites hourly, and never overloads any single website. Sketch the frontier, workers, and dedup, and say what you store.",
@@ -75,6 +501,7 @@
       "Dedup URLs before fetching and content after fetching",
       "Cache DNS results locally and resolve asynchronously",
       "Shard workers so one host maps to one worker",
+      "Schedule recrawls from observed change rate so news sites refresh hourly (conditional GET with If-Modified-Since / ETag)",
       "Handle worker crashes and spider traps"
     ],
     "hints": [
@@ -90,6 +517,7 @@
       "Politeness is enforced in one place per host",
       "URL dedup and content dedup are both present and distinguished",
       "DNS and robots.txt caching are mentioned",
+      "Recrawl policy ties interval to change frequency and priority",
       "Failure handling covers worker crash and infinite URL traps"
     ]
   }

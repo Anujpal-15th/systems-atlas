@@ -1,7 +1,7 @@
 {
   "slug": "testing",
   "title": "Testing Distributed Systems",
-  "subtitle": "Watch one Orders service get tested at five layers, from unit tests to injected network faults, and see what each layer catches.",
+  "subtitle": "Watch one Orders service get tested with five kinds of test, from unit tests to injected network faults, and see what each layer catches.",
   "minutes": 12,
   "level": "Intermediate",
   "learn": [
@@ -12,55 +12,446 @@
     "How to inject latency and failures to prove timeouts and fallbacks work"
   ],
   "nodes": [
-    {"id": "load", "label": "Load generator", "kind": "worker", "x": 10, "y": 16},
-    {"id": "runner", "label": "Test runner", "kind": "client", "x": 10, "y": 52},
-    {"id": "svc", "label": "Orders service", "kind": "service", "x": 36, "y": 52},
-    {"id": "broker", "label": "Contract broker", "kind": "storage", "x": 36, "y": 88},
-    {"id": "proxy", "label": "Fault proxy", "kind": "gateway", "x": 62, "y": 52},
-    {"id": "db", "label": "Postgres (container)", "kind": "db", "x": 88, "y": 22},
-    {"id": "pay", "label": "Payments service", "kind": "external", "x": 88, "y": 80}
+    {
+      "id": "load",
+      "label": "Load generator",
+      "kind": "worker",
+      "x": 10,
+      "y": 16
+    },
+    {
+      "id": "runner",
+      "label": "Test runner",
+      "kind": "client",
+      "x": 10,
+      "y": 52
+    },
+    {
+      "id": "svc",
+      "label": "Orders service",
+      "kind": "service",
+      "x": 36,
+      "y": 52
+    },
+    {
+      "id": "broker",
+      "label": "Contract broker",
+      "kind": "storage",
+      "x": 36,
+      "y": 88
+    },
+    {
+      "id": "proxy",
+      "label": "Fault proxy",
+      "kind": "gateway",
+      "x": 62,
+      "y": 52
+    },
+    {
+      "id": "db",
+      "label": "Postgres (container)",
+      "kind": "db",
+      "x": 88,
+      "y": 22
+    },
+    {
+      "id": "pay",
+      "label": "Payments (provider)",
+      "kind": "external",
+      "x": 88,
+      "y": 80
+    }
   ],
   "edges": [
-    {"from": "runner", "to": "svc"},
-    {"from": "load", "to": "svc"},
-    {"from": "svc", "to": "db"},
-    {"from": "svc", "to": "proxy"},
-    {"from": "proxy", "to": "pay"},
-    {"from": "runner", "to": "broker"},
-    {"from": "broker", "to": "svc"}
+    {
+      "from": "runner",
+      "to": "svc"
+    },
+    {
+      "from": "load",
+      "to": "svc"
+    },
+    {
+      "from": "svc",
+      "to": "db"
+    },
+    {
+      "from": "svc",
+      "to": "proxy"
+    },
+    {
+      "from": "proxy",
+      "to": "pay"
+    },
+    {
+      "from": "runner",
+      "to": "broker"
+    },
+    {
+      "from": "broker",
+      "to": "pay"
+    }
   ],
   "metrics": [
-    {"id": "tests", "label": "Tests run", "unit": ""},
-    {"id": "suite", "label": "Suite time", "unit": "s"},
-    {"id": "p99", "label": "p99 latency", "unit": "ms"},
-    {"id": "errors", "label": "Error rate", "unit": "%"}
+    {
+      "id": "tests",
+      "label": "Tests run",
+      "unit": ""
+    },
+    {
+      "id": "suite",
+      "label": "Suite time",
+      "unit": "s"
+    },
+    {
+      "id": "p99",
+      "label": "p99 latency",
+      "unit": "ms"
+    },
+    {
+      "id": "errors",
+      "label": "Error rate",
+      "unit": "%"
+    }
   ],
   "steps": [
-    {"tag": "QUESTION", "title": "Green tests, broken checkout", "body": "Every unit test for the Orders service passes. Yet after deploy, checkout fails because the Payments team renamed a JSON field, and later a slow Payments call freezes the whole service. A single mocked function cannot reveal either problem. Distributed systems fail in the gaps between components, so tests must cover those gaps too.", "idea": "Passing unit tests prove your code matches your assumptions, not that your assumptions are true.", "caption": "Orders depends on a database and on Payments.", "focus": [], "flows": [], "metrics": {}},
-    {"tag": "PYRAMID", "title": "Many fast unit tests", "body": "The base of the pyramid is unit tests: pure logic such as price totals and state transitions, run in memory with no network. Take 1,200 of them at about 30 ms each across parallel workers and the suite finishes in roughly 40 seconds. They are cheap, so run them on every commit and write lots of them. The pyramid is a rule of thumb: the higher a layer, the slower, costlier and flakier it is, so keep fewer of them.", "idea": "Put most tests where feedback is fastest and failures are easiest to diagnose.", "caption": "Runner exercises Orders logic in memory.", "focus": ["runner", "svc"], "flows": [{"from": "runner", "to": "svc", "kind": "request", "label": "1,200 unit tests"}, {"from": "svc", "to": "runner", "kind": "response", "label": "pass"}], "metrics": {"tests": "1200", "suite": "40"}},
-    {"tag": "CONTRACT", "title": "Contract tests for the API gap", "body": "Orders is the consumer of the Payments API. Its tests record what it relies on, such as a POST /charges reply containing amount and status, and publish that contract to a broker. The Payments team's build downloads every consumer contract and verifies its real code against them. If Payments renames status, their build fails before release. No shared staging environment is needed.", "idea": "A contract test catches breaking API changes at the provider's build, where they are cheapest to fix.", "caption": "Contract published, then verified by the provider.", "focus": ["runner", "broker", "svc"], "flows": [{"from": "runner", "to": "broker", "kind": "async", "label": "publish contract"}, {"from": "broker", "to": "svc", "kind": "request", "label": "verify provider"}, {"from": "svc", "to": "broker", "kind": "response", "label": "verified"}], "metrics": {"tests": "1240", "suite": "55"}},
-    {"tag": "INTEGRATION", "title": "Use the real database", "body": "Next come integration tests with real dependencies. The runner starts a throwaway Postgres container (for example with Testcontainers), applies the real migrations, and runs 80 tests through the actual SQL. A mocked database would happily accept a query that violates a unique constraint or uses a missing index. A real one does not. These tests cost about three minutes, so run them on every pull request, not every keystroke.", "idea": "Mock what you do not own; run what you do own, such as your database, for real.", "caption": "Orders runs real SQL against a container.", "focus": ["svc", "db"], "flows": [{"from": "svc", "to": "db", "kind": "request", "label": "INSERT order"}, {"from": "db", "to": "svc", "kind": "response", "label": "row + constraints"}], "metrics": {"tests": "1320", "suite": "220"}},
-    {"tag": "FAULT", "title": "Inject latency and failures", "body": "Payments is stubbed behind a fault proxy that can delay, drop or error on command. The test makes Payments take 5 seconds, then asserts that Orders gives up after its 500 ms timeout and returns a clear 'try again' response instead of hanging. Without this test, the timeout code is untested and probably wrong. Other faults to try: connection reset, HTTP 503, duplicate delivery.", "idea": "Failure-handling code only works if you have watched it run against a failure.", "caption": "Proxy stalls Payments; Orders must time out.", "focus": ["svc", "proxy", "pay"], "flows": [{"from": "svc", "to": "proxy", "kind": "request", "label": "POST /charges"}, {"from": "proxy", "to": "pay", "kind": "request", "label": "+5 s delay"}, {"from": "proxy", "to": "svc", "kind": "fail", "label": "timeout 500 ms"}], "metrics": {"tests": "1335", "suite": "250", "errors": "0"}},
-    {"tag": "LOAD", "title": "Load test the baseline", "body": "A load generator now replays realistic traffic, say 500 requests per second for 10 minutes, against a production-like deployment. It measures latency percentiles, not averages, because the slowest 1 percent of requests is what users complain about. The healthy result here is p99 near 180 ms with errors below 0.1 percent. Save that as the baseline to compare against after every release.", "idea": "Load tests produce a baseline; their value is comparing against it later.", "caption": "500 req/s through Orders and Postgres.", "focus": ["load", "svc", "db"], "flows": [{"from": "load", "to": "svc", "kind": "request", "label": "500 req/s"}, {"from": "svc", "to": "db", "kind": "request", "label": "queries"}, {"from": "svc", "to": "load", "kind": "response", "label": "200 OK"}], "metrics": {"p99": "180", "errors": "0.1"}},
-    {"tag": "WHAT IF", "title": "Push past the limit", "body": "Raise the rate to 1,500 requests per second. At about 1,000 the service uses up its 20 database connections, and extra requests queue waiting for one. The p99 climbs to 2.4 seconds and 4 percent of requests fail. No unit test could show this, because the limit comes from how pieces interact under concurrency. The fix might be a bigger pool, a cache, or shedding load early.", "idea": "Load tests find the knee in the curve where queues build and latency explodes.", "caption": "Connection pool exhausted at 1,500 req/s.", "focus": ["load", "svc", "db"], "flows": [{"from": "load", "to": "svc", "kind": "request", "label": "1,500 req/s"}, {"from": "svc", "to": "db", "kind": "fail", "label": "pool exhausted"}], "metrics": {"p99": "2400", "errors": "4"}},
-    {"tag": "TRADE-OFF", "title": "Cost and flakiness", "body": "Broad tests are expensive and can fail for reasons unrelated to your change: a slow CI machine, a shared environment, a clock race. A suite that fails randomly trains people to rerun and ignore it. Keep upper layers few, give each a clear purpose, make them deterministic with fixed seeds and no real sleeps, and quarantine flaky tests quickly. Production monitoring and gradual rollouts, covered in other lessons, catch what testing cannot.", "idea": "A test suite is only useful if people trust a red result.", "caption": "Each layer adds coverage and cost.", "focus": ["runner", "svc", "db", "pay"], "flows": [], "metrics": {"tests": "1335", "suite": "250"}},
-    {"tag": "RECAP", "title": "Which layer catches what", "body": "Unit tests guard logic, contract tests guard API agreements, integration tests with real dependencies guard SQL and wiring, fault injection guards timeouts and fallbacks, and load tests guard capacity. Many cheap tests at the bottom, a few expensive ones on top. Each layer answers a different question, so skipping one leaves that question open.", "idea": "Match each risk to the cheapest test that can reveal it.", "caption": "Five layers, five different risks covered.", "focus": ["load", "runner", "svc", "broker", "proxy", "db", "pay"], "flows": [], "metrics": {"tests": "1335", "suite": "250", "p99": "180", "errors": "0.1"}}
+    {
+      "tag": "QUESTION",
+      "title": "Green tests, broken checkout",
+      "body": "Every unit test for the Orders service passes. Yet after deploy, checkout fails because the Payments team renamed a JSON field, and later a slow Payments call freezes the whole service. A single mocked function cannot reveal either problem. Distributed systems fail in the gaps between components, so tests must cover those gaps too.",
+      "idea": "Passing unit tests prove your code matches your assumptions, not that your assumptions are true.",
+      "caption": "Orders depends on a database and on Payments.",
+      "focus": [],
+      "flows": [],
+      "metrics": {}
+    },
+    {
+      "tag": "PYRAMID",
+      "title": "Many fast unit tests",
+      "body": "The base of the pyramid is unit tests: pure logic such as price totals and state transitions, run in memory with no network. Take 1,200 of them at about 5 ms each, so a few seconds of test time plus about 30 s of build and startup, roughly 40 seconds in total. They are cheap, so run them on every commit and write lots of them. Above integration tests sit a handful of end-to-end tests that drive the whole system through its UI or public API: realistic but slow and flaky. The pyramid is a rule of thumb: the higher a layer, the slower, costlier and flakier it is, so keep fewer of them.",
+      "idea": "Put most tests where feedback is fastest and failures are easiest to diagnose.",
+      "caption": "Runner exercises Orders logic in memory.",
+      "focus": [
+        "runner",
+        "svc"
+      ],
+      "flows": [
+        {
+          "from": "runner",
+          "to": "svc",
+          "kind": "request",
+          "label": "1,200 unit tests"
+        },
+        {
+          "from": "svc",
+          "to": "runner",
+          "kind": "response",
+          "label": "pass"
+        }
+      ],
+      "metrics": {
+        "tests": "1200",
+        "suite": "40"
+      }
+    },
+    {
+      "tag": "CONTRACT",
+      "title": "Contract tests for the API gap",
+      "body": "Orders is the consumer of the Payments API. Its tests record what it relies on, such as a POST /charges reply containing amount and status, and publish that contract to a broker. The Payments team's build downloads every consumer contract and verifies its real code against them. If Payments renames status, their build fails before release. No shared staging environment is needed.",
+      "idea": "A contract test catches breaking API changes at the provider's build, where they are cheapest to fix.",
+      "caption": "Orders publishes; Payments verifies in its build.",
+      "focus": [
+        "runner",
+        "broker",
+        "pay"
+      ],
+      "flows": [
+        {
+          "from": "runner",
+          "to": "broker",
+          "kind": "async",
+          "label": "publish contract"
+        },
+        {
+          "from": "broker",
+          "to": "pay",
+          "kind": "request",
+          "label": "verify provider"
+        },
+        {
+          "from": "pay",
+          "to": "broker",
+          "kind": "response",
+          "label": "verified"
+        }
+      ],
+      "metrics": {
+        "tests": "1240",
+        "suite": "55"
+      }
+    },
+    {
+      "tag": "INTEGRATION",
+      "title": "Use the real database",
+      "body": "Next come integration tests with real dependencies. The runner starts a throwaway Postgres container (for example with Testcontainers), applies the real migrations, and runs 80 tests through the actual SQL. A mocked database would happily accept a query that violates a unique constraint, mistypes a column name, or relies on a migration you forgot to write. A real one does not. These tests cost about three minutes, so run them on every pull request, not every keystroke.",
+      "idea": "Stub remote services you do not control; run the infrastructure you own, such as your database, for real.",
+      "caption": "Orders runs real SQL against a container.",
+      "focus": [
+        "svc",
+        "db"
+      ],
+      "flows": [
+        {
+          "from": "svc",
+          "to": "db",
+          "kind": "request",
+          "label": "INSERT order"
+        },
+        {
+          "from": "db",
+          "to": "svc",
+          "kind": "response",
+          "label": "row + constraints"
+        }
+      ],
+      "metrics": {
+        "tests": "1320",
+        "suite": "235"
+      }
+    },
+    {
+      "tag": "FAULT",
+      "title": "Inject latency and failures",
+      "body": "Payments is stubbed behind a fault proxy that can delay, drop or error on command. The test makes Payments take 5 seconds, then asserts that Orders gives up after its 500 ms timeout and returns a clear 'try again' response instead of hanging. Without this test, the timeout code is untested and probably wrong. Other faults to try: connection reset, HTTP 503, duplicate delivery.",
+      "idea": "Failure-handling code only works if you have watched it run against a failure.",
+      "caption": "Proxy stalls Payments; Orders must time out.",
+      "focus": [
+        "svc",
+        "proxy",
+        "pay"
+      ],
+      "flows": [
+        {
+          "from": "svc",
+          "to": "proxy",
+          "kind": "request",
+          "label": "POST /charges"
+        },
+        {
+          "from": "proxy",
+          "to": "pay",
+          "kind": "request",
+          "label": "+5 s delay"
+        },
+        {
+          "from": "svc",
+          "to": "proxy",
+          "kind": "fail",
+          "label": "gave up at 500 ms"
+        }
+      ],
+      "metrics": {
+        "tests": "1335",
+        "suite": "265"
+      }
+    },
+    {
+      "tag": "LOAD",
+      "title": "Load test the baseline",
+      "body": "A load generator now replays realistic traffic, say 500 requests per second for 10 minutes, against a production-like deployment. It measures latency percentiles, not averages, because the slowest 1 percent of requests is what users complain about. The healthy result here is p99 near 180 ms with errors below 0.1 percent. Save that as the baseline to compare against after every release.",
+      "idea": "Load tests produce a baseline; their value is comparing against it later.",
+      "caption": "500 req/s through Orders and Postgres.",
+      "focus": [
+        "load",
+        "svc",
+        "db"
+      ],
+      "flows": [
+        {
+          "from": "load",
+          "to": "svc",
+          "kind": "request",
+          "label": "500 req/s"
+        },
+        {
+          "from": "svc",
+          "to": "db",
+          "kind": "request",
+          "label": "queries"
+        },
+        {
+          "from": "svc",
+          "to": "load",
+          "kind": "response",
+          "label": "200 OK"
+        }
+      ],
+      "metrics": {
+        "p99": "180",
+        "errors": "0.05"
+      }
+    },
+    {
+      "tag": "WHAT IF",
+      "title": "Push past the limit",
+      "body": "Raise the rate to 1,500 requests per second. Assume each request holds a connection for about 20 ms, so 20 connections serve about 1,000 req/s. Beyond that the service uses up its 20 database connections, and the unserved third queues until requests time out. The p99 climbs to 2.4 seconds and about 30 percent of requests fail. No unit test could show this, because the limit comes from how pieces interact under concurrency. The fix might be faster queries, a pooler such as PgBouncer, a cache, or shedding load early; a bigger pool alone often just moves the queue to the database.",
+      "idea": "Load tests find the knee in the curve where queues build and latency explodes.",
+      "caption": "Pool exhausted at 1,500 req/s: about 30% of requests fail.",
+      "focus": [
+        "load",
+        "svc",
+        "db"
+      ],
+      "flows": [
+        {
+          "from": "load",
+          "to": "svc",
+          "kind": "request",
+          "label": "1,500 req/s"
+        },
+        {
+          "from": "svc",
+          "to": "db",
+          "kind": "fail",
+          "label": "pool exhausted"
+        }
+      ],
+      "metrics": {
+        "p99": "2400",
+        "errors": "30"
+      }
+    },
+    {
+      "tag": "TRADE-OFF",
+      "title": "Cost and flakiness",
+      "body": "Broad tests are expensive and can fail for reasons unrelated to your change: a slow CI machine, a shared environment, a clock race. A suite that fails randomly trains people to rerun and ignore it. Keep upper layers few, give each a clear purpose, make them deterministic with fixed seeds and no real sleeps, and quarantine flaky tests quickly. Production monitoring and gradual rollouts, covered in other lessons, catch what testing cannot.",
+      "idea": "A test suite is only useful if people trust a red result.",
+      "caption": "Each layer adds coverage and cost.",
+      "focus": [
+        "runner",
+        "svc",
+        "db",
+        "pay"
+      ],
+      "flows": [],
+      "metrics": {
+        "tests": "1335",
+        "suite": "265"
+      }
+    },
+    {
+      "tag": "RECAP",
+      "title": "Which layer catches what",
+      "body": "Five kinds of test, each aimed at a different risk. Unit tests guard logic, contract tests guard API agreements, integration tests with real dependencies guard SQL and wiring, fault injection guards timeouts and fallbacks, and load tests guard capacity. Many cheap tests at the bottom, a few expensive ones on top. Each layer answers a different question, so skipping one leaves that question open.",
+      "idea": "Match each risk to the cheapest test that can reveal it.",
+      "caption": "Five kinds of test, five different risks covered.",
+      "focus": [
+        "load",
+        "runner",
+        "svc",
+        "broker",
+        "proxy",
+        "db",
+        "pay"
+      ],
+      "flows": [],
+      "metrics": {
+        "tests": "1335",
+        "suite": "265",
+        "p99": "180",
+        "errors": "0.05"
+      }
+    }
   ],
   "quiz": [
-    {"q": "The Payments team renames a response field. Which test would fail in the Payments build before release?", "options": ["A unit test inside Orders", "A provider verification of Orders' published contract", "A load test against Orders", "A snapshot of the Orders database"], "answer": 1, "why": "The broker holds what Orders relies on. Payments verifies its real code against that contract, so the rename fails their build."},
-    {"q": "Why run integration tests against a real Postgres container instead of a mocked repository?", "options": ["Mocks cannot be written for databases", "A real database enforces constraints, types and SQL syntax that a mock silently accepts", "Containers make tests run faster than unit tests", "It removes the need for unit tests"], "answer": 1, "why": "A mock returns whatever you told it to, so bugs in the SQL or schema stay hidden. A real database rejects them."},
-    {"q": "A load test reports an average latency of 90 ms, yet users complain about slow checkouts. What should you check?", "options": ["Only the maximum single request", "p95 and p99 percentiles, which show the slow tail", "The number of unit tests", "Whether the load generator is a container"], "answer": 1, "why": "Averages hide the slow tail. A few percent of very slow requests barely move the mean but affect many real users."},
-    {"q": "A fault-injection test makes a dependency take 5 s, and Orders also hangs for 5 s. What does this reveal?", "options": ["The dependency is healthy", "The timeout is missing or misconfigured", "The test pyramid is inverted", "The contract is out of date"], "answer": 1, "why": "A correct client would stop waiting at its own timeout. Hanging for the full delay shows that protection is not working."},
-    {"q": "Your suite has few unit tests and thousands of browser-driven end-to-end tests, and it fails randomly. What is the best direction?", "options": ["Add more end-to-end tests", "Rerun failures until they pass", "Move checks down to unit, contract and integration tests, and keep few end-to-end ones", "Delete the integration tests"], "answer": 2, "why": "Lower layers are faster and more deterministic. Shifting coverage down gives quicker, more trustworthy feedback."}
+    {
+      "q": "The Payments team renames a response field. Which test would fail in the Payments build before release?",
+      "options": [
+        "A unit test inside Orders",
+        "A load test against Orders",
+        "A provider verification of Orders' published contract",
+        "A snapshot of the Orders database"
+      ],
+      "answer": 2,
+      "why": "The broker holds what Orders relies on. Payments verifies its real code against that contract, so the rename fails their build."
+    },
+    {
+      "q": "Why run integration tests against a real Postgres container instead of a mocked repository?",
+      "options": [
+        "A real database enforces constraints, types and SQL syntax that a mock silently accepts",
+        "Mocks cannot be written for databases",
+        "Containers make tests run faster than unit tests",
+        "It removes the need for unit tests"
+      ],
+      "answer": 0,
+      "why": "A mock returns whatever you told it to, so bugs in the SQL or schema stay hidden. A real database rejects them."
+    },
+    {
+      "q": "A load test reports an average latency of 90 ms, yet users complain about slow checkouts. What should you check?",
+      "options": [
+        "Only the maximum single request",
+        "The number of unit tests",
+        "Whether the load generator is a container",
+        "p95 and p99 percentiles, which show the slow tail"
+      ],
+      "answer": 3,
+      "why": "Averages hide the slow tail. A few percent of very slow requests barely move the mean but affect many real users."
+    },
+    {
+      "q": "A fault-injection test makes a dependency take 5 s, and Orders also hangs for 5 s. What does this reveal?",
+      "options": [
+        "The dependency is healthy",
+        "The timeout is missing or misconfigured",
+        "The test pyramid is inverted",
+        "The contract is out of date"
+      ],
+      "answer": 1,
+      "why": "A correct client would stop waiting at its own timeout. Hanging for the full delay shows that protection is not working."
+    },
+    {
+      "q": "Your suite has few unit tests and thousands of browser-driven end-to-end tests, and it fails randomly. What is the best direction?",
+      "options": [
+        "Add more end-to-end tests",
+        "Rerun failures until they pass",
+        "Move checks down to unit, contract and integration tests, and keep few end-to-end ones",
+        "Delete the integration tests"
+      ],
+      "answer": 2,
+      "why": "Lower layers are faster and more deterministic. Shifting coverage down gives quicker, more trustworthy feedback."
+    }
   ],
   "cheatsheet": [
-    {"term": "Test pyramid", "def": "Rule of thumb: many fast unit tests, fewer integration tests, very few end-to-end tests. Cost and flakiness rise with each layer."},
-    {"term": "Contract test", "def": "Checks that a consumer's expectations of an API match what the provider actually returns, verified in the provider's build."},
-    {"term": "Testcontainers pattern", "def": "Start real dependencies such as Postgres or Kafka in disposable containers for each test run, then throw them away."},
-    {"term": "Test double", "def": "A stand-in (stub, mock, fake) for a dependency. Use for things you do not own or that are slow; avoid for your own database."},
-    {"term": "Load vs stress test", "def": "Load test: expected traffic, to confirm the baseline. Stress test: push beyond it to find the breaking point."},
-    {"term": "Percentile latency", "def": "p99 means 99 percent of requests were faster. Report percentiles, not averages, because users feel the tail."},
-    {"term": "Fault injection", "def": "Deliberately add delay, errors, drops or duplicates to a dependency to prove timeouts, retries and fallbacks behave."},
-    {"term": "Flaky test", "def": "A test that passes and fails without code changes. Fix or quarantine it fast; it erodes trust in the whole suite."}
+    {
+      "term": "Test pyramid",
+      "def": "Rule of thumb: many fast unit tests, fewer integration tests, very few end-to-end tests. Cost and flakiness rise with each layer."
+    },
+    {
+      "term": "Contract test",
+      "def": "Checks that a consumer's expectations of an API match what the provider actually returns, verified in the provider's build."
+    },
+    {
+      "term": "Testcontainers pattern",
+      "def": "Start real dependencies such as Postgres or Kafka in disposable containers for each test run, then throw them away."
+    },
+    {
+      "term": "Test double",
+      "def": "A stand-in (stub, mock, fake) for a dependency. Use for remote services you do not control or that are slow; run infrastructure you own, such as your database, for real."
+    },
+    {
+      "term": "Load vs stress test",
+      "def": "Load test: expected traffic, to confirm the baseline. Stress test: push beyond it to find the breaking point."
+    },
+    {
+      "term": "Percentile latency",
+      "def": "p99 means 99 percent of requests were faster. Report percentiles, not averages, because users feel the tail."
+    },
+    {
+      "term": "Fault injection",
+      "def": "Deliberately add delay, errors, drops or duplicates to a dependency to prove timeouts, retries and fallbacks behave."
+    },
+    {
+      "term": "Flaky test",
+      "def": "A test that passes and fails without code changes. Fix or quarantine it fast; it erodes trust in the whole suite."
+    }
   ]
 }

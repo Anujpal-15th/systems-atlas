@@ -1,7 +1,7 @@
 {
   "slug": "design-ride-sharing",
   "title": "Design Ride Sharing",
-  "subtitle": "Watch a driver's GPS ping become a live map, a match, a trip, and a price.",
+  "subtitle": "Watch a driver's GPS ping become a nearby-car search, a match, a trip, and a price.",
   "minutes": 16,
   "level": "Advanced",
   "learn": [
@@ -12,66 +12,577 @@
     "How surge pricing is computed per cell from demand and supply, and why it is smoothed"
   ],
   "nodes": [
-    {"id": "rider", "label": "Rider app", "kind": "client", "x": 9, "y": 20},
-    {"id": "driver", "label": "Driver app", "kind": "client", "x": 9, "y": 80},
-    {"id": "gw", "label": "API gateway", "kind": "gateway", "x": 28, "y": 50},
-    {"id": "loc", "label": "Location service", "kind": "service", "x": 48, "y": 82},
-    {"id": "geo", "label": "Geo index (memory)", "kind": "cache", "x": 74, "y": 82},
-    {"id": "match", "label": "Matching service", "kind": "service", "x": 50, "y": 50},
-    {"id": "surge", "label": "Surge pricing", "kind": "service", "x": 50, "y": 17},
-    {"id": "trip", "label": "Trip service", "kind": "service", "x": 74, "y": 50},
-    {"id": "tripdb", "label": "Trip database", "kind": "db", "x": 91, "y": 22}
+    {
+      "id": "rider",
+      "label": "Rider app",
+      "kind": "client",
+      "x": 9,
+      "y": 20
+    },
+    {
+      "id": "driver",
+      "label": "Driver app",
+      "kind": "client",
+      "x": 9,
+      "y": 80
+    },
+    {
+      "id": "gw",
+      "label": "API gateway",
+      "kind": "gateway",
+      "x": 28,
+      "y": 50
+    },
+    {
+      "id": "loc",
+      "label": "Location service",
+      "kind": "service",
+      "x": 48,
+      "y": 82
+    },
+    {
+      "id": "geo",
+      "label": "Geo index (memory)",
+      "kind": "cache",
+      "x": 74,
+      "y": 82
+    },
+    {
+      "id": "match",
+      "label": "Matching service",
+      "kind": "service",
+      "x": 50,
+      "y": 50
+    },
+    {
+      "id": "surge",
+      "label": "Surge pricing",
+      "kind": "service",
+      "x": 50,
+      "y": 17
+    },
+    {
+      "id": "trip",
+      "label": "Trip service",
+      "kind": "service",
+      "x": 74,
+      "y": 50
+    },
+    {
+      "id": "tripdb",
+      "label": "Trip database",
+      "kind": "db",
+      "x": 91,
+      "y": 22
+    }
   ],
   "edges": [
-    {"from": "rider", "to": "gw"},
-    {"from": "driver", "to": "gw"},
-    {"from": "gw", "to": "loc"},
-    {"from": "loc", "to": "geo"},
-    {"from": "gw", "to": "match"},
-    {"from": "match", "to": "geo"},
-    {"from": "match", "to": "surge"},
-    {"from": "surge", "to": "geo"},
-    {"from": "match", "to": "trip"},
-    {"from": "gw", "to": "trip"},
-    {"from": "trip", "to": "tripdb"}
+    {
+      "from": "rider",
+      "to": "gw"
+    },
+    {
+      "from": "driver",
+      "to": "gw"
+    },
+    {
+      "from": "gw",
+      "to": "loc"
+    },
+    {
+      "from": "loc",
+      "to": "geo"
+    },
+    {
+      "from": "gw",
+      "to": "match"
+    },
+    {
+      "from": "match",
+      "to": "geo"
+    },
+    {
+      "from": "match",
+      "to": "surge"
+    },
+    {
+      "from": "surge",
+      "to": "geo"
+    },
+    {
+      "from": "match",
+      "to": "trip"
+    },
+    {
+      "from": "gw",
+      "to": "trip"
+    },
+    {
+      "from": "trip",
+      "to": "tripdb"
+    },
+    {
+      "from": "trip",
+      "to": "geo"
+    }
   ],
   "metrics": [
-    {"id": "pings", "label": "Pings/s", "unit": "k"},
-    {"id": "cands", "label": "Candidates", "unit": ""},
-    {"id": "wait", "label": "Time to match", "unit": "s"},
-    {"id": "surge", "label": "Surge", "unit": "x"}
+    {
+      "id": "pings",
+      "label": "Pings/s",
+      "unit": "k"
+    },
+    {
+      "id": "cands",
+      "label": "Candidates",
+      "unit": ""
+    },
+    {
+      "id": "wait",
+      "label": "Request age",
+      "unit": "s"
+    },
+    {
+      "id": "surge",
+      "label": "Surge",
+      "unit": "x"
+    }
   ],
   "steps": [
-    {"tag": "QUESTION", "title": "Where is everyone, right now?", "body": "A rider taps Request. Within a few seconds the system must find a nearby free driver, get that driver to say yes, and agree on a price. The hard part is that every driver is moving, so 'nearby' changes every few seconds. We will build four pieces: a location stream, a geospatial index, a matcher with a trip state machine, and surge pricing.", "idea": "Ride sharing is a real-time search over things that will not stand still.", "caption": "A rider wants a car; drivers are scattered and moving.", "focus": ["rider", "driver"], "flows": [], "metrics": {}},
-    {"tag": "INGEST", "title": "Drivers report their position", "body": "Assume 1 million drivers are online at peak and each app sends a GPS ping every 4 seconds. That is about 250,000 writes per second, each only about 100 bytes (driver id, latitude, longitude, heading, timestamp). Pings go over a persistent connection to the gateway, then to a location service. Losing one ping is harmless because another arrives in 4 seconds, so we do not need a heavy durable write for each.", "idea": "Location updates are a high-volume stream where the newest value matters and old ones are worthless.", "caption": "Pings stream in from driver phones.", "focus": ["driver", "gw", "loc"], "flows": [{"from": "driver", "to": "gw", "kind": "async", "label": "lat,lng every 4s"}, {"from": "gw", "to": "loc", "kind": "async", "label": "location update"}], "metrics": {"pings": "250"}},
-    {"tag": "INDEX", "title": "Index drivers by map cell", "body": "The location service writes each driver into an in-memory index keyed by grid cell. The map is cut into cells using geohash or H3 hexagons, each roughly one kilometre across. A driver moving into a new cell is removed from the old cell's set and added to the new one. Each entry expires after about 30 seconds, so a driver whose app died simply disappears. The index is sharded by cell, so one city never lives on one machine.", "idea": "Cutting the map into cells turns 'find nearby' into 'read a few small sets'.", "caption": "Drivers are filed under their current cell, with a TTL.", "focus": ["loc", "geo"], "flows": [{"from": "loc", "to": "geo", "kind": "request", "label": "move to new cell"}, {"from": "geo", "to": "loc", "kind": "response", "label": "ok"}], "metrics": {}},
-    {"tag": "REQUEST", "title": "A rider asks for a car", "body": "The rider sends pickup and destination. The gateway authenticates the call and forwards it to the matching service, which creates a ride request. Request volume is tiny compared with pings: even a large service sees only hundreds to a few thousand ride requests per second. That is why the matcher can afford to be careful while the location path has to be cheap.", "idea": "Reads and decisions are rare; location writes are the firehose.", "caption": "The ride request reaches the matcher.", "focus": ["rider", "gw", "match"], "flows": [{"from": "rider", "to": "gw", "kind": "request", "label": "request ride"}, {"from": "gw", "to": "match", "kind": "request", "label": "pickup + dropoff"}], "metrics": {}},
-    {"tag": "SEARCH", "title": "Find nearby drivers", "body": "The matcher computes the rider's cell, then asks the geo index for free drivers in that cell and its ring of neighbours. Neighbours matter because the rider may stand at a cell edge, where the closest car is in the next cell. If too few drivers come back, it widens to the next ring. This usually returns a few dozen candidates from a handful of in-memory reads, in single-digit milliseconds.", "idea": "Search the rider's cell plus neighbours, and widen the ring only if you must.", "caption": "Candidates come back from the cells around the rider.", "focus": ["match", "geo"], "flows": [{"from": "match", "to": "geo", "kind": "request", "label": "nearby free cars"}, {"from": "geo", "to": "match", "kind": "response", "label": "42 drivers"}], "metrics": {"cands": "42"}},
-    {"tag": "OFFER", "title": "Rank, reserve, and offer", "body": "Straight-line distance is a poor guess, since a car across a river may be ten minutes away. So the matcher ranks the top few candidates by estimated time of arrival (ETA) from a routing service, which this lesson treats as a black box. It picks the best driver and asks the trip service to reserve that driver for this request. The trip service creates the trip in state REQUESTED and pushes an offer to the driver. The driver has about 15 seconds to answer.", "idea": "Rank by ETA, then reserve one driver at a time so nobody is offered two rides.", "caption": "A trip row is created and the offer goes to one driver.", "focus": ["match", "trip", "tripdb", "gw", "driver"], "flows": [{"from": "match", "to": "trip", "kind": "request", "label": "reserve driver"}, {"from": "trip", "to": "tripdb", "kind": "request", "label": "insert REQUESTED"}, {"from": "trip", "to": "gw", "kind": "async", "label": "offer"}, {"from": "gw", "to": "driver", "kind": "async", "label": "offer, 15s"}], "metrics": {"wait": "3"}},
-    {"tag": "STATE", "title": "The trip state machine", "body": "The driver accepts. A trip moves through fixed states: REQUESTED, ACCEPTED, ARRIVED, IN_PROGRESS, COMPLETED, with CANCELLED reachable from the early ones. Every change is a conditional update such as 'set ACCEPTED only if the state is REQUESTED and the version matches'. If a retry or a second request tries the same change, the condition fails and nothing breaks. The database is the single source of truth, and the geo index marks the driver busy.", "idea": "Guarded transitions make retries and races harmless.", "caption": "The accept becomes a guarded state change in the database.", "focus": ["driver", "gw", "trip", "tripdb"], "flows": [{"from": "driver", "to": "gw", "kind": "request", "label": "accept"}, {"from": "gw", "to": "trip", "kind": "request", "label": "accept trip"}, {"from": "trip", "to": "tripdb", "kind": "request", "label": "to ACCEPTED"}, {"from": "tripdb", "to": "trip", "kind": "response", "label": "1 row changed"}], "metrics": {"wait": "9"}},
-    {"tag": "WHAT IF", "title": "The driver does not answer", "body": "Now suppose the driver is in a tunnel and the 15 second timer expires. The trip service releases the reservation and tells the matcher, which offers the ride to the next candidate on its list. If the old driver's accept arrives late, the guarded update sees the trip is no longer waiting for that driver and rejects it. Each decline or timeout adds delay, so many systems cap the attempts and then widen the search.", "idea": "Timeouts plus guarded updates keep a slow driver from corrupting a trip that moved on.", "caption": "Offer expires; the matcher moves to the next driver.", "focus": ["match", "trip", "driver"], "flows": [{"from": "trip", "to": "gw", "kind": "fail", "label": "offer expired"}, {"from": "trip", "to": "match", "kind": "response", "label": "try next driver"}, {"from": "match", "to": "trip", "kind": "request", "label": "reserve driver 2"}], "metrics": {"wait": "27", "cands": "41"}},
-    {"tag": "SURGE", "title": "Price from supply and demand", "body": "When there are many more requests than free drivers in an area, surge raises the price to attract drivers and ration demand. A pricing job counts open requests and free drivers per cell over a sliding window of one to two minutes, then computes a multiplier from the ratio. It smooths the result and caps it, so prices do not flicker or explode. The matcher reads the multiplier when it quotes a fare, and the rider sees it before confirming.", "idea": "Surge is a per-cell ratio of demand to supply, smoothed and capped.", "caption": "Counts per cell become a multiplier on the fare.", "focus": ["surge", "geo", "match"], "flows": [{"from": "surge", "to": "geo", "kind": "request", "label": "count free drivers"}, {"from": "geo", "to": "surge", "kind": "response", "label": "supply per cell"}, {"from": "match", "to": "surge", "kind": "request", "label": "price for cell?"}, {"from": "surge", "to": "match", "kind": "response", "label": "1.4x"}], "metrics": {"surge": "1.4"}},
-    {"tag": "RECAP", "title": "The whole picture", "body": "Pings flow into a sharded in-memory cell index with short TTLs. A ride request searches the rider's cell and neighbours, ranks by ETA, reserves one driver, and offers the ride with a timeout. A guarded state machine in the trip database keeps every transition safe under retries. Surge turns per-cell supply and demand into a price. The firehose stays cheap and in memory; only the few decisions that matter touch the durable database.", "idea": "Keep the hot stream in memory, and put strong guarantees only on the small set of decisions that need them.", "caption": "Ingest, index, match, trip, price.", "focus": ["rider", "driver", "gw", "loc", "geo", "match", "surge", "trip", "tripdb"], "flows": [], "metrics": {"pings": "250", "cands": "42", "wait": "9", "surge": "1.4"}}
+    {
+      "tag": "QUESTION",
+      "title": "Where is everyone, right now?",
+      "body": "A rider taps Request. Within a few seconds the system must find a nearby free driver, get that driver to say yes, and agree on a price. The hard part is that every driver is moving, so 'nearby' changes every few seconds. We will build four pieces: a location stream, a geospatial index, a matcher with a trip state machine, and surge pricing.",
+      "idea": "Ride sharing is a real-time search over things that will not stand still.",
+      "caption": "A rider wants a car; drivers are scattered and moving.",
+      "focus": [
+        "rider",
+        "driver"
+      ],
+      "flows": [],
+      "metrics": {}
+    },
+    {
+      "tag": "INGEST",
+      "title": "Drivers report their position",
+      "body": "Assume 1 million drivers are online at peak and each app pings GPS every 4 seconds. That is about 250,000 writes per second, each about 100 bytes (driver id, latitude, longitude, heading, timestamp). Pings go over a persistent connection to the gateway, then to a location service. Losing one ping is harmless because another arrives in 4 seconds, so no heavy durable write per ping. A sampled copy is appended to a log for trip routes and analytics, off the matching path.",
+      "idea": "Location updates are a high-volume stream where only the newest value matters for matching.",
+      "caption": "Pings stream in from driver phones.",
+      "focus": [
+        "driver",
+        "gw",
+        "loc"
+      ],
+      "flows": [
+        {
+          "from": "driver",
+          "to": "gw",
+          "kind": "async",
+          "label": "lat,lng every 4s"
+        },
+        {
+          "from": "gw",
+          "to": "loc",
+          "kind": "async",
+          "label": "location update"
+        }
+      ],
+      "metrics": {
+        "pings": "250"
+      }
+    },
+    {
+      "tag": "INDEX",
+      "title": "Index drivers by map cell",
+      "body": "The location service writes each driver into an in-memory index keyed by grid cell. Geohash and H3 are schemes that give each map region a short id (geohash uses rectangles, H3 hexagons); cells are about a kilometre across. A driver changing cell moves between sets. Each entry has a TTL (time to live): a countdown after which it is deleted unless the next ping refreshes it, so a dead app vanishes in about 30 s. The index is sharded (split across machines by cell id) to spread the 250k writes per second. The data is only about 100 MB, so sharding is for write rate and availability, not space. It is rebuilt from fresh pings within one TTL, so a lost shard heals in about 30 s.",
+      "idea": "Cutting the map into cells turns 'find nearby' into 'read a few small sets'.",
+      "caption": "Drivers are filed under their current cell and expire if not refreshed.",
+      "focus": [
+        "loc",
+        "geo"
+      ],
+      "flows": [
+        {
+          "from": "loc",
+          "to": "geo",
+          "kind": "request",
+          "label": "move to new cell"
+        },
+        {
+          "from": "geo",
+          "to": "loc",
+          "kind": "response",
+          "label": "ok"
+        }
+      ],
+      "metrics": {}
+    },
+    {
+      "tag": "REQUEST",
+      "title": "A rider asks for a car",
+      "body": "The rider sends pickup and destination. The gateway authenticates the call and forwards it to the matching service, which creates a ride request. Request volume is tiny compared with pings: even a large service sees only hundreds to a few thousand ride requests per second. That is why the matcher can afford to be careful while the location path must stay cheap. (The map's 'cars nearby' view reads the same index.)",
+      "idea": "Ride requests are rare compared with location writes, so the matcher can afford to be careful.",
+      "caption": "The ride request reaches the matcher.",
+      "focus": [
+        "rider",
+        "gw",
+        "match"
+      ],
+      "flows": [
+        {
+          "from": "rider",
+          "to": "gw",
+          "kind": "request",
+          "label": "request ride"
+        },
+        {
+          "from": "gw",
+          "to": "match",
+          "kind": "request",
+          "label": "pickup + dropoff"
+        }
+      ],
+      "metrics": {}
+    },
+    {
+      "tag": "SEARCH",
+      "title": "Find nearby drivers",
+      "body": "The matcher computes the rider's cell, then asks the geo index for free drivers in that cell and its ring of neighbours. Neighbours matter because the rider may stand at a cell edge, where the closest car is in the next cell. If too few drivers come back, it widens to the next ring. This usually returns a few dozen candidates from a handful of in-memory reads, in single-digit milliseconds.",
+      "idea": "Search the rider's cell plus neighbours, and widen the ring only if you must.",
+      "caption": "Candidates come back from the cells around the rider.",
+      "focus": [
+        "match",
+        "geo"
+      ],
+      "flows": [
+        {
+          "from": "match",
+          "to": "geo",
+          "kind": "request",
+          "label": "nearby free cars"
+        },
+        {
+          "from": "geo",
+          "to": "match",
+          "kind": "response",
+          "label": "42 drivers"
+        }
+      ],
+      "metrics": {
+        "cands": "42"
+      }
+    },
+    {
+      "tag": "OFFER",
+      "title": "Rank, reserve, and offer",
+      "body": "The matcher keeps the closest ~10 candidates by straight-line distance, then ranks those by ETA from a routing service (a black box here), since a car across a river may be ten minutes away. It asks the trip service to reserve the best driver. The reservation is a conditional write on the driver's record: set current_offer to this trip only if the driver is AVAILABLE, in the same transaction that inserts the trip as REQUESTED. It is a lease that expires after 15 s; a unique constraint of one active trip per driver also works. This greedy one-at-a-time offer is the simple version; larger platforms often batch requests and drivers over a couple of seconds and optimise together.",
+      "idea": "Rank by ETA, then reserve one driver with a compare-and-set so nobody is offered two rides.",
+      "caption": "The driver is reserved, a trip row is created, and the offer goes out.",
+      "focus": [
+        "match",
+        "trip",
+        "tripdb",
+        "gw",
+        "driver"
+      ],
+      "flows": [
+        {
+          "from": "match",
+          "to": "trip",
+          "kind": "request",
+          "label": "reserve driver"
+        },
+        {
+          "from": "trip",
+          "to": "tripdb",
+          "kind": "request",
+          "label": "reserve + insert"
+        },
+        {
+          "from": "trip",
+          "to": "gw",
+          "kind": "async",
+          "label": "offer"
+        },
+        {
+          "from": "gw",
+          "to": "driver",
+          "kind": "async",
+          "label": "offer, 15s"
+        }
+      ],
+      "metrics": {
+        "wait": "1"
+      }
+    },
+    {
+      "tag": "STATE",
+      "title": "The trip state machine",
+      "body": "Drivers typically take 5 to 10 s to tap accept, so the request is about 8 s old. A trip moves through REQUESTED, ACCEPTED, ARRIVED, IN_PROGRESS, COMPLETED, with CANCELLED reachable from the early ones. Each change is a conditional update such as 'set ACCEPTED only if state is REQUESTED and the offer is still held by this driver', so retries fail harmlessly. The database is the source of truth, and the trip service then marks the driver busy in the geo index. If every attempt is declined or times out, the trip ends as EXPIRED and the rider is told no cars are available.",
+      "idea": "Guarded transitions make retries and races harmless.",
+      "caption": "The accept becomes a guarded state change in the database.",
+      "focus": [
+        "driver",
+        "gw",
+        "trip",
+        "tripdb",
+        "geo"
+      ],
+      "flows": [
+        {
+          "from": "driver",
+          "to": "gw",
+          "kind": "request",
+          "label": "accept"
+        },
+        {
+          "from": "gw",
+          "to": "trip",
+          "kind": "request",
+          "label": "accept trip"
+        },
+        {
+          "from": "trip",
+          "to": "tripdb",
+          "kind": "request",
+          "label": "to ACCEPTED"
+        },
+        {
+          "from": "tripdb",
+          "to": "trip",
+          "kind": "response",
+          "label": "1 row changed"
+        },
+        {
+          "from": "trip",
+          "to": "geo",
+          "kind": "async",
+          "label": "mark busy"
+        }
+      ],
+      "metrics": {
+        "wait": "8"
+      }
+    },
+    {
+      "tag": "WHAT IF",
+      "title": "The driver does not answer",
+      "body": "Now suppose the driver is in a tunnel and the 15 second timer expires. The trip service releases the reservation and tells the matcher, which, about 1 s later, offers the ride to the next candidate on its list. If the old driver's accept arrives late, the guarded update sees the trip is no longer waiting for that driver and rejects it. The request is now 17 s old (15 s timeout plus about 1 s to re-offer). Each decline or timeout adds delay, so many systems cap the attempts and then widen the search.",
+      "idea": "Timeouts plus guarded updates keep a slow driver from corrupting a trip that moved on.",
+      "caption": "Offer expires; the matcher moves to the next driver.",
+      "focus": [
+        "match",
+        "trip",
+        "gw",
+        "driver"
+      ],
+      "flows": [
+        {
+          "from": "trip",
+          "to": "gw",
+          "kind": "fail",
+          "label": "offer expired"
+        },
+        {
+          "from": "gw",
+          "to": "driver",
+          "kind": "fail",
+          "label": "offer expired"
+        },
+        {
+          "from": "trip",
+          "to": "match",
+          "kind": "response",
+          "label": "try next driver"
+        },
+        {
+          "from": "match",
+          "to": "trip",
+          "kind": "request",
+          "label": "reserve driver 2"
+        },
+        {
+          "from": "driver",
+          "to": "gw",
+          "kind": "request",
+          "label": "late accept"
+        },
+        {
+          "from": "gw",
+          "to": "driver",
+          "kind": "fail",
+          "label": "rejected"
+        }
+      ],
+      "metrics": {
+        "wait": "17",
+        "cands": "41"
+      }
+    },
+    {
+      "tag": "SURGE",
+      "title": "Price from supply and demand",
+      "body": "When requests far outnumber free drivers in an area, surge raises the price to attract drivers and ration demand. A pricing job samples free-driver counts from the geo index every few seconds, averages them over a one to two minute window, and counts open requests from the matcher. It computes a multiplier from the ratio, smooths it and caps it. The multiplier is recomputed continuously. When the rider opens the request screen, the app asks for a fare estimate carrying the current multiplier. The quote is locked for a few minutes, so the price does not change between confirming and matching.",
+      "idea": "Surge is a per-cell ratio of demand to supply, smoothed and capped.",
+      "caption": "Counts per cell become a multiplier on the fare.",
+      "focus": [
+        "surge",
+        "geo",
+        "match"
+      ],
+      "flows": [
+        {
+          "from": "surge",
+          "to": "geo",
+          "kind": "request",
+          "label": "count free drivers"
+        },
+        {
+          "from": "geo",
+          "to": "surge",
+          "kind": "response",
+          "label": "supply per cell"
+        },
+        {
+          "from": "match",
+          "to": "surge",
+          "kind": "async",
+          "label": "open requests"
+        },
+        {
+          "from": "match",
+          "to": "surge",
+          "kind": "request",
+          "label": "price for cell?"
+        },
+        {
+          "from": "surge",
+          "to": "match",
+          "kind": "response",
+          "label": "1.4x"
+        }
+      ],
+      "metrics": {
+        "surge": "1.4"
+      }
+    },
+    {
+      "tag": "RECAP",
+      "title": "The whole picture",
+      "body": "Pings flow into a sharded in-memory cell index with short TTLs. A ride request searches the rider's cell and neighbours, ranks by ETA, reserves one driver, and offers the ride with a timeout. A guarded state machine in the trip database keeps every transition safe under retries. After acceptance, the driver's pings are also pushed to the rider's app so the car moves on the map. Surge turns per-cell supply and demand into a price. Only the few decisions that matter touch the durable database.",
+      "idea": "Keep the hot stream in memory, and put strong guarantees only on the small set of decisions that need them.",
+      "caption": "Ingest, index, match, trip, price.",
+      "focus": [
+        "rider",
+        "driver",
+        "gw",
+        "loc",
+        "geo",
+        "match",
+        "surge",
+        "trip",
+        "tripdb"
+      ],
+      "flows": [],
+      "metrics": {
+        "pings": "250",
+        "surge": "1.4"
+      }
+    }
   ],
   "quiz": [
-    {"q": "Why is the live driver location store usually an in-memory index with a TTL instead of rows in the main trip database?", "options": ["Maps cannot be stored in SQL", "Each position is overwritten within seconds, so durability is wasted and the write rate is huge", "Riders must never see old locations in any backup", "In-memory stores guarantee no two riders get the same driver"], "answer": 1, "why": "Only the latest position matters and a new one arrives every few seconds. Durable storage would pay a high cost to keep data that is worthless almost immediately. A TTL also removes drivers whose apps went silent."},
-    {"q": "A rider stands right on the boundary between two grid cells. What must the nearby-driver search do?", "options": ["Search only the rider's own cell, since it contains the rider", "Search every cell in the city", "Ask drivers to report which rider is closest", "Search the rider's cell and its neighbouring cells"], "answer": 3, "why": "The nearest car may sit just across the cell edge. Checking the cell plus its neighbours fixes that cheaply, and the ring widens only if too few drivers are found."},
-    {"q": "Two riders are matched to the same best driver at the same moment. Which design stops both from getting the trip?", "options": ["Send both offers and let the driver pick", "Make the geo index fully consistent across regions", "Reserve the driver with a conditional update that succeeds for only one request", "Cache the driver list for longer"], "answer": 2, "why": "A compare-and-set reservation lets exactly one request win. The loser sees the condition fail and tries the next candidate. The index is only a hint, so the guarantee must live in the trip store."},
-    {"q": "A driver's accept message arrives 20 seconds after the offer expired and the trip was given to another driver. What should happen?", "options": ["Accept it and reassign the trip", "Reject it because the guarded update finds the trip is no longer in the expected state for that driver", "Accept it and cancel the other driver", "Ignore it silently and leave the driver waiting"], "answer": 1, "why": "State transitions are conditional on current state and owner, so a stale message cannot change a trip that moved on. The driver should be told the offer is gone so their app returns to idle."},
-    {"q": "Why is surge computed per cell over a window and then smoothed, instead of using the raw request count each second?", "options": ["Raw counts are too small to store", "Smoothing makes drivers cheaper", "Per-second ratios swing wildly and would make prices flicker", "It lets the index skip TTLs"], "answer": 2, "why": "Short windows are noisy: one burst of requests would spike prices and then drop them seconds later. A one to two minute window with smoothing and a cap gives stable, explainable prices."}
+    {
+      "q": "Why is the live driver location store usually an in-memory index with a TTL instead of rows in the main trip database?",
+      "options": [
+        "Relational databases cannot index latitude and longitude at all",
+        "Each position is overwritten within seconds, so durability is wasted and the write rate is huge",
+        "Location data is too sensitive to ever be written to disk",
+        "In-memory stores guarantee no two riders get the same driver"
+      ],
+      "answer": 1,
+      "why": "Only the latest position matters and a new one arrives every few seconds. Durable storage would pay a high cost to keep data that is stale for matching almost immediately. A TTL also removes drivers whose apps went silent."
+    },
+    {
+      "q": "A rider stands right on the boundary between two grid cells. What must the nearby-driver search do?",
+      "options": [
+        "Search only the rider's own cell, since it contains the rider",
+        "Search every cell in the city",
+        "Ask drivers to report which rider is closest",
+        "Search the rider's cell and its neighbouring cells"
+      ],
+      "answer": 3,
+      "why": "The nearest car may sit just across the cell edge. Checking the cell plus its neighbours fixes that cheaply, and the ring widens only if too few drivers are found."
+    },
+    {
+      "q": "Two riders are matched to the same best driver at the same moment. Which design stops both from getting the trip?",
+      "options": [
+        "Send both offers and let the driver pick",
+        "Make the geo index fully consistent across regions",
+        "Reserve the driver with a conditional update that succeeds for only one request",
+        "Cache the driver list for longer"
+      ],
+      "answer": 2,
+      "why": "A compare-and-set on the driver's record (set current_offer only if the driver is AVAILABLE) lets exactly one request win. The loser sees the condition fail and tries the next candidate. The index is only a hint, so the guarantee must live in the store holding that record."
+    },
+    {
+      "q": "A driver's accept message arrives 20 seconds after the 15-second offer window closed and the trip was given to another driver. What should happen?",
+      "options": [
+        "Accept it and reassign the trip",
+        "Reject it because the guarded update finds the trip is no longer in the expected state for that driver",
+        "Accept it and cancel the other driver",
+        "Ignore it silently and leave the driver waiting"
+      ],
+      "answer": 1,
+      "why": "State transitions are conditional on current state and owner, so a stale message cannot change a trip that moved on. The driver should be told the offer is gone so their app returns to idle."
+    },
+    {
+      "q": "Why is surge computed per cell over a window and then smoothed, instead of using the raw request count each second?",
+      "options": [
+        "Averaging over a window is needed because the index only stores counts per day",
+        "Raw counts cannot be compared between cells of different sizes",
+        "Per-second ratios swing wildly and would make prices flicker",
+        "It lets the index skip TTLs"
+      ],
+      "answer": 2,
+      "why": "Short windows are noisy: one burst of requests would spike prices and then drop them seconds later. A one to two minute window with smoothing and a cap gives stable, explainable prices."
+    }
   ],
   "cheatsheet": [
-    {"term": "Geohash / H3", "def": "Ways to cut the map into cells with ids. Nearby places share a cell or neighbouring cells, so a spatial search becomes a lookup by id."},
-    {"term": "Cell ring search", "def": "Query the rider's cell, then its neighbours, then wider rings only if too few drivers are found."},
-    {"term": "Location TTL", "def": "Each driver entry expires after about 30 seconds, so silent or crashed apps drop out of the index on their own."},
-    {"term": "Ping rate maths", "def": "1M online drivers pinging every 4 s is about 250k writes/s at roughly 100 bytes each, around 25 MB/s. Rule of thumb, not a measured figure."},
-    {"term": "ETA ranking", "def": "Rank candidates by estimated drive time on roads, not straight-line distance, since rivers and one-way streets change the answer."},
-    {"term": "Trip state machine", "def": "Fixed states (REQUESTED, ACCEPTED, ARRIVED, IN_PROGRESS, COMPLETED, CANCELLED) with conditional updates so only valid moves succeed."},
-    {"term": "Driver reservation", "def": "A compare-and-set that holds one driver for one request for a short time, preventing double offers."},
-    {"term": "Surge multiplier", "def": "Fare factor from demand versus supply per cell over a sliding window, smoothed and capped to avoid flicker."}
+    {
+      "term": "Geohash / H3",
+      "def": "Ways to cut the map into cells with ids. Nearby places share a cell or neighbouring cells, so a spatial search becomes a lookup by id."
+    },
+    {
+      "term": "Cell ring search",
+      "def": "Query the rider's cell, then its neighbours, then wider rings only if too few drivers are found."
+    },
+    {
+      "term": "Location TTL (time to live)",
+      "def": "Each driver entry expires after about 30 seconds, so silent or crashed apps drop out of the index on their own."
+    },
+    {
+      "term": "Ping rate maths",
+      "def": "1M online drivers pinging every 4 s is about 250k writes/s at roughly 100 bytes each, around 25 MB/s. Rule of thumb, not a measured figure."
+    },
+    {
+      "term": "ETA ranking",
+      "def": "Rank candidates by estimated drive time on roads, not straight-line distance, since rivers and one-way streets change the answer."
+    },
+    {
+      "term": "Trip state machine",
+      "def": "Fixed states (REQUESTED, ACCEPTED, ARRIVED, IN_PROGRESS, COMPLETED, CANCELLED, EXPIRED) with conditional updates so only valid moves succeed."
+    },
+    {
+      "term": "Driver reservation",
+      "def": "A compare-and-set on the driver's availability that holds one driver for one request for a short lease, preventing double offers."
+    },
+    {
+      "term": "Surge multiplier",
+      "def": "Fare factor from demand versus supply per cell over a sliding window, smoothed and capped to avoid flicker."
+    }
   ],
   "lab": {
-    "prompt": "Design the backend for a ride-sharing service in one city of 200,000 online drivers at peak. Cover how location updates are ingested, how nearby drivers are found, how a driver is matched and a trip tracked, and how surge is priced. State your numbers and where each piece of data lives.",
+    "prompt": "Design the backend for a ride-sharing service in one city of 200,000 online drivers at peak. Cover how location updates are ingested, how nearby drivers are found, how a driver is matched and a trip tracked, and how surge is priced. State your numbers and where each piece of data lives. Assume each driver pings every 4 seconds and the city sees about 100 to 300 ride requests per second at peak.",
     "requirements": [
       "Ingest driver location updates and make them searchable within a few seconds.",
       "Return nearby free drivers for a pickup point in under 100 ms.",
@@ -92,7 +603,7 @@
       "Location writes go to an in-memory, sharded index with a TTL, not the trip database.",
       "Nearby search checks the rider's cell plus neighbouring cells.",
       "Candidates are ranked by ETA and offered one at a time with a timeout.",
-      "Reservation and state changes use conditional updates, so a second assignment fails.",
+      "Reservation is a compare-and-set on driver availability, and state changes use conditional updates, so a second assignment fails.",
       "States and transitions are listed, including cancellation.",
       "Surge is per cell, windowed, smoothed, and capped.",
       "Numbers are stated: pings per second, index size, requests per second."

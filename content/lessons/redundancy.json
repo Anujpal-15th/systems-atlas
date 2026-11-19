@@ -12,60 +12,535 @@
     "Why redundancy fails when the copies share a fate"
   ],
   "nodes": [
-    {"id": "users", "label": "Users", "kind": "user", "x": 9, "y": 50},
-    {"id": "lb", "label": "Load balancer", "kind": "lb", "x": 30, "y": 50},
-    {"id": "monitor", "label": "Health checker", "kind": "service", "x": 30, "y": 88},
-    {"id": "app-a", "label": "App server A", "kind": "server", "x": 56, "y": 22},
-    {"id": "app-b", "label": "App server B", "kind": "server", "x": 56, "y": 62},
-    {"id": "primary", "label": "DB primary", "kind": "db", "x": 85, "y": 22},
-    {"id": "standby", "label": "DB standby", "kind": "db", "x": 85, "y": 78}
+    {
+      "id": "users",
+      "label": "Users",
+      "kind": "user",
+      "x": 9,
+      "y": 50
+    },
+    {
+      "id": "lb",
+      "label": "Load balancer",
+      "kind": "lb",
+      "x": 30,
+      "y": 50
+    },
+    {
+      "id": "monitor",
+      "label": "Health checker",
+      "kind": "service",
+      "x": 30,
+      "y": 88
+    },
+    {
+      "id": "app-a",
+      "label": "App server A",
+      "kind": "server",
+      "x": 56,
+      "y": 22
+    },
+    {
+      "id": "app-b",
+      "label": "App server B",
+      "kind": "server",
+      "x": 56,
+      "y": 62
+    },
+    {
+      "id": "primary",
+      "label": "DB primary",
+      "kind": "db",
+      "x": 85,
+      "y": 22
+    },
+    {
+      "id": "standby",
+      "label": "DB standby",
+      "kind": "db",
+      "x": 85,
+      "y": 78
+    }
   ],
   "edges": [
-    {"from": "users", "to": "lb"},
-    {"from": "lb", "to": "app-a"},
-    {"from": "lb", "to": "app-b"},
-    {"from": "app-a", "to": "primary"},
-    {"from": "app-b", "to": "primary"},
-    {"from": "app-a", "to": "standby"},
-    {"from": "app-b", "to": "standby"},
-    {"from": "primary", "to": "standby"},
-    {"from": "monitor", "to": "lb"},
-    {"from": "monitor", "to": "app-a"},
-    {"from": "monitor", "to": "app-b"},
-    {"from": "monitor", "to": "standby"}
+    {
+      "from": "users",
+      "to": "lb"
+    },
+    {
+      "from": "lb",
+      "to": "app-a"
+    },
+    {
+      "from": "lb",
+      "to": "app-b"
+    },
+    {
+      "from": "app-a",
+      "to": "primary"
+    },
+    {
+      "from": "app-b",
+      "to": "primary"
+    },
+    {
+      "from": "app-a",
+      "to": "standby"
+    },
+    {
+      "from": "app-b",
+      "to": "standby"
+    },
+    {
+      "from": "primary",
+      "to": "standby"
+    },
+    {
+      "from": "monitor",
+      "to": "lb"
+    },
+    {
+      "from": "monitor",
+      "to": "app-a"
+    },
+    {
+      "from": "monitor",
+      "to": "app-b"
+    },
+    {
+      "from": "monitor",
+      "to": "standby"
+    },
+    {
+      "from": "monitor",
+      "to": "primary"
+    }
   ],
   "metrics": [
-    {"id": "avail", "label": "Availability", "unit": "%"},
-    {"id": "down", "label": "Downtime/year", "unit": "min"},
-    {"id": "failover", "label": "Failover time", "unit": "s"}
+    {
+      "id": "avail",
+      "label": "Availability",
+      "unit": "%"
+    },
+    {
+      "id": "down",
+      "label": "Downtime/year",
+      "unit": "min"
+    },
+    {
+      "id": "failover",
+      "label": "Failover time",
+      "unit": "s"
+    }
   ],
   "steps": [
-    {"tag": "QUESTION", "title": "One machine, one bad day", "body": "Picture a shop that runs on a single app server. It is a good server: it is up 99.9% of the time, which sounds great. But 0.1% of a year is about 526 minutes, nearly nine hours, when nobody can buy anything. Hardware dies, disks fill, deploys go wrong. How do you keep serving when one part breaks?", "idea": "Every machine will fail eventually; the design question is what the user sees when it does.", "caption": "One server, 99.9% available.", "focus": ["app-a"], "flows": [], "metrics": {"avail": "99.9", "down": "526"}},
-    {"tag": "CONCEPT", "title": "Find the single points of failure", "body": "A single point of failure (SPOF) is any part whose death stops the whole request. Imagine only the top path exists: load balancer, one app server, one database. They are in series, so all must work at once. Assume 99.99%, 99.9% and 99.9%. Multiply: 0.9999 x 0.999 x 0.999 is about 99.79%, roughly 1,100 minutes a year. Chaining parts makes you less reliable than your weakest part.", "idea": "In series, availabilities multiply, so the whole is always worse than its worst component.", "caption": "Three parts in a chain: every one is a SPOF.", "focus": ["lb", "app-a", "primary"], "flows": [{"from": "users", "to": "lb", "kind": "request", "label": "GET /cart"}, {"from": "lb", "to": "app-a", "kind": "request", "label": "GET /cart"}, {"from": "app-a", "to": "primary", "kind": "request", "label": "SELECT"}], "metrics": {"avail": "99.79", "down": "1103"}},
-    {"tag": "CONCEPT", "title": "Add a spare in parallel", "body": "Now add app server B behind the load balancer. The tier fails only if both servers are down at the same time. If each is down 0.1% of the time and failures are independent, both are down 0.001 x 0.001 = 0.000001 of the time, which is 99.9999% for that tier. The total improves, but the single database, at 99.9%, now dominates what is left.", "idea": "In parallel you multiply failure probabilities, which shrinks them fast, but only for the tier you duplicated.", "caption": "The load balancer now has two servers to choose from.", "focus": ["lb", "app-a", "app-b"], "flows": [{"from": "lb", "to": "app-a", "kind": "request", "label": "GET /cart"}, {"from": "lb", "to": "app-b", "kind": "request", "label": "GET /cart"}], "metrics": {"avail": "99.89", "down": "579"}},
-    {"tag": "CONCEPT", "title": "Active-active: all copies work", "body": "Here both servers take live traffic, about half each. This is active-active. You use the hardware you pay for and there is nothing to switch on when one dies; the balancer simply stops sending to it. The catch is capacity. If each server runs at 70% load, losing one pushes the survivor to 140% and it falls over too. Plan so the survivors can carry everything, often called N+1.", "idea": "Active-active needs spare capacity: after a failure, the remaining copies must absorb the whole load.", "caption": "Traffic is split across both servers.", "focus": ["lb", "app-a", "app-b"], "flows": [{"from": "users", "to": "lb", "kind": "request", "label": "100 req/s"}, {"from": "lb", "to": "app-a", "kind": "request", "label": "50 req/s"}, {"from": "lb", "to": "app-b", "kind": "request", "label": "50 req/s"}], "metrics": {}},
-    {"tag": "FLOW", "title": "Detect the failure and route around it", "body": "App server A crashes. Nothing improves until someone notices. The health checker probes each server, say every 5 seconds, and marks it unhealthy after 3 misses in a row. That is about 15 seconds when requests to A still fail. Then the balancer drops A and sends everything to B. Faster probes shorten the gap but risk false alarms from a single slow reply.", "idea": "Failover is detection plus rerouting, and detection time is downtime you must budget for.", "caption": "Probes to A fail; traffic shifts to B.", "focus": ["monitor", "lb", "app-a", "app-b"], "flows": [{"from": "monitor", "to": "app-a", "kind": "fail", "label": "probe: no reply"}, {"from": "monitor", "to": "lb", "kind": "async", "label": "A unhealthy"}, {"from": "lb", "to": "app-b", "kind": "request", "label": "all traffic"}, {"from": "app-b", "to": "lb", "kind": "response", "label": "200 OK"}], "metrics": {"failover": "15"}},
-    {"tag": "CONCEPT", "title": "Active-passive for stateful parts", "body": "A database is harder to duplicate than a stateless server, because two copies must not both accept conflicting writes. The common answer is active-passive: one primary takes writes and streams every change to a standby that only follows. Replication is often asynchronous, so the standby can lag by a few hundred milliseconds. That lag is the data you could lose in a crash.", "idea": "Active-passive keeps one writer to avoid conflicts; asynchronous replication trades a little possible data loss for speed.", "caption": "Primary streams changes to an idle standby.", "focus": ["app-a", "app-b", "primary", "standby"], "flows": [{"from": "app-a", "to": "primary", "kind": "request", "label": "INSERT order"}, {"from": "app-b", "to": "primary", "kind": "request", "label": "UPDATE cart"}, {"from": "primary", "to": "standby", "kind": "replicate", "label": "change log"}], "metrics": {}},
-    {"tag": "FLOW", "title": "Failing over the database", "body": "The primary dies. The standby sees its change stream stop and the health checker confirms it. Promoting a standby is a bigger step than rerouting a server: it must start accepting writes, and the apps must find the new primary. Expect about 30 seconds. Writes in that window fail or queue, and the last few hundred milliseconds of un-replicated changes may be lost. We now assume the standby is promoted.", "idea": "Stateful failover is slower and can lose recent writes, so measure it rather than assume it is instant.", "caption": "Standby is promoted; apps move their writes over.", "focus": ["primary", "standby", "monitor", "app-a", "app-b"], "flows": [{"from": "primary", "to": "standby", "kind": "fail", "label": "heartbeat lost"}, {"from": "monitor", "to": "standby", "kind": "handshake", "label": "promote"}, {"from": "app-a", "to": "standby", "kind": "request", "label": "writes"}, {"from": "app-b", "to": "standby", "kind": "request", "label": "writes"}], "metrics": {"failover": "30", "avail": "99.99", "down": "55"}},
-    {"tag": "WHAT IF", "title": "The spare you forgot", "body": "Look at what is still single: the load balancer, and the health checker that decides who is healthy. At 99.99% the balancer alone causes about 53 of those 55 minutes a year. Redundancy has to continue up the chain. Run two balancers sharing a floating IP address or answered by DNS or anycast, and run checkers in more than one place. Then the sum drops to about 3 minutes, mostly the database failover time.", "idea": "Every layer you forget is still a SPOF; redundancy is only as good as its least-duplicated part.", "caption": "The load balancer is the next single point of failure.", "focus": ["users", "lb", "monitor"], "flows": [{"from": "users", "to": "lb", "kind": "fail", "label": "LB down"}], "metrics": {"avail": "99.9994", "down": "3"}},
-    {"tag": "WHAT IF", "title": "When copies share a fate", "body": "The parallel math assumed independent failures. Suppose both servers sit on one rack, share one power feed, and just received the same buggy release. One cause now kills both at once and the probability multiplication no longer applies. Spread copies across separate racks and availability zones, stagger deploys, and let a canary take a new version first.", "idea": "Redundancy only helps when failures are independent; correlated failures make two copies behave like one.", "caption": "One shared cause takes down both servers.", "focus": ["lb", "app-a", "app-b"], "flows": [{"from": "lb", "to": "app-a", "kind": "fail", "label": "bad release"}, {"from": "lb", "to": "app-b", "kind": "fail", "label": "bad release"}], "metrics": {"avail": "99.9", "down": "526"}},
-    {"tag": "RECAP", "title": "Spare parts, honestly counted", "body": "Remove SPOFs layer by layer: servers, database, balancer, even the checker. Series multiplies availability down, parallel multiplies failure odds down. Choose active-active for stateless tiers and active-passive for stateful ones. Count detection and promotion time as downtime, keep spare capacity, and spread copies so one cause cannot hit them all. Multi-region setups extend the same ideas in a later lesson.", "idea": "Remove SPOFs in every layer, keep failures independent, and budget for the failover itself.", "caption": "Redundant at every layer, spread across failure domains.", "focus": ["users", "lb", "monitor", "app-a", "app-b", "primary", "standby"], "flows": [], "metrics": {"avail": "99.9994", "down": "3", "failover": "30"}}
+    {
+      "tag": "QUESTION",
+      "title": "One machine, one bad day",
+      "body": "Picture a shop that runs on a single app server. It is a good server: it is up 99.9% of the time (\"three nines\"; each extra nine cuts allowed downtime tenfold), which sounds great. But 0.1% of a year is about 526 minutes, nearly nine hours, when nobody can buy anything. Hardware dies, disks fill, deploys go wrong. How do you keep serving when one part breaks?",
+      "idea": "Every machine will fail eventually; the design question is what the user sees when it does.",
+      "caption": "One server, 99.9% available.",
+      "focus": [
+        "app-a"
+      ],
+      "flows": [],
+      "metrics": {
+        "avail": "99.9",
+        "down": "526"
+      }
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "Find the single points of failure",
+      "body": "A single point of failure (SPOF) is any part whose death stops the whole request. Imagine only the top path exists: load balancer, one app server, one database. They are in series, so all must work at once. Assume 99.99%, 99.9% and 99.9%. Multiply: 0.9999 x 0.999 x 0.999 is about 99.79%, roughly 1,100 minutes a year. Chaining parts makes you less reliable than your weakest part.",
+      "idea": "In series, availabilities multiply, so the whole is always worse than its worst component.",
+      "caption": "Three parts in a chain: every one is a SPOF.",
+      "focus": [
+        "lb",
+        "app-a",
+        "primary"
+      ],
+      "flows": [
+        {
+          "from": "users",
+          "to": "lb",
+          "kind": "request",
+          "label": "GET /cart"
+        },
+        {
+          "from": "lb",
+          "to": "app-a",
+          "kind": "request",
+          "label": "GET /cart"
+        },
+        {
+          "from": "app-a",
+          "to": "primary",
+          "kind": "request",
+          "label": "SELECT"
+        }
+      ],
+      "metrics": {
+        "avail": "99.79",
+        "down": "1103"
+      }
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "Add a spare in parallel",
+      "body": "Now add app server B behind the load balancer. The tier fails only if both servers are down at the same time. If each is down 0.1% of the time and failures are independent, both are down 0.001 x 0.001 = 0.000001 of the time, which is 99.9999% for that tier. The total improves, but the single database, at 99.9%, now dominates what is left.",
+      "idea": "In parallel you multiply failure probabilities, which shrinks them fast, but only for the tier you duplicated.",
+      "caption": "The load balancer now has two servers to choose from.",
+      "focus": [
+        "lb",
+        "app-a",
+        "app-b"
+      ],
+      "flows": [
+        {
+          "from": "lb",
+          "to": "app-a",
+          "kind": "request",
+          "label": "GET /cart"
+        },
+        {
+          "from": "lb",
+          "to": "app-b",
+          "kind": "request",
+          "label": "GET /cart"
+        }
+      ],
+      "metrics": {
+        "avail": "99.89",
+        "down": "579"
+      }
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "Active-active: all copies work",
+      "body": "Here both servers take live traffic, about half each. This is active-active. There is nothing to switch on when one dies; the balancer simply stops sending to it. The catch is capacity. If each server runs at 70% load, losing one pushes the survivor to 140% and it falls over too. With two servers each must stay under about 50% load; with four, each can run at 75% and survive losing one. Plan so survivors can carry everything, often called N+1.",
+      "idea": "Active-active needs spare capacity: after a failure, the remaining copies must absorb the whole load.",
+      "caption": "Traffic is split across both servers.",
+      "focus": [
+        "lb",
+        "app-a",
+        "app-b"
+      ],
+      "flows": [
+        {
+          "from": "users",
+          "to": "lb",
+          "kind": "request",
+          "label": "100 req/s"
+        },
+        {
+          "from": "lb",
+          "to": "app-a",
+          "kind": "request",
+          "label": "50 req/s"
+        },
+        {
+          "from": "lb",
+          "to": "app-b",
+          "kind": "request",
+          "label": "50 req/s"
+        }
+      ],
+      "metrics": {}
+    },
+    {
+      "tag": "FLOW",
+      "title": "Detect the failure and route around it",
+      "body": "App server A crashes. Nothing improves until someone notices. The health checker probes each server, say every 5 seconds, and marks it unhealthy after 3 misses in a row. That is about 15 seconds when requests to A still fail. Then the balancer drops A and sends everything to B. Faster probes shorten the gap but risk false alarms from a single slow reply.",
+      "idea": "Failover is detection plus rerouting, and detection time is downtime you must budget for.",
+      "caption": "Probes to A fail; traffic shifts to B.",
+      "focus": [
+        "monitor",
+        "lb",
+        "app-a",
+        "app-b"
+      ],
+      "flows": [
+        {
+          "from": "monitor",
+          "to": "app-a",
+          "kind": "fail",
+          "label": "probe: no reply"
+        },
+        {
+          "from": "monitor",
+          "to": "lb",
+          "kind": "async",
+          "label": "A unhealthy"
+        },
+        {
+          "from": "lb",
+          "to": "app-b",
+          "kind": "request",
+          "label": "all traffic"
+        },
+        {
+          "from": "app-b",
+          "to": "lb",
+          "kind": "response",
+          "label": "200 OK"
+        }
+      ],
+      "metrics": {
+        "failover": "15"
+      }
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "Active-passive for stateful parts",
+      "body": "A database is harder to duplicate than a stateless server, because two copies must not both accept conflicting writes. The common answer is active-passive: one primary takes writes and streams every change to a standby that only follows. Replication is often asynchronous, so the standby can lag by milliseconds to seconds. That lag is the data you could lose in a crash.",
+      "idea": "Active-passive keeps one writer to avoid conflicts; asynchronous replication trades a little possible data loss for speed.",
+      "caption": "Primary streams changes to an idle standby.",
+      "focus": [
+        "app-a",
+        "app-b",
+        "primary",
+        "standby"
+      ],
+      "flows": [
+        {
+          "from": "app-a",
+          "to": "primary",
+          "kind": "request",
+          "label": "INSERT order"
+        },
+        {
+          "from": "app-b",
+          "to": "primary",
+          "kind": "request",
+          "label": "UPDATE cart"
+        },
+        {
+          "from": "primary",
+          "to": "standby",
+          "kind": "replicate",
+          "label": "change log"
+        }
+      ],
+      "metrics": {}
+    },
+    {
+      "tag": "FLOW",
+      "title": "Failing over the database",
+      "body": "The primary dies. The standby sees its change stream stop and the health checker probes the primary to confirm. Before promoting, the old primary must be fenced off (cut off from storage or the network), or a half-alive primary and the new one will both accept writes, a failure called split-brain. Then the standby starts accepting writes and the apps find it. Say about 30 seconds; real systems range from seconds to a couple of minutes. Writes in that window fail or queue, and un-replicated changes may be lost. We now assume the standby is promoted.",
+      "idea": "Stateful failover is slower and can lose recent writes, so measure it rather than assume it is instant.",
+      "caption": "Standby is promoted; apps move their writes over.",
+      "focus": [
+        "primary",
+        "standby",
+        "monitor",
+        "app-a",
+        "app-b"
+      ],
+      "flows": [
+        {
+          "from": "primary",
+          "to": "standby",
+          "kind": "fail",
+          "label": "heartbeat lost"
+        },
+        {
+          "from": "monitor",
+          "to": "primary",
+          "kind": "fail",
+          "label": "probe: no reply"
+        },
+        {
+          "from": "monitor",
+          "to": "standby",
+          "kind": "handshake",
+          "label": "promote"
+        },
+        {
+          "from": "app-a",
+          "to": "standby",
+          "kind": "request",
+          "label": "writes"
+        },
+        {
+          "from": "app-b",
+          "to": "standby",
+          "kind": "request",
+          "label": "writes"
+        }
+      ],
+      "metrics": {
+        "failover": "30",
+        "avail": "99.99",
+        "down": "55"
+      }
+    },
+    {
+      "tag": "WHAT IF",
+      "title": "The spare you forgot",
+      "body": "Look at what is still single: the load balancer, and the health checker that decides who is healthy. At 99.99% the balancer alone causes about 53 of those 55 minutes a year. Run two balancers sharing a floating IP (an address that moves to the survivor), or use DNS (answers can be cached for minutes) or anycast (many sites announce one address and the network sends users to a live one), plus checkers in several places. The overlap math then leaves about 1 minute a year. Failovers add more: assume 4 database failovers a year at 30 seconds, 2 minutes, so about 3 minutes in total, mostly failover time.",
+      "idea": "Every layer you forget is still a SPOF; redundancy is only as good as its least-duplicated part.",
+      "caption": "Add a second balancer and checker to remove the last SPOFs (not drawn).",
+      "focus": [
+        "users",
+        "lb",
+        "monitor"
+      ],
+      "flows": [
+        {
+          "from": "users",
+          "to": "lb",
+          "kind": "fail",
+          "label": "LB down"
+        }
+      ],
+      "metrics": {
+        "avail": "99.9994",
+        "down": "3"
+      }
+    },
+    {
+      "tag": "WHAT IF",
+      "title": "When copies share a fate",
+      "body": "The parallel math assumed independent failures. Suppose both servers sit on one rack, share one power feed, and just received the same buggy release. One cause now kills both at once and the probability multiplication no longer applies. Spread copies across separate racks and availability zones (isolated data-centre groups within a region), stagger deploys, and let a canary (a small first slice of traffic) take a new version first.",
+      "idea": "Redundancy only helps when failures are independent; correlated failures make two copies behave like one.",
+      "caption": "One shared cause takes down both servers.",
+      "focus": [
+        "lb",
+        "app-a",
+        "app-b"
+      ],
+      "flows": [
+        {
+          "from": "monitor",
+          "to": "app-a",
+          "kind": "fail",
+          "label": "probe: no reply"
+        },
+        {
+          "from": "monitor",
+          "to": "app-b",
+          "kind": "fail",
+          "label": "probe: no reply"
+        }
+      ],
+      "metrics": {
+        "avail": "99.9",
+        "down": "526"
+      }
+    },
+    {
+      "tag": "RECAP",
+      "title": "Spare parts, honestly counted",
+      "body": "Remove SPOFs layer by layer: servers, database, balancer, even the checker. Series multiplies availability down, parallel multiplies failure odds down. Stateless tiers are easy to run active-active; stateful ones usually use one writer with a standby, unless the datastore is built for multiple writers. Count detection and promotion time as downtime, keep spare capacity, and spread copies so one cause cannot hit them all. Multi-region setups extend the same ideas in a later lesson.",
+      "idea": "Remove SPOFs in every layer, keep failures independent, and budget for the failover itself.",
+      "caption": "Redundant at every layer, spread across failure domains.",
+      "focus": [
+        "users",
+        "lb",
+        "monitor",
+        "app-a",
+        "app-b",
+        "primary",
+        "standby"
+      ],
+      "flows": [],
+      "metrics": {
+        "avail": "99.9994",
+        "down": "3",
+        "failover": "30"
+      }
+    }
   ],
   "quiz": [
-    {"q": "A request needs service X and service Y in series. Each is 99% available and they fail independently. Roughly what is the combined availability?", "options": ["99.99%", "99%", "98%", "100%"], "answer": 2, "why": "In series you multiply: 0.99 x 0.99 = 0.9801, about 98%. The chain is worse than either part alone."},
-    {"q": "Two identical servers, each 99% available and failing independently, sit in parallel behind a perfect balancer. What is the best estimate for the pair?", "options": ["99.99%", "99%", "98%", "99.5%"], "answer": 0, "why": "The pair is down only when both are down: 0.01 x 0.01 = 0.0001, so 99.99%. This holds only if failures are truly independent."},
-    {"q": "Two active-active servers each run at 65% of capacity. One crashes. What most likely happens?", "options": ["Nothing, since the other server was healthy", "The survivor needs about 130% of capacity and overloads", "The load balancer adds a server automatically", "Latency halves because there is less to coordinate"], "answer": 1, "why": "The survivor inherits all the traffic, 65% + 65% = 130% of one server. Active-active needs headroom so survivors can carry the full load."},
-    {"q": "Why can promoting a database standby lose data even though it worked as designed?", "options": ["Standbys cannot store writes", "Asynchronous replication may not have delivered the primary's last few changes", "Promotion always wipes the new primary", "The load balancer drops write requests"], "answer": 1, "why": "With asynchronous replication the primary acknowledges writes before the standby has them, so a crash can lose the lag window. Synchronous replication avoids that at the cost of slower writes."},
-    {"q": "You run two app servers in the same rack, deploying the same new build to both at once. Why is your 'parallel' math misleading?", "options": ["Two servers never beat one", "The failures are correlated, so one cause can take both down together", "Racks do not support load balancing", "The math only works for databases"], "answer": 1, "why": "Multiplying failure probabilities requires independence. A shared rack, power feed or bad release breaks that assumption, so the pair acts like one."}
+    {
+      "q": "A request needs service X and service Y in series. Each is 99% available and they fail independently. Roughly what is the combined availability?",
+      "options": [
+        "99.99%",
+        "99%",
+        "98%",
+        "100%"
+      ],
+      "answer": 2,
+      "why": "In series you multiply: 0.99 x 0.99 = 0.9801, about 98%. The chain is worse than either part alone."
+    },
+    {
+      "q": "Two identical servers, each 99% available and failing independently, sit in parallel behind a perfect balancer. What is the best estimate for the pair?",
+      "options": [
+        "99.99%",
+        "99%",
+        "98%",
+        "99.5%"
+      ],
+      "answer": 0,
+      "why": "The pair is down only when both are down: 0.01 x 0.01 = 0.0001, so 99.99%. This holds only if failures are truly independent."
+    },
+    {
+      "q": "Two active-active servers each run at 65% of capacity. One crashes. What most likely happens?",
+      "options": [
+        "Nothing, since the other server was healthy",
+        "The survivor needs about 130% of capacity and overloads",
+        "The load balancer adds a server automatically",
+        "Latency halves because there is less to coordinate"
+      ],
+      "answer": 1,
+      "why": "The survivor inherits all the traffic, 65% + 65% = 130% of one server. Active-active needs headroom so survivors can carry the full load."
+    },
+    {
+      "q": "Why can promoting a database standby lose data even though it worked as designed?",
+      "options": [
+        "Standbys cannot store writes",
+        "The load balancer drops write requests",
+        "Promotion always wipes the new primary",
+        "Asynchronous replication may not have delivered the primary's last few changes"
+      ],
+      "answer": 3,
+      "why": "With asynchronous replication the primary acknowledges writes before the standby has them, so a crash can lose the lag window. Synchronous replication avoids that at the cost of slower writes."
+    },
+    {
+      "q": "You run two app servers in the same rack, deploying the same new build to both at once. Why is your 'parallel' math misleading?",
+      "options": [
+        "Two servers never beat one",
+        "The failures are correlated, so one cause can take both down together",
+        "Racks do not support load balancing",
+        "The math only works for databases"
+      ],
+      "answer": 1,
+      "why": "Multiplying failure probabilities requires independence. A shared rack, power feed or bad release breaks that assumption, so the pair acts like one."
+    }
   ],
   "cheatsheet": [
-    {"term": "SPOF", "def": "Single point of failure: any component whose failure stops the whole service because nothing can replace it."},
-    {"term": "Series availability", "def": "When every part must work, multiply availabilities. 0.999 x 0.999 = 0.998. Each extra dependency lowers the total."},
-    {"term": "Parallel availability", "def": "When any one copy suffices, multiply failure rates: 1 - (1 - a)^n. Two 99% copies give 99.99% if failures are independent."},
-    {"term": "Nines", "def": "99.9% allows about 526 min/year of downtime; 99.99% about 53 min; 99.999% about 5 min."},
-    {"term": "Active-active", "def": "All copies serve traffic at once. Failover is just removal from rotation, but spare capacity (N+1) is needed."},
-    {"term": "Active-passive", "def": "One copy serves while a standby follows. Suits stateful systems with a single writer; failover needs a promotion step."},
-    {"term": "Health check", "def": "A probe such as an HTTP /health call every few seconds. Detection time is roughly interval x failures to mark unhealthy."},
-    {"term": "Failure domain", "def": "A group that can fail together (rack, power feed, zone, release). Spread copies across domains so failures stay independent."}
+    {
+      "term": "SPOF",
+      "def": "Single point of failure: any component whose failure stops the whole service because nothing can replace it."
+    },
+    {
+      "term": "Series vs parallel",
+      "def": "Series (all parts must work): multiply availabilities, 0.999 x 0.999 = 0.998. Parallel (any one suffices): 1 - (1 - a)^n, so two 99% copies give 99.99% if independent."
+    },
+    {
+      "term": "Split-brain",
+      "def": "Two nodes both believe they are the primary and accept conflicting writes. Prevent it with fencing of the old primary and a quorum or consensus vote before promotion."
+    },
+    {
+      "term": "Nines",
+      "def": "99.9% allows about 526 min/year of downtime; 99.99% about 53 min; 99.999% about 5 min."
+    },
+    {
+      "term": "Active-active",
+      "def": "All copies serve traffic at once. Failover is just removal from rotation, but spare capacity (N+1) is needed."
+    },
+    {
+      "term": "Active-passive",
+      "def": "One copy serves while a standby follows. Suits stateful systems with a single writer; failover needs a promotion step."
+    },
+    {
+      "term": "Health check",
+      "def": "A probe such as an HTTP /health call every few seconds. Detection time is roughly interval x failures to mark unhealthy."
+    },
+    {
+      "term": "Failure domain",
+      "def": "A group that can fail together (rack, power feed, zone, release). Spread copies across domains so failures stay independent."
+    }
   ]
 }

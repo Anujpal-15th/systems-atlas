@@ -8,65 +8,624 @@
     "Why chat uses long-lived WebSocket connections and how a gateway tier scales them",
     "How a message is stored first, then routed to the recipient's gateway",
     "How sent, delivered and read receipts flow back as ordinary messages",
-    "How group fan-out cost grows with group size, and how presence stays cheap",
+    "How group fan-out cost grows with group size, and how presence stays affordable with batched heartbeats",
     "How an offline user catches up using a per-conversation sequence number"
   ],
   "nodes": [
-    {"id": "alice", "label": "Alice's phone", "kind": "client", "x": 9, "y": 28},
-    {"id": "gw1", "label": "WS gateway A", "kind": "gateway", "x": 31, "y": 28},
-    {"id": "chat", "label": "Chat service", "kind": "service", "x": 54, "y": 28},
-    {"id": "store", "label": "Message store", "kind": "db", "x": 80, "y": 12},
-    {"id": "presence", "label": "Presence + routes", "kind": "cache", "x": 80, "y": 44},
-    {"id": "bus", "label": "Delivery queue", "kind": "queue", "x": 54, "y": 62},
-    {"id": "push", "label": "Push (APNs/FCM)", "kind": "external", "x": 80, "y": 84},
-    {"id": "gw2", "label": "WS gateway B", "kind": "gateway", "x": 31, "y": 72},
-    {"id": "bob", "label": "Bob's phone", "kind": "client", "x": 9, "y": 72}
+    {
+      "id": "alice",
+      "label": "Alice's phone",
+      "kind": "client",
+      "x": 9,
+      "y": 28
+    },
+    {
+      "id": "gw1",
+      "label": "WS gateway A",
+      "kind": "gateway",
+      "x": 31,
+      "y": 28
+    },
+    {
+      "id": "chat",
+      "label": "Chat service",
+      "kind": "service",
+      "x": 54,
+      "y": 28
+    },
+    {
+      "id": "store",
+      "label": "Message store",
+      "kind": "db",
+      "x": 80,
+      "y": 12
+    },
+    {
+      "id": "presence",
+      "label": "Presence + routes",
+      "kind": "cache",
+      "x": 80,
+      "y": 44
+    },
+    {
+      "id": "bus",
+      "label": "Delivery queue",
+      "kind": "queue",
+      "x": 54,
+      "y": 62
+    },
+    {
+      "id": "push",
+      "label": "Push (APNs/FCM)",
+      "kind": "external",
+      "x": 80,
+      "y": 84
+    },
+    {
+      "id": "gw2",
+      "label": "WS gateway B",
+      "kind": "gateway",
+      "x": 31,
+      "y": 72
+    },
+    {
+      "id": "bob",
+      "label": "Bob's phone",
+      "kind": "client",
+      "x": 9,
+      "y": 72
+    }
   ],
   "edges": [
-    {"from": "alice", "to": "gw1"},
-    {"from": "gw1", "to": "chat"},
-    {"from": "chat", "to": "store"},
-    {"from": "chat", "to": "presence"},
-    {"from": "chat", "to": "bus"},
-    {"from": "bus", "to": "gw2"},
-    {"from": "gw2", "to": "bob"},
-    {"from": "gw2", "to": "chat"},
-    {"from": "chat", "to": "push"}
+    {
+      "from": "alice",
+      "to": "gw1"
+    },
+    {
+      "from": "gw1",
+      "to": "chat"
+    },
+    {
+      "from": "chat",
+      "to": "store"
+    },
+    {
+      "from": "chat",
+      "to": "presence"
+    },
+    {
+      "from": "chat",
+      "to": "bus"
+    },
+    {
+      "from": "bus",
+      "to": "gw2"
+    },
+    {
+      "from": "gw2",
+      "to": "bob"
+    },
+    {
+      "from": "gw2",
+      "to": "chat"
+    },
+    {
+      "from": "chat",
+      "to": "push"
+    }
   ],
   "metrics": [
-    {"id": "rate", "label": "Msgs/sec", "unit": "/s"},
-    {"id": "gateways", "label": "Gateways", "unit": ""},
-    {"id": "ack", "label": "Send ack", "unit": "ms"},
-    {"id": "deliv", "label": "Deliveries", "unit": "per msg"}
+    {
+      "id": "rate",
+      "label": "Msgs/sec",
+      "unit": "/s"
+    },
+    {
+      "id": "gateways",
+      "label": "Gateways",
+      "unit": ""
+    },
+    {
+      "id": "ack",
+      "label": "Send ack",
+      "unit": "ms"
+    },
+    {
+      "id": "deliv",
+      "label": "Deliveries",
+      "unit": "per msg"
+    }
   ],
   "steps": [
-    {"tag": "QUESTION", "title": "Alice texts Bob", "body": "Alice types hi and presses send. Within a fraction of a second Bob's phone should buzz, Alice should see a tick, and nothing may be lost even if Bob's phone is off. A web page can only ask the server questions, so how does the server push a message to Bob the moment it arrives? Assume 100 million daily users sending about 40 messages each.", "idea": "Chat needs server-initiated delivery, durability, and ordering, all at once.", "caption": "Two phones, and a message that must cross the system.", "focus": ["alice", "bob"], "flows": [], "metrics": {"rate": "46000"}},
-    {"tag": "CONNECT", "title": "Keep a socket open", "body": "Polling every second wastes millions of empty requests. Instead each app opens a WebSocket: an ordinary HTTP request upgraded into a long-lived two-way channel. A gateway holds it and records in a fast store that Alice is reachable through gateway A. With about 20 million users online and roughly 100,000 sockets per gateway, you need around 200 gateways.", "idea": "Gateways only hold connections; a route table says which gateway holds which user.", "caption": "Socket opens and the route is recorded.", "focus": ["alice", "gw1", "chat", "presence"], "flows": [{"from": "alice", "to": "gw1", "kind": "handshake", "label": "HTTP Upgrade"}, {"from": "gw1", "to": "alice", "kind": "handshake", "label": "101 Switching"}, {"from": "gw1", "to": "chat", "kind": "async", "label": "user online"}, {"from": "chat", "to": "presence", "kind": "request", "label": "alice -> gwA"}], "metrics": {"gateways": "200"}},
-    {"tag": "SEND", "title": "Store first, then ack", "body": "Alice's app sends the message with a client-generated ID over the socket. The chat service assigns the next sequence number for that conversation and writes the message durably before replying. Only then does Alice see the single tick. Because the ID is unique, a retry after a dropped connection is detected and not stored twice.", "idea": "Persist before acknowledging, and use a message ID so retries are safe.", "caption": "Message saved, then Alice gets a sent tick.", "focus": ["alice", "gw1", "chat", "store"], "flows": [{"from": "alice", "to": "gw1", "kind": "request", "label": "msg id=m1"}, {"from": "gw1", "to": "chat", "kind": "request", "label": "msg id=m1"}, {"from": "chat", "to": "store", "kind": "request", "label": "append seq=4021"}, {"from": "store", "to": "chat", "kind": "response", "label": "committed"}, {"from": "chat", "to": "gw1", "kind": "response", "label": "ack seq=4021"}, {"from": "gw1", "to": "alice", "kind": "response", "label": "sent tick"}], "metrics": {"ack": "60"}},
-    {"tag": "ROUTE", "title": "Find Bob and deliver", "body": "The chat service looks up Bob in the route table and finds he is on gateway B. It places the message on a queue for that gateway, which pushes it down Bob's socket. Gateways never talk to each other directly, so any gateway can be added, removed or restarted without the others knowing. Delivery is at-least-once, so Bob's app drops duplicates by message ID.", "idea": "The route table plus a queue lets any server reach any connected user.", "caption": "Message routed to Bob's gateway and socket.", "focus": ["chat", "presence", "bus", "gw2", "bob"], "flows": [{"from": "chat", "to": "presence", "kind": "request", "label": "where is bob?"}, {"from": "presence", "to": "chat", "kind": "response", "label": "gateway B"}, {"from": "chat", "to": "bus", "kind": "async", "label": "m1 for gwB"}, {"from": "bus", "to": "gw2", "kind": "async", "label": "m1"}, {"from": "gw2", "to": "bob", "kind": "request", "label": "m1 seq=4021"}], "metrics": {"deliv": "1"}},
-    {"tag": "RECEIPTS", "title": "Delivered and read", "body": "When Bob's phone receives the message it sends a tiny delivered receipt back; later, when he opens the chat, a read receipt. Receipts are just small messages routed the same way in reverse, referencing a sequence number. A single read receipt can mean everything up to seq 4021 was read, which keeps traffic small.", "idea": "Receipts are ordinary messages, and a cursor (up to seq N) is cheaper than one receipt per message.", "caption": "Receipt travels back to Alice as a double tick.", "focus": ["bob", "gw2", "chat", "gw1", "alice"], "flows": [{"from": "bob", "to": "gw2", "kind": "response", "label": "delivered 4021"}, {"from": "gw2", "to": "chat", "kind": "async", "label": "receipt"}, {"from": "chat", "to": "gw1", "kind": "async", "label": "receipt"}, {"from": "gw1", "to": "alice", "kind": "response", "label": "double tick"}], "metrics": {}},
-    {"tag": "GROUP", "title": "One message, many inboxes", "body": "In a group of 500 people, one message must reach 499 others. The simplest design stores the message once under the group and fans out a small pointer to each member's gateway through the queue. Storage cost stays flat, but delivery work grows with group size. That is why apps cap group sizes, and very large broadcast channels use a different pull-based design.", "idea": "Store once, deliver many: fan-out cost scales with members, not with storage.", "caption": "One stored message becomes hundreds of deliveries.", "focus": ["chat", "store", "bus", "gw2"], "flows": [{"from": "chat", "to": "store", "kind": "request", "label": "1 copy"}, {"from": "chat", "to": "bus", "kind": "async", "label": "fan out x499"}, {"from": "bus", "to": "gw2", "kind": "async", "label": "batch per gateway"}], "metrics": {"deliv": "499"}},
-    {"tag": "OFFLINE", "title": "Bob's phone is off", "body": "Now Bob has no socket, so the route table has no entry for him. The message is already stored, so nothing is lost. The chat service asks the push provider to send a notification that wakes his phone. The push carries little or no content; it only says there is something new. Push is best effort and may be delayed or dropped.", "idea": "The stored message is the truth; push is only a nudge to come and get it.", "caption": "No route found, so a push nudge goes out.", "focus": ["chat", "presence", "push"], "flows": [{"from": "chat", "to": "presence", "kind": "request", "label": "where is bob?"}, {"from": "presence", "to": "chat", "kind": "fail", "label": "not online"}, {"from": "chat", "to": "push", "kind": "async", "label": "wake bob"}], "metrics": {"deliv": "0"}},
-    {"tag": "SYNC", "title": "Catch up on reconnect", "body": "Bob turns his phone on. It reconnects and sends the last sequence number it holds for each chat, say 4020. The server reads everything after that from the store and sends it in order. Sequence numbers make catch-up exact: no guessing from timestamps, which clocks can disagree on. The same path repairs any gap caused by a dropped delivery.", "idea": "Clients ask for everything after seq N, which makes sync idempotent and gap-free.", "caption": "Bob pulls messages after his last known seq.", "focus": ["bob", "gw2", "chat", "store"], "flows": [{"from": "bob", "to": "gw2", "kind": "request", "label": "sync after 4020"}, {"from": "gw2", "to": "chat", "kind": "request", "label": "sync after 4020"}, {"from": "chat", "to": "store", "kind": "request", "label": "range read"}, {"from": "store", "to": "chat", "kind": "response", "label": "seq 4021-4030"}, {"from": "chat", "to": "gw2", "kind": "response", "label": "10 messages"}, {"from": "gw2", "to": "bob", "kind": "response", "label": "10 messages"}], "metrics": {"deliv": "10"}},
-    {"tag": "TRADE-OFF", "title": "Presence without a storm", "body": "The green dot means a user is online. Each app sends a heartbeat every 30 seconds, and the route entry expires if two are missed, so crashes clean themselves up. Broadcasting every change to all contacts would explode: someone with 500 friends flapping online and offline creates 500 updates each time. So presence is fetched lazily, only for the chats currently on screen.", "idea": "Treat presence as soft, expiring state and publish it only to people looking.", "caption": "Heartbeats refresh a short-lived presence entry.", "focus": ["bob", "gw2", "chat", "presence"], "flows": [{"from": "bob", "to": "gw2", "kind": "async", "label": "heartbeat 30s"}, {"from": "gw2", "to": "chat", "kind": "async", "label": "alive"}, {"from": "chat", "to": "presence", "kind": "request", "label": "SET ttl=70s"}], "metrics": {"rate": "46000"}},
-    {"tag": "RECAP", "title": "The whole path", "body": "Persistent sockets on a gateway tier carry messages. The chat service stores each message with a sequence number, acks the sender, looks up the recipient's gateway, and delivers through a queue. Receipts flow back the same way, groups fan out from one stored copy, offline users get a push nudge and then sync by sequence number, and presence is a cheap expiring flag.", "idea": "Store first, route by lookup, and let sequence numbers repair every gap.", "caption": "Every component and its job in one picture.", "focus": ["alice", "gw1", "chat", "store", "presence", "bus", "push", "gw2", "bob"], "flows": [], "metrics": {"rate": "46000", "gateways": "200", "ack": "60", "deliv": "1"}}
+    {
+      "tag": "QUESTION",
+      "title": "Alice texts Bob",
+      "body": "Alice types hi and presses send. Within a fraction of a second Bob's phone should buzz, Alice should see a tick, and nothing may be lost even if Bob's phone is off. Plain HTTP lets only the client start a request, so the server cannot speak first. How does it push a message to Bob the moment it arrives? Assume 100 million daily users sending about 40 messages each.",
+      "idea": "Chat needs server-initiated delivery, durability, and ordering, all at once.",
+      "caption": "Two phones, and a message that must cross the system.",
+      "focus": [
+        "alice",
+        "bob"
+      ],
+      "flows": [],
+      "metrics": {
+        "rate": "46000"
+      }
+    },
+    {
+      "tag": "CONNECT",
+      "title": "Keep a socket open",
+      "body": "Polling every second wastes millions of empty requests. Instead each app opens a WebSocket: an ordinary HTTP request upgraded into a long-lived two-way channel. A gateway holds it and records in a fast store that Alice is reachable through gateway A. With about 20 million users online and roughly 100,000 sockets per gateway, you need around 200 gateways. If a gateway dies, its 100,000 clients reconnect to other gateways with randomized backoff so they do not all return at once, and its stale routes expire on their own. Keep spare capacity beyond 200.",
+      "idea": "Gateways only hold connections; a route table says which gateway holds which user.",
+      "caption": "Socket opens and the route is recorded.",
+      "focus": [
+        "alice",
+        "gw1",
+        "chat",
+        "presence"
+      ],
+      "flows": [
+        {
+          "from": "alice",
+          "to": "gw1",
+          "kind": "handshake",
+          "label": "HTTP Upgrade"
+        },
+        {
+          "from": "gw1",
+          "to": "alice",
+          "kind": "handshake",
+          "label": "101 Switching"
+        },
+        {
+          "from": "gw1",
+          "to": "chat",
+          "kind": "async",
+          "label": "user online"
+        },
+        {
+          "from": "chat",
+          "to": "presence",
+          "kind": "request",
+          "label": "alice -> gwA"
+        }
+      ],
+      "metrics": {
+        "gateways": "200"
+      }
+    },
+    {
+      "tag": "SEND",
+      "title": "Store first, then ack",
+      "body": "Alice's app sends the message with a client-generated ID over the socket. The chat service assigns the next sequence number for that conversation and writes the message durably before replying. Only then does Alice see the single tick. The server remembers each ID, so a retry after a dropped connection returns the original ack instead of storing a second copy.",
+      "idea": "Persist before acknowledging, and use a message ID so retries are safe.",
+      "caption": "Message saved, then Alice gets a sent tick.",
+      "focus": [
+        "alice",
+        "gw1",
+        "chat",
+        "store"
+      ],
+      "flows": [
+        {
+          "from": "alice",
+          "to": "gw1",
+          "kind": "request",
+          "label": "msg id=m1"
+        },
+        {
+          "from": "gw1",
+          "to": "chat",
+          "kind": "request",
+          "label": "msg id=m1"
+        },
+        {
+          "from": "chat",
+          "to": "store",
+          "kind": "request",
+          "label": "append seq=4021"
+        },
+        {
+          "from": "store",
+          "to": "chat",
+          "kind": "response",
+          "label": "committed"
+        },
+        {
+          "from": "chat",
+          "to": "gw1",
+          "kind": "response",
+          "label": "ack seq=4021"
+        },
+        {
+          "from": "gw1",
+          "to": "alice",
+          "kind": "response",
+          "label": "sent tick"
+        }
+      ],
+      "metrics": {
+        "ack": "60"
+      }
+    },
+    {
+      "tag": "STORAGE",
+      "title": "Where messages live",
+      "body": "At 46,000 messages a second, one database server cannot take the writes, so the store is sharded. Partition by conversation ID and order rows by sequence number, so one chat's history is a single range read. This suits a wide-column or key-value store built for heavy appends. Because a conversation lives on one shard, that shard hands out sequence numbers one at a time, so 4021 is never issued twice. At about 100 bytes per message, 4 billion messages a day is roughly 400 GB a day before replication, so plan retention and archiving.",
+      "idea": "Partition by conversation, order by seq: one shard owns each chat's counter and its history.",
+      "caption": "Store is sharded by conversation, rows ordered by seq.",
+      "focus": [
+        "chat",
+        "store"
+      ],
+      "flows": [
+        {
+          "from": "chat",
+          "to": "store",
+          "kind": "request",
+          "label": "write by conv id"
+        },
+        {
+          "from": "store",
+          "to": "chat",
+          "kind": "response",
+          "label": "seq 4021"
+        }
+      ],
+      "metrics": {}
+    },
+    {
+      "tag": "ROUTE",
+      "title": "Deliver, then receipts",
+      "body": "The chat service looks up Bob in the route table, finds gateway B, and queues the message for it; the gateway pushes it down his socket. Delivery is at-least-once, so Bob's app drops duplicates by message ID. His phone then sends a delivered receipt, and later a read receipt: small messages the chat service sends back to Alice's gateway, found with the same route lookup. One read receipt can cover everything up to seq 4021.",
+      "idea": "A route lookup plus a queue reaches any user, and receipts are small cursor messages (up to seq N) sent back the same way.",
+      "caption": "Message reaches Bob, receipts return as ticks.",
+      "focus": [
+        "chat",
+        "presence",
+        "bus",
+        "gw2",
+        "bob",
+        "gw1",
+        "alice"
+      ],
+      "flows": [
+        {
+          "from": "chat",
+          "to": "presence",
+          "kind": "request",
+          "label": "where is bob?"
+        },
+        {
+          "from": "presence",
+          "to": "chat",
+          "kind": "response",
+          "label": "gateway B"
+        },
+        {
+          "from": "chat",
+          "to": "bus",
+          "kind": "async",
+          "label": "m1 for gwB"
+        },
+        {
+          "from": "bus",
+          "to": "gw2",
+          "kind": "async",
+          "label": "m1"
+        },
+        {
+          "from": "gw2",
+          "to": "bob",
+          "kind": "request",
+          "label": "m1 seq=4021"
+        },
+        {
+          "from": "bob",
+          "to": "gw2",
+          "kind": "response",
+          "label": "delivered 4021"
+        },
+        {
+          "from": "gw2",
+          "to": "chat",
+          "kind": "async",
+          "label": "receipt"
+        },
+        {
+          "from": "chat",
+          "to": "gw1",
+          "kind": "async",
+          "label": "receipt"
+        },
+        {
+          "from": "gw1",
+          "to": "alice",
+          "kind": "response",
+          "label": "double tick"
+        }
+      ],
+      "metrics": {
+        "deliv": "1"
+      }
+    },
+    {
+      "tag": "GROUP",
+      "title": "One message, many inboxes",
+      "body": "In a group of 500 people, one message must reach 499 others. The simplest design stores the message once under the group and fans out a small pointer to each member's gateway through the queue. The service looks up all 499 routes, groups them by gateway, and sends one batch per gateway. Storage cost stays flat, but delivery work grows with group size. That is why apps cap group sizes, and very large broadcast channels use a different pull-based design.",
+      "idea": "Store once, deliver many: fan-out cost scales with members, not with storage.",
+      "caption": "One stored message becomes hundreds of deliveries.",
+      "focus": [
+        "chat",
+        "store",
+        "bus",
+        "gw2"
+      ],
+      "flows": [
+        {
+          "from": "chat",
+          "to": "store",
+          "kind": "request",
+          "label": "1 copy"
+        },
+        {
+          "from": "chat",
+          "to": "bus",
+          "kind": "async",
+          "label": "lookup x499"
+        },
+        {
+          "from": "bus",
+          "to": "gw2",
+          "kind": "async",
+          "label": "batch per gateway"
+        }
+      ],
+      "metrics": {
+        "deliv": "499"
+      }
+    },
+    {
+      "tag": "OFFLINE",
+      "title": "Bob's phone is off",
+      "body": "Now Bob has no socket, so the route table has no entry for him. The message is already stored, so nothing is lost. The chat service asks the push provider to send a notification that wakes his phone. The push carries little or no content; it only says there is something new. Push is best effort and may be delayed or dropped. Presence can lag, so if no delivered receipt comes back within a few seconds, the service sends the push anyway.",
+      "idea": "The stored message is the truth; push is only a nudge to come and get it.",
+      "caption": "No route found, so a push nudge goes out.",
+      "focus": [
+        "chat",
+        "presence",
+        "push"
+      ],
+      "flows": [
+        {
+          "from": "chat",
+          "to": "presence",
+          "kind": "request",
+          "label": "where is bob?"
+        },
+        {
+          "from": "presence",
+          "to": "chat",
+          "kind": "fail",
+          "label": "not online"
+        },
+        {
+          "from": "chat",
+          "to": "push",
+          "kind": "async",
+          "label": "wake bob"
+        }
+      ],
+      "metrics": {
+        "deliv": "0"
+      }
+    },
+    {
+      "tag": "SYNC",
+      "title": "Catch up on reconnect",
+      "body": "Bob turns his phone on. It reconnects and sends the last sequence number it holds for each chat, say 4020. The server reads everything after that from the store and sends it in order. Sequence numbers make catch-up exact: no guessing from timestamps, which clocks can disagree on. The same path repairs any gap caused by a dropped delivery. If Bob receives seq 4023 right after 4021, he knows 4022 is missing and asks for it. Real apps also keep one per-user cursor so reconnect does not query every chat.",
+      "idea": "Clients ask for everything after seq N, which makes sync idempotent and gap-free.",
+      "caption": "Bob pulls messages after his last known seq.",
+      "focus": [
+        "bob",
+        "gw2",
+        "chat",
+        "store"
+      ],
+      "flows": [
+        {
+          "from": "bob",
+          "to": "gw2",
+          "kind": "request",
+          "label": "sync after 4020"
+        },
+        {
+          "from": "gw2",
+          "to": "chat",
+          "kind": "request",
+          "label": "sync after 4020"
+        },
+        {
+          "from": "chat",
+          "to": "store",
+          "kind": "request",
+          "label": "range read"
+        },
+        {
+          "from": "store",
+          "to": "chat",
+          "kind": "response",
+          "label": "seq 4021-4030"
+        },
+        {
+          "from": "chat",
+          "to": "gw2",
+          "kind": "response",
+          "label": "10 messages"
+        },
+        {
+          "from": "gw2",
+          "to": "bob",
+          "kind": "response",
+          "label": "10 messages"
+        }
+      ],
+      "metrics": {
+        "deliv": "10"
+      }
+    },
+    {
+      "tag": "TRADE-OFF",
+      "title": "Presence without a storm",
+      "body": "The green dot means a user is online. Each app sends a heartbeat every 30 seconds, and the route entry expires if two are missed, so crashes clean themselves up. Naively, 20 million users is about 670,000 refreshes a second, so each gateway absorbs its sockets' heartbeats and sends one batched refresh every few seconds. Broadcasting every presence change to all contacts would also explode, so presence is fetched lazily, only for the chats on screen.",
+      "idea": "Treat presence as soft, expiring state and publish it only to people looking.",
+      "caption": "Gateways batch heartbeats into short-lived presence entries.",
+      "focus": [
+        "bob",
+        "gw2",
+        "chat",
+        "presence"
+      ],
+      "flows": [
+        {
+          "from": "bob",
+          "to": "gw2",
+          "kind": "async",
+          "label": "ping every 30s"
+        },
+        {
+          "from": "gw2",
+          "to": "chat",
+          "kind": "async",
+          "label": "batch alive"
+        },
+        {
+          "from": "chat",
+          "to": "presence",
+          "kind": "request",
+          "label": "SET ttl=70s"
+        }
+      ],
+      "metrics": {
+        "rate": "46000"
+      }
+    },
+    {
+      "tag": "RECAP",
+      "title": "The whole path",
+      "body": "Persistent sockets on a gateway tier carry messages. The chat service stores each message with a sequence number, acks the sender, looks up the recipient's gateway, and delivers through a queue. Receipts flow back the same way, groups fan out from one stored copy, offline users get a push nudge and then sync by sequence number, and presence is soft, expiring state refreshed in batches.",
+      "idea": "Store first, route by lookup, and let sequence numbers repair every gap.",
+      "caption": "Every component and its job in one picture.",
+      "focus": [
+        "alice",
+        "gw1",
+        "chat",
+        "store",
+        "presence",
+        "bus",
+        "push",
+        "gw2",
+        "bob"
+      ],
+      "flows": [],
+      "metrics": {
+        "rate": "46000",
+        "gateways": "200",
+        "ack": "60",
+        "deliv": "1"
+      }
+    }
   ],
   "quiz": [
-    {"q": "A gateway crashes while holding 100,000 sockets. What should the design guarantee about messages sent to those users?", "options": ["They are lost, because the sockets are gone", "They stay in the store, and clients reconnect and sync after their last seq", "They are retried forever by the sender's app only", "They are moved to the other gateways' memory automatically"], "answer": 1, "why": "Messages are persisted before being acked and delivery is only a nudge on top. After reconnecting to any gateway, each client asks for everything after its last sequence number."},
-    {"q": "Why does the chat service write the message to the store before sending the sent tick to Alice?", "options": ["Writes are faster than delivery", "So a tick always means the message will not be lost", "To avoid needing a message ID", "Because Bob must be online first"], "answer": 1, "why": "If the tick were sent first and the server then crashed, Alice would believe it was sent while no copy existed. Persisting first makes the ack a durable promise."},
-    {"q": "A group has 1,000 members and gets 5 messages per second. About how many deliveries per second must the system make, and what stays flat?", "options": ["About 5,000 deliveries; stored copies stay at 5", "About 5 deliveries; stored copies grow to 5,000", "About 1,000 deliveries; stored copies stay at 1", "About 5,000 deliveries and 5,000 stored copies"], "answer": 0, "why": "Each message goes to roughly 1,000 recipients, so about 5,000 deliveries per second, but storing one copy per message keeps storage at 5 writes per second."},
-    {"q": "Bob was offline and the push notification never arrived. When does he get his messages?", "options": ["Never, push is the only delivery route", "When Alice resends them", "When he next opens the app and syncs after his last seq", "After the queue's retention expires"], "answer": 2, "why": "Push is best effort and only a hint. The authoritative path is the sync request on reconnect, which reads the stored messages by sequence number."},
-    {"q": "Why is presence implemented as heartbeats with a TTL instead of an online/offline event on every change?", "options": ["Events cannot cross gateways", "Crashes send no offline event, and fan-out of every flap to all contacts is costly", "TTLs are required by WebSocket", "It makes messages arrive in order"], "answer": 1, "why": "A crashed phone cannot announce it left, so an expiring entry cleans itself up. Publishing every change to all contacts multiplies cost, so presence is fetched lazily."}
+    {
+      "q": "A gateway crashes while holding 100,000 sockets. What should the design guarantee about messages sent to those users?",
+      "options": [
+        "They are lost, because the sockets are gone",
+        "They stay in the store, and clients reconnect and sync after their last seq",
+        "They are retried forever by the sender's app only",
+        "They are moved to the other gateways' memory automatically"
+      ],
+      "answer": 1,
+      "why": "Messages are persisted before being acked and delivery is only a nudge on top. After reconnecting to any gateway, each client asks for everything after its last sequence number."
+    },
+    {
+      "q": "Why does the chat service write the message to the store before sending the sent tick to Alice?",
+      "options": [
+        "Writes are faster than delivery",
+        "To avoid needing a message ID",
+        "Because Bob must be online first",
+        "So a tick always means the message will not be lost"
+      ],
+      "answer": 3,
+      "why": "If the tick were sent first and the server then crashed, Alice would believe it was sent while no copy existed. Persisting first makes the ack a durable promise."
+    },
+    {
+      "q": "A group has 1,000 members and gets 5 messages per second. About how many deliveries per second must the system make, and what stays flat?",
+      "options": [
+        "About 5,000 deliveries; stored copies stay at 5",
+        "About 5 deliveries; stored copies grow to 5,000",
+        "About 1,000 deliveries; stored copies stay at 1",
+        "About 5,000 deliveries and 5,000 stored copies"
+      ],
+      "answer": 0,
+      "why": "Each message goes to roughly 1,000 recipients, so about 5,000 deliveries per second, but storing one copy per message keeps storage at 5 writes per second."
+    },
+    {
+      "q": "Bob was offline and the push notification never arrived. When does he get his messages?",
+      "options": [
+        "Never, push is the only delivery route",
+        "When Alice resends them",
+        "When he next opens the app and syncs after his last seq",
+        "After the queue's retention expires"
+      ],
+      "answer": 2,
+      "why": "Push is best effort and only a hint. The authoritative path is the sync request on reconnect, which reads the stored messages by sequence number."
+    },
+    {
+      "q": "Why is presence implemented as heartbeats with a TTL instead of an online/offline event on every change?",
+      "options": [
+        "Events cannot cross gateways",
+        "TTLs are required by WebSocket",
+        "It makes messages arrive in order",
+        "Crashes send no offline event, and fan-out of every flap to all contacts is costly"
+      ],
+      "answer": 3,
+      "why": "A crashed phone cannot announce it left, so an expiring entry cleans itself up. Publishing every change to all contacts multiplies cost, so presence is fetched lazily."
+    }
   ],
   "cheatsheet": [
-    {"term": "WebSocket", "def": "A long-lived two-way connection started by an HTTP upgrade, letting the server push data without the client asking."},
-    {"term": "Gateway tier", "def": "Servers that only hold sockets (about 100k each as a rule of thumb) and forward messages; kept stateless apart from their connections."},
-    {"term": "Route table", "def": "A fast key-value map from user to the gateway holding their socket, with a TTL refreshed by heartbeats."},
-    {"term": "Sequence number", "def": "A per-conversation counter assigned on write. Gives ordering, de-duplication, and exact catch-up with sync after N."},
-    {"term": "At-least-once + idempotent", "def": "Delivery may repeat, so receivers drop duplicates by message ID. Easier and safer than trying for exactly-once."},
-    {"term": "Receipt cursor", "def": "One read or delivered marker meaning everything up to seq N, instead of a receipt per message."},
-    {"term": "Fan-out on delivery", "def": "Store a group message once and push pointers to each member's gateway; cost grows with member count."},
-    {"term": "Push notification", "def": "A best-effort wake-up through APNs or FCM for offline devices; never the source of truth."}
+    {
+      "term": "WebSocket",
+      "def": "A long-lived two-way connection started by an HTTP upgrade, letting the server push data without the client asking."
+    },
+    {
+      "term": "Gateway tier",
+      "def": "Servers that only hold sockets (about 100k each as a rule of thumb) and forward messages; kept stateless apart from their connections."
+    },
+    {
+      "term": "Route table",
+      "def": "A fast key-value map from user to the gateway holding their socket, with a TTL refreshed by heartbeats."
+    },
+    {
+      "term": "Sequence number",
+      "def": "A per-conversation counter assigned on write. Gives ordering, de-duplication, and exact catch-up with sync after N."
+    },
+    {
+      "term": "At-least-once + idempotent",
+      "def": "Delivery may repeat, so receivers drop duplicates by message ID. Easier and safer than trying for exactly-once."
+    },
+    {
+      "term": "Receipt cursor",
+      "def": "One read or delivered marker meaning everything up to seq N, instead of a receipt per message."
+    },
+    {
+      "term": "Fan-out on delivery",
+      "def": "Store a group message once and push pointers to each member's gateway; cost grows with member count."
+    },
+    {
+      "term": "Push notification",
+      "def": "A best-effort wake-up through APNs or FCM for offline devices; never the source of truth."
+    }
   ],
   "lab": {
     "prompt": "Design a one-to-one and group chat service for 100 million daily users (about 20 million online at peak). Sketch the components, the message path, and the data model, then say what happens when a gateway dies.",
@@ -83,11 +642,13 @@
       "Choose a partition key for storage so one conversation's messages sit together, ordered by sequence number",
       "Decide what the ack means and when it is sent",
       "Think about how a client detects a gap or a duplicate",
-      "Keep presence as expiring soft state rather than durable data"
+      "Keep presence as expiring soft state rather than durable data",
+      "Estimate storage per day and per year, and decide retention"
     ],
     "checklist": [
       "Persistent connection tier separated from the message-handling service",
       "Route table from user to gateway with expiry",
+      "Storage partition key and how sequence numbers are allocated safely",
       "Message stored with a per-conversation sequence number before the ack",
       "Receipts defined as cursors that flow back along the same path",
       "Group fan-out plan and a size limit",

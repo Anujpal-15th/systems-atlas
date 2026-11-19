@@ -11,56 +11,493 @@
     "Why the gateway becomes a single point of failure and how to contain that risk"
   ],
   "nodes": [
-    {"id": "web", "label": "Web app", "kind": "client", "x": 8, "y": 30},
-    {"id": "mobile", "label": "Mobile app", "kind": "client", "x": 8, "y": 72},
-    {"id": "fproxy", "label": "Corporate proxy", "kind": "server", "x": 30, "y": 30},
-    {"id": "bff", "label": "Mobile BFF", "kind": "server", "x": 30, "y": 72},
-    {"id": "gw", "label": "API gateway", "kind": "gateway", "x": 52, "y": 50},
-    {"id": "auth", "label": "Auth service", "kind": "service", "x": 52, "y": 12},
-    {"id": "orders", "label": "Orders service", "kind": "service", "x": 84, "y": 20},
-    {"id": "users", "label": "Users service", "kind": "service", "x": 84, "y": 50},
-    {"id": "catalog", "label": "Catalog service", "kind": "service", "x": 84, "y": 80}
+    {
+      "id": "web",
+      "label": "Web app",
+      "kind": "client",
+      "x": 8,
+      "y": 30
+    },
+    {
+      "id": "mobile",
+      "label": "Mobile app",
+      "kind": "client",
+      "x": 8,
+      "y": 72
+    },
+    {
+      "id": "fproxy",
+      "label": "Corporate proxy",
+      "kind": "server",
+      "x": 30,
+      "y": 30
+    },
+    {
+      "id": "bff",
+      "label": "Mobile BFF",
+      "kind": "server",
+      "x": 30,
+      "y": 72
+    },
+    {
+      "id": "gw",
+      "label": "API gateway",
+      "kind": "gateway",
+      "x": 52,
+      "y": 50
+    },
+    {
+      "id": "auth",
+      "label": "Auth service",
+      "kind": "service",
+      "x": 52,
+      "y": 12
+    },
+    {
+      "id": "orders",
+      "label": "Orders service",
+      "kind": "service",
+      "x": 84,
+      "y": 20
+    },
+    {
+      "id": "users",
+      "label": "Users service",
+      "kind": "service",
+      "x": 84,
+      "y": 50
+    },
+    {
+      "id": "catalog",
+      "label": "Catalog service",
+      "kind": "service",
+      "x": 84,
+      "y": 80
+    }
   ],
   "edges": [
-    {"from": "web", "to": "fproxy"},
-    {"from": "fproxy", "to": "gw"},
-    {"from": "mobile", "to": "bff"},
-    {"from": "bff", "to": "gw"},
-    {"from": "gw", "to": "auth"},
-    {"from": "gw", "to": "orders"},
-    {"from": "gw", "to": "users"},
-    {"from": "gw", "to": "catalog"}
+    {
+      "from": "web",
+      "to": "fproxy"
+    },
+    {
+      "from": "fproxy",
+      "to": "gw"
+    },
+    {
+      "from": "mobile",
+      "to": "bff"
+    },
+    {
+      "from": "bff",
+      "to": "gw"
+    },
+    {
+      "from": "gw",
+      "to": "auth"
+    },
+    {
+      "from": "gw",
+      "to": "orders"
+    },
+    {
+      "from": "gw",
+      "to": "users"
+    },
+    {
+      "from": "gw",
+      "to": "catalog"
+    }
   ],
   "metrics": [
-    {"id": "calls", "label": "Client calls", "unit": "calls"},
-    {"id": "latency", "label": "Server time", "unit": "ms"}
+    {
+      "id": "calls",
+      "label": "Client calls",
+      "unit": "calls"
+    },
+    {
+      "id": "latency",
+      "label": "Server time",
+      "unit": "ms"
+    }
   ],
   "steps": [
-    {"tag": "QUESTION", "title": "Too many doors", "body": "A shop is split into many small services: orders, users, catalog, auth. If every app talked to each service directly, each client would need every address, its own login check, and its own retry logic. Changing one service would break clients in the field. Is there one place to put all of that shared plumbing?", "idea": "Without a front door, every client must know every backend and re-implement the same cross-cutting rules.", "caption": "Clients would have to call three services directly.", "focus": ["web", "mobile", "orders", "users", "catalog"], "flows": [], "metrics": {"calls": "3"}},
-    {"tag": "CONCEPT", "title": "Forward vs reverse proxy", "body": "A proxy is a middleman that passes requests along. A forward proxy sits on the client side: a company routes employee traffic through it to filter sites, cache downloads or hide internal addresses, and the destination sees the proxy, not the employee. A reverse proxy sits on the server side: clients talk to it as if it were the site, and it forwards to hidden backends. The gateway in this lesson is a reverse proxy.", "idea": "A forward proxy acts for clients; a reverse proxy acts for servers. Which side it protects is the difference.", "caption": "The corporate proxy fronts the client; the gateway fronts the servers.", "focus": ["web", "fproxy", "gw"], "flows": [{"from": "web", "to": "fproxy", "kind": "request", "label": "GET /orders/42"}, {"from": "fproxy", "to": "gw", "kind": "request", "label": "GET /orders/42"}], "metrics": {}},
-    {"tag": "FLOW", "title": "One entry, many routes", "body": "The gateway terminates TLS and then routes by path or host: /orders goes to Orders, /users to Users, /catalog to Catalog. Clients only know one hostname, so services can be moved, split, or renamed behind it. Assume the gateway hop costs about 2 ms and each service answers in about 20 ms.", "idea": "Routing hides the internal topology, so backends can change without clients noticing.", "caption": "Path /orders/42 is routed to the Orders service.", "focus": ["gw", "orders"], "flows": [{"from": "gw", "to": "orders", "kind": "request", "label": "route /orders"}, {"from": "orders", "to": "gw", "kind": "response", "label": "200 order 42"}, {"from": "gw", "to": "fproxy", "kind": "response", "label": "200 order 42"}], "metrics": {"calls": "1", "latency": "22"}},
-    {"tag": "AUTH", "title": "Check who is asking", "body": "Instead of every service verifying logins itself, the gateway does it once at the edge. With signed tokens such as JWTs it can check the signature locally in microseconds; with opaque tokens it asks the auth service, shown here at about 5 ms. Either way, unauthenticated calls die at the door and services receive a trusted user id. Services still need their own authorization for sensitive actions.", "idea": "Authenticate once at the edge, but do not make the gateway the only line of defence.", "caption": "Gateway validates the token before routing.", "focus": ["gw", "auth"], "flows": [{"from": "gw", "to": "auth", "kind": "request", "label": "verify token"}, {"from": "auth", "to": "gw", "kind": "response", "label": "ok, user 7"}], "metrics": {"latency": "27"}},
-    {"tag": "RATE LIMIT", "title": "Protect the backends", "body": "A buggy client loops and sends 5,000 requests a second. The gateway counts requests per API key, for example with a token bucket allowing 100 per minute, and answers the excess with 429 Too Many Requests. The rejection costs about 1 ms and the backends never see it. Limits are usually per key or per IP, with stricter ones on expensive endpoints.", "idea": "Shedding abusive traffic at the edge is cheaper than letting it reach services that cannot say no.", "caption": "Excess requests are rejected with 429 at the gateway.", "focus": ["fproxy", "gw"], "flows": [{"from": "fproxy", "to": "gw", "kind": "request", "label": "burst of calls"}, {"from": "gw", "to": "fproxy", "kind": "fail", "label": "429 slow down"}], "metrics": {"latency": "1"}},
-    {"tag": "AGGREGATE", "title": "One call, three services", "body": "A home screen needs the user profile, recent orders and recommended products. Rather than make the phone send three requests over a slow mobile network, the gateway can fan out to all three in parallel and merge the answers into one response. Server time is then about the slowest call plus overhead: 2 + 5 + 20 = 27 ms, versus about 67 ms if the calls were chained one after another.", "idea": "Aggregation trades one fat client-facing call for parallel internal calls on a fast network.", "caption": "Gateway fans out to three services and merges the replies.", "focus": ["gw", "orders", "users", "catalog"], "flows": [{"from": "gw", "to": "orders", "kind": "request", "label": "recent orders"}, {"from": "gw", "to": "users", "kind": "request", "label": "profile"}, {"from": "gw", "to": "catalog", "kind": "request", "label": "recommended"}, {"from": "orders", "to": "gw", "kind": "response", "label": "orders"}, {"from": "users", "to": "gw", "kind": "response", "label": "profile"}, {"from": "catalog", "to": "gw", "kind": "response", "label": "products"}], "metrics": {"calls": "1", "latency": "27"}},
-    {"tag": "PATTERN", "title": "A BFF per client type", "body": "Web and mobile want different things: the phone wants small payloads and few calls, the web app wants rich data. Putting both shapes in one gateway makes it a tangle of special cases. A Backend-for-Frontend is a thin server per client type that shapes the response for that client, ideally owned by the same team that builds the client. It adds one more hop, here about 2 ms.", "idea": "A BFF lets each client team shape its own API without bloating the shared gateway.", "caption": "The mobile BFF trims the home-screen payload for the phone.", "focus": ["mobile", "bff", "gw"], "flows": [{"from": "mobile", "to": "bff", "kind": "request", "label": "GET /home"}, {"from": "bff", "to": "gw", "kind": "request", "label": "GET /home-data"}, {"from": "gw", "to": "bff", "kind": "response", "label": "full data"}, {"from": "bff", "to": "mobile", "kind": "response", "label": "lean JSON"}], "metrics": {"calls": "1", "latency": "29"}},
-    {"tag": "WHAT IF", "title": "The front door fails", "body": "Every request now passes through the gateway, so if it goes down, everything goes down even though all the services are healthy. This is a single point of failure (SPOF). The cure is to run several gateway instances across availability zones behind a load balancer, keep them stateless and thin, and avoid putting business logic in them. Set timeouts and circuit breakers so one slow service cannot tie up the gateway's workers.", "idea": "A gateway concentrates risk; redundancy and keeping it thin are what make that acceptable.", "caption": "With one gateway instance, both client paths fail together.", "focus": ["gw", "fproxy", "bff"], "flows": [{"from": "fproxy", "to": "gw", "kind": "fail", "label": "timeout"}, {"from": "bff", "to": "gw", "kind": "fail", "label": "timeout"}], "metrics": {}},
-    {"tag": "RECAP", "title": "One door, with care", "body": "A forward proxy fronts clients; a reverse proxy fronts servers. An API gateway is a reverse proxy that routes, authenticates, rate limits and can aggregate, so clients stay simple and services stay hidden. Add a BFF when client types need different shapes. Run the gateway redundantly and keep logic out of it so the front door does not become the single point of failure.", "idea": "Centralise shared edge concerns, but keep the gateway thin and redundant.", "caption": "Clients make one call; the gateway handles the rest.", "focus": ["web", "mobile", "fproxy", "bff", "gw", "auth", "orders", "users", "catalog"], "flows": [], "metrics": {"calls": "1", "latency": "29"}}
+    {
+      "tag": "QUESTION",
+      "title": "Too many doors",
+      "body": "A shop is split into small services: orders, users, catalog and auth. If every app talked to each service directly, a home screen that needs profile, orders and recommendations means three separate calls from every client, each with its own address, login check and retry logic. Changing one service would break clients in the field. Is there one place to put all of that shared plumbing?",
+      "idea": "Without a front door, every client must know every backend and re-implement the same cross-cutting rules.",
+      "caption": "Without a front door, every client must reach every service.",
+      "focus": [
+        "web",
+        "mobile",
+        "orders",
+        "users",
+        "catalog",
+        "auth"
+      ],
+      "flows": [],
+      "metrics": {
+        "calls": "3"
+      }
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "Forward vs reverse proxy",
+      "body": "A proxy is a middleman that passes requests along. A forward proxy sits on the client side: a company routes traffic from employees on the office network through it to filter sites, cache downloads or hide internal addresses, and the destination sees the proxy, not the employee. For HTTPS it usually tunnels the encrypted traffic unless the company inspects it. A reverse proxy sits on the server side: clients talk to it as if it were the site, and it forwards to hidden backends. The gateway in this lesson is a reverse proxy.",
+      "idea": "A forward proxy acts for clients; a reverse proxy acts for servers. Which side it protects is the difference.",
+      "caption": "An employee's web app goes out through the company's forward proxy; the gateway fronts the servers.",
+      "focus": [
+        "web",
+        "fproxy",
+        "gw"
+      ],
+      "flows": [
+        {
+          "from": "web",
+          "to": "fproxy",
+          "kind": "request",
+          "label": "GET /orders/42"
+        },
+        {
+          "from": "fproxy",
+          "to": "gw",
+          "kind": "request",
+          "label": "GET /orders/42"
+        }
+      ],
+      "metrics": {}
+    },
+    {
+      "tag": "FLOW",
+      "title": "One entry, many routes",
+      "body": "The gateway terminates TLS (decrypts the HTTPS connection) and then routes by path or host: /orders goes to Orders, /users to Users, /catalog to Catalog. Clients only know one hostname, so services can be moved, split, or renamed behind it. Assume the gateway hop costs about 2 ms and each service answers in about 20 ms.",
+      "idea": "Routing hides the internal topology, so backends can change without clients noticing.",
+      "caption": "Path /orders/42 is routed to the Orders service.",
+      "focus": [
+        "fproxy",
+        "gw",
+        "orders"
+      ],
+      "flows": [
+        {
+          "from": "gw",
+          "to": "orders",
+          "kind": "request",
+          "label": "route /orders"
+        },
+        {
+          "from": "orders",
+          "to": "gw",
+          "kind": "response",
+          "label": "200 order 42"
+        },
+        {
+          "from": "gw",
+          "to": "fproxy",
+          "kind": "response",
+          "label": "200 order 42"
+        }
+      ],
+      "metrics": {
+        "latency": "22"
+      }
+    },
+    {
+      "tag": "AUTH",
+      "title": "Check who is asking",
+      "body": "Instead of every service verifying logins itself, the gateway does it once at the edge. With signed tokens such as JWTs it can check the signature locally in microseconds (the catch: a signed token stays valid until it expires unless you add a revocation list); with opaque tokens it asks the auth service, shown here at about 5 ms. Either way, unauthenticated calls die at the door and services receive a trusted user id. Services still need their own authorization for sensitive actions.",
+      "idea": "Authenticate once at the edge, but do not make the gateway the only line of defence.",
+      "caption": "Gateway validates the token before routing.",
+      "focus": [
+        "gw",
+        "auth"
+      ],
+      "flows": [
+        {
+          "from": "gw",
+          "to": "auth",
+          "kind": "request",
+          "label": "verify token"
+        },
+        {
+          "from": "auth",
+          "to": "gw",
+          "kind": "response",
+          "label": "ok, user 7"
+        }
+      ],
+      "metrics": {
+        "latency": "27"
+      }
+    },
+    {
+      "tag": "RATE LIMIT",
+      "title": "Protect the backends",
+      "body": "A buggy client loops and sends 5,000 requests a second. The gateway counts requests per API key, for example with a token bucket (each key gets a bucket that refills at 100 tokens a minute, and every request spends one), and answers the excess with 429 Too Many Requests. The rejection costs about 1 ms, since the check is cheaper than a full hop, and the backends never see it. Per-IP limits can unfairly hit many users behind one shared proxy, which is why per-key limits are preferred. With several gateway instances the counters live in a shared fast store such as Redis, or each instance enforces its share of the limit (cheaper but approximate).",
+      "idea": "Shedding abusive traffic at the edge is cheaper than letting it reach services that cannot say no.",
+      "caption": "Excess requests are rejected with 429 at the gateway.",
+      "focus": [
+        "fproxy",
+        "gw"
+      ],
+      "flows": [
+        {
+          "from": "fproxy",
+          "to": "gw",
+          "kind": "request",
+          "label": "burst of calls"
+        },
+        {
+          "from": "gw",
+          "to": "fproxy",
+          "kind": "fail",
+          "label": "429 slow down"
+        }
+      ],
+      "metrics": {
+        "latency": "1"
+      }
+    },
+    {
+      "tag": "AGGREGATE",
+      "title": "One call, three services",
+      "body": "A home screen needs the user profile, recent orders and recommended products. Rather than make the phone send three requests over a slow mobile network, the gateway can fan out to all three in parallel and merge the answers into one response. Server time is then about the gateway hop (2 ms) plus the token check (5 ms) plus the slowest of the three parallel calls (20 ms): 27 ms, versus about 67 ms if the three calls were chained (2 + 5 + 20 + 20 + 20).",
+      "idea": "Aggregation trades one fat client-facing call for parallel internal calls on a fast network.",
+      "caption": "Gateway fans out to three services and merges the replies.",
+      "focus": [
+        "gw",
+        "orders",
+        "users",
+        "catalog"
+      ],
+      "flows": [
+        {
+          "from": "gw",
+          "to": "orders",
+          "kind": "request",
+          "label": "recent orders"
+        },
+        {
+          "from": "gw",
+          "to": "users",
+          "kind": "request",
+          "label": "profile"
+        },
+        {
+          "from": "gw",
+          "to": "catalog",
+          "kind": "request",
+          "label": "recommended"
+        },
+        {
+          "from": "orders",
+          "to": "gw",
+          "kind": "response",
+          "label": "orders"
+        },
+        {
+          "from": "users",
+          "to": "gw",
+          "kind": "response",
+          "label": "profile"
+        },
+        {
+          "from": "catalog",
+          "to": "gw",
+          "kind": "response",
+          "label": "products"
+        }
+      ],
+      "metrics": {
+        "calls": "1",
+        "latency": "27"
+      }
+    },
+    {
+      "tag": "PATTERN",
+      "title": "A BFF per client type",
+      "body": "Web and mobile want different things: the phone wants small payloads and few calls, the web app wants rich data. Simple fan-out can stay in the gateway, but client-specific shaping (dropping fields, merging screens, renaming) is what bloats a shared gateway, so it lives in a Backend-for-Frontend: a thin server per client type, ideally owned by the team that builds that client. It adds one more hop, here about 2 ms. Here the BFF sits in front of the gateway; many teams place it behind instead. Either way the client-facing hop must still be authenticated and rate-limited, so the BFF forwards the user's token.",
+      "idea": "A BFF lets each client team shape its own API without bloating the shared gateway.",
+      "caption": "The mobile BFF trims the home-screen payload for the phone.",
+      "focus": [
+        "mobile",
+        "bff",
+        "gw"
+      ],
+      "flows": [
+        {
+          "from": "mobile",
+          "to": "bff",
+          "kind": "request",
+          "label": "GET /home"
+        },
+        {
+          "from": "bff",
+          "to": "gw",
+          "kind": "request",
+          "label": "GET /home-data"
+        },
+        {
+          "from": "gw",
+          "to": "bff",
+          "kind": "response",
+          "label": "full data"
+        },
+        {
+          "from": "bff",
+          "to": "mobile",
+          "kind": "response",
+          "label": "lean JSON"
+        }
+      ],
+      "metrics": {
+        "calls": "1",
+        "latency": "29"
+      }
+    },
+    {
+      "tag": "WHAT IF",
+      "title": "The front door fails",
+      "body": "Every request now passes through the gateway, so if it goes down, everything goes down even though all the services are healthy. This is a single point of failure (SPOF). The cure is to run several gateway instances across availability zones (separate data-centre buildings in a region) behind a load balancer (which must itself be redundant, covered in the Load Balancing lesson), keep them thin, and keep shared state such as rate-limit counters in a replicated store. Set timeouts and circuit breakers (stop calling a failing service for a while and fail fast) so one slow service cannot tie up the gateway's workers. Clients wait out a 1 s timeout.",
+      "idea": "A gateway concentrates risk; redundancy and keeping it thin are what make that acceptable.",
+      "caption": "With one gateway instance, both client paths fail together.",
+      "focus": [
+        "gw",
+        "fproxy",
+        "bff"
+      ],
+      "flows": [
+        {
+          "from": "fproxy",
+          "to": "gw",
+          "kind": "fail",
+          "label": "timeout"
+        },
+        {
+          "from": "bff",
+          "to": "gw",
+          "kind": "fail",
+          "label": "timeout"
+        }
+      ],
+      "metrics": {
+        "latency": "1000"
+      }
+    },
+    {
+      "tag": "RECAP",
+      "title": "One door, with care",
+      "body": "A forward proxy fronts clients; a reverse proxy fronts servers. An API gateway is a reverse proxy that routes, authenticates, rate limits and can aggregate, so clients stay simple and services stay hidden. Add a BFF when client types need different shapes. Run the gateway redundantly and keep logic out of it so the front door does not become the single point of failure.",
+      "idea": "Centralise shared edge concerns, but keep the gateway thin and redundant.",
+      "caption": "Clients make one call; the gateway handles the rest.",
+      "focus": [
+        "web",
+        "mobile",
+        "fproxy",
+        "bff",
+        "gw",
+        "auth",
+        "orders",
+        "users",
+        "catalog"
+      ],
+      "flows": [],
+      "metrics": {
+        "calls": "1",
+        "latency": "29"
+      }
+    }
   ],
   "quiz": [
-    {"q": "Which statement correctly distinguishes a forward proxy from a reverse proxy?", "options": ["A forward proxy caches, a reverse proxy never does", "A forward proxy represents the clients to the internet; a reverse proxy represents the servers to clients", "A reverse proxy only works over HTTPS", "A forward proxy sits inside the data center in front of the database"], "answer": 1, "why": "The difference is which side the proxy acts for. Clients are configured to use a forward proxy; clients are unaware of a reverse proxy and think it is the site."},
-    {"q": "A service behind your gateway accepts any request that reaches it, because the gateway checks tokens. What is the main risk?", "options": ["Tokens become too long", "Anything that bypasses the gateway, such as another internal service or a misconfigured route, is unauthenticated", "The gateway cannot route requests", "Rate limits stop working"], "answer": 1, "why": "Edge authentication is not a full defence. Services should still verify identity and authorize sensitive actions, since the network inside is not automatically trustworthy."},
-    {"q": "A mobile home screen needs data from three services. Which design best cuts latency on a slow phone connection?", "options": ["The phone calls each service directly and merges the results", "The gateway or a BFF calls the three services in parallel and returns one response", "The gateway calls the three services one after another", "Add a second gateway in front of the first"], "answer": 1, "why": "Fanning out on the fast internal network replaces three slow client round trips with one, and parallel calls cost about the slowest service rather than the sum."},
-    {"q": "Your team adds order-pricing rules and discount logic into the gateway because it is convenient. Why is this a poor idea?", "options": ["Gateways cannot run code", "It couples every team's release to one shared component and makes the single point of failure bigger and riskier", "It makes rate limiting impossible", "It forces clients to use HTTP/1.1"], "answer": 1, "why": "Business logic belongs in services. A fat gateway becomes a deployment bottleneck and a larger blast radius, so keep it to cross-cutting concerns."},
-    {"q": "What is the best way to reduce the gateway as a single point of failure?", "options": ["Make the one instance a bigger machine", "Run several stateless instances across zones behind a load balancer, with timeouts and circuit breakers", "Let clients bypass it when it is slow", "Move authentication into every client"], "answer": 1, "why": "Redundancy removes the single instance as a failure point, and timeouts plus circuit breakers stop one slow service from exhausting the gateway's capacity."}
+    {
+      "q": "Which statement correctly distinguishes a forward proxy from a reverse proxy?",
+      "options": [
+        "A forward proxy caches responses, but a reverse proxy never does",
+        "A forward proxy represents clients to the internet; a reverse proxy represents servers to clients",
+        "A reverse proxy only works over HTTPS connections",
+        "A forward proxy sits inside the data center in front of the database"
+      ],
+      "answer": 1,
+      "why": "The difference is which side the proxy acts for. Clients (or the network they sit on) are set up to send traffic through a forward proxy; with a reverse proxy, clients are unaware and think it is the site."
+    },
+    {
+      "q": "A service behind your gateway accepts any request that reaches it, because the gateway checks tokens. What is the main risk?",
+      "options": [
+        "Tokens become too long to send in headers",
+        "The gateway cannot route requests without services",
+        "Rate limits stop working for authenticated users",
+        "Anything that bypasses the gateway, such as another internal service or a misconfigured route, is unauthenticated"
+      ],
+      "answer": 3,
+      "why": "Edge authentication is not a full defence. Services should still verify identity and authorize sensitive actions, since the network inside is not automatically trustworthy."
+    },
+    {
+      "q": "Who should own a mobile BFF?",
+      "options": [
+        "A central platform team, so every client gets identical APIs",
+        "The team that builds the mobile app, so it can change the API shape without waiting on a central team",
+        "The database team, since the BFF reads shared data",
+        "Nobody; a BFF is generated automatically by the gateway"
+      ],
+      "answer": 1,
+      "why": "A BFF exists to let one client team shape its own API quickly. If a central team owns it, every change queues behind them and the BFF becomes another shared bottleneck."
+    },
+    {
+      "q": "Your team adds order-pricing rules and discount logic into the gateway because it is convenient. Why is this a poor idea?",
+      "options": [
+        "Gateways cannot run any business code at all",
+        "It makes rate limiting impossible to configure",
+        "It couples every team's release to one shared component and enlarges the single point of failure",
+        "It forces every client to use HTTP/1.1 only"
+      ],
+      "answer": 2,
+      "why": "Business logic belongs in services. A fat gateway becomes a deployment bottleneck and a larger blast radius, so keep it to cross-cutting concerns."
+    },
+    {
+      "q": "What is the best way to reduce the gateway as a single point of failure?",
+      "options": [
+        "Make the one instance a much bigger machine",
+        "Run several stateless instances across zones behind a load balancer, with timeouts and breakers",
+        "Let clients bypass it whenever it is slow",
+        "Move authentication into every single client"
+      ],
+      "answer": 1,
+      "why": "Redundancy removes the single instance as a failure point, and timeouts plus circuit breakers stop one slow service from exhausting the gateway's capacity."
+    }
   ],
   "cheatsheet": [
-    {"term": "Forward proxy", "def": "Sits on the client side and makes requests on behalf of clients. Used for filtering, caching, anonymity and controlled egress."},
-    {"term": "Reverse proxy", "def": "Sits on the server side and receives requests meant for the site, then forwards them to backends. Hides topology, terminates TLS, can cache and balance load."},
-    {"term": "API gateway", "def": "A reverse proxy specialised for APIs: routing, authentication, rate limiting, request/response shaping, and sometimes aggregation, metrics and logging."},
-    {"term": "Rate limiting", "def": "Capping requests per key or IP over time, often with a token bucket. Over-limit requests get HTTP 429 and never reach backends."},
-    {"term": "Aggregation (fan-out)", "def": "The gateway or BFF calls several services in parallel and merges the results, so clients make one call instead of many."},
-    {"term": "BFF", "def": "Backend-for-Frontend: a thin server per client type (web, mobile) that shapes data for that client, ideally owned by that client's team."},
-    {"term": "Gateway SPOF", "def": "All traffic flows through the gateway, so one instance is a single point of failure. Run several stateless instances across zones and keep logic out of it."},
-    {"term": "Circuit breaker", "def": "Stops calling a failing service for a short period and fails fast, so a slow dependency cannot exhaust the gateway's workers."}
+    {
+      "term": "Forward proxy",
+      "def": "Sits on the client side and makes requests on behalf of clients. Used for filtering, caching, anonymity and controlled egress."
+    },
+    {
+      "term": "Reverse proxy",
+      "def": "Sits on the server side and receives requests meant for the site, then forwards them to backends. Hides topology, terminates TLS, can cache and balance load."
+    },
+    {
+      "term": "API gateway",
+      "def": "A reverse proxy specialised for APIs: routing, authentication, rate limiting, request/response shaping, and sometimes aggregation, metrics and logging."
+    },
+    {
+      "term": "Rate limiting",
+      "def": "Capping requests per key or IP over time, often with a token bucket. Over-limit requests get HTTP 429 and never reach backends."
+    },
+    {
+      "term": "Aggregation (fan-out)",
+      "def": "The gateway or BFF calls several services in parallel and merges the results, so clients make one call instead of many."
+    },
+    {
+      "term": "BFF",
+      "def": "Backend-for-Frontend: a thin server per client type (web, mobile) that shapes data for that client, ideally owned by that client's team."
+    },
+    {
+      "term": "Gateway SPOF",
+      "def": "All traffic flows through the gateway, so one instance is a single point of failure. Run several stateless instances across zones and keep logic out of it."
+    },
+    {
+      "term": "Circuit breaker",
+      "def": "Stops calling a failing service for a short period and fails fast, so a slow dependency cannot exhaust the gateway's workers."
+    }
   ]
 }
