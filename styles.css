@@ -139,10 +139,14 @@ h1{font-size:30px;line-height:1.15;margin:6px 0 2px}
 .diagram{margin-top:8px;border-radius:9px;background-color:var(--paper);background-image:repeating-linear-gradient(30deg,var(--grid) 0 1px,transparent 1px 28px),repeating-linear-gradient(150deg,var(--grid) 0 1px,transparent 1px 28px)}
 .diagram svg{display:block;width:100%;height:auto;font-family:var(--sans)}
 .k-request{--fc:var(--request)}.k-response{--fc:var(--response)}.k-handshake{--fc:var(--handshake)}.k-async{--fc:var(--async)}.k-replicate{--fc:var(--replicate)}.k-fail{--fc:var(--fail)}
-.edge{fill:none;stroke:var(--line-2);stroke-width:2.5;stroke-dasharray:3 7;stroke-linecap:round}
-.edge.hot{stroke:var(--fc);stroke-width:3.5;stroke-dasharray:9 7;animation:march .9s linear infinite}
-.edge.hot.k-response,.edge.hot.k-replicate{stroke-dasharray:3 6}.edge.hot.k-fail{stroke-dasharray:4 8}
-@keyframes march{to{stroke-dashoffset:-32}}
+.edge{fill:none;stroke:var(--line-2);stroke-width:1.8;stroke-dasharray:4 7;stroke-linecap:round}
+.edge.hot{stroke:var(--ink);stroke-width:2;stroke-dasharray:none}
+.edge.new{animation:draw .6s .25s ease-out backwards}
+@keyframes draw{from{stroke-dasharray:var(--len);stroke-dashoffset:var(--len)}to{stroke-dasharray:var(--len);stroke-dashoffset:0}}
+.arrow{fill:var(--ink)}.arrow.new{animation:fadein .3s .75s backwards}
+@keyframes fadein{from{opacity:0}}
+.gs-a{stop-color:color-mix(in srgb,var(--nc) 74%,#fff)}.gs-b{stop-color:var(--nc)}
+.node .ch.f-left{fill:color-mix(in srgb,var(--nc) 88%,var(--ink))}.node .ch.f-right{fill:color-mix(in srgb,var(--nc) 70%,var(--ink))}
 .node .s{stroke:var(--ink);stroke-width:2.2;stroke-linejoin:round;stroke-linecap:round}
 .node .d{fill:none;stroke:var(--ink);stroke-width:1.8;stroke-linecap:round;opacity:.55}
 .node .led{fill:var(--response);stroke:var(--ink);stroke-width:1}
@@ -157,22 +161,20 @@ h1{font-size:30px;line-height:1.15;margin:6px 0 2px}
 .node .pill rect{fill:var(--panel);stroke:var(--ink);stroke-width:1.8}
 .node .pill text{fill:var(--ink);font-size:12.5px;font-weight:700;text-anchor:middle}
 .node .ring{fill:none;stroke:var(--ink-2);stroke-width:2;stroke-dasharray:5 5;transform-box:fill-box;transform-origin:center;animation:pulse 2s ease-in-out infinite}
-.node{transition:opacity .25s}
+.node{transition:opacity .4s}
 .node.dim{opacity:.5}
 .node.focus .f-top{fill:color-mix(in srgb,var(--nc) 85%,#fff)}
-.node.rise .body{animation:rise .6s cubic-bezier(.2,.9,.3,1.2) both}
-@keyframes rise{from{opacity:0;transform:translateY(-22px)}to{opacity:1;transform:none}}
+.node.rise .body{transform-box:view-box;transform-origin:0 0;animation:rise .5s cubic-bezier(.34,1.56,.64,1) both}
+@keyframes rise{from{opacity:0;transform:translateY(-18px) scale(.6)}to{opacity:1;transform:none}}
 @keyframes pulse{0%,100%{opacity:.8;transform:scale(1)}50%{opacity:.2;transform:scale(1.14)}}
 .diagram.paused *{animation-play-state:paused!important}
 .flabel rect{fill:var(--panel);stroke:var(--fc);stroke-width:2}
 .flabel text{fill:var(--ink);font-size:13.5px;font-weight:700;text-anchor:middle}
-.comet{fill:none;stroke:var(--fc);stroke-width:6;stroke-linecap:butt;opacity:.85;filter:drop-shadow(0 0 4px var(--fc))}
-.packet circle{stroke:var(--ink);stroke-width:2;fill:var(--fc)}
-.packet .halo{stroke:none;opacity:.25}
+.packet circle{stroke:var(--panel);stroke-width:1.5;fill:var(--fc)}
 .kind-client{--nc:var(--n-client)}.kind-user{--nc:var(--n-user)}.kind-server{--nc:var(--n-server)}.kind-service{--nc:var(--n-service)}.kind-worker{--nc:var(--n-worker)}
 .kind-db{--nc:var(--n-db)}.kind-storage{--nc:var(--n-storage)}.kind-cache{--nc:var(--n-cache)}.kind-queue{--nc:var(--n-queue)}.kind-lb{--nc:var(--n-lb)}
 .kind-gateway{--nc:var(--n-gateway)}.kind-cdn{--nc:var(--n-cdn)}.kind-dns{--nc:var(--n-dns)}.kind-region{--nc:var(--n-region)}.kind-external{--nc:var(--n-external)}
-@media (prefers-reduced-motion:reduce){.node .ring,.node.rise .body,.edge.hot{animation:none}}
+@media (prefers-reduced-motion:reduce){.node .ring,.node.rise .body,.edge.new,.arrow.new{animation:none}}
 .stage-foot{display:flex;flex-wrap:wrap;gap:6px 16px;align-items:center;justify-content:space-between;margin-top:8px}
 .legend{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11px;color:var(--muted)}
 .legend span::before{content:"";display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px;border:1.5px solid var(--ink);vertical-align:-1px;background:currentColor}

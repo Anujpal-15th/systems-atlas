@@ -279,6 +279,18 @@ function art(kind) {
   if (kind === 'region') return [box(-72, 72, -72, 72, 0, 5, ' stroke-dasharray="7 5"'), 72];
   return null;
 }
+// camera: the viewBox tweens between per-step frames; last frame is remembered per lesson
+const cam = { slug: null, vb: null, raf: 0 }, lastDraw = { slug: null, focus: new Set() };
+const easeIO = p => p < .5 ? 4 * p * p * p : 1 - (-2 * p + 2) ** 3 / 2;
+function flyTo(svg, to, slug) {
+  cancelAnimationFrame(cam.raf);
+  const from = cam.slug === slug && cam.vb && !reducedMotion ? cam.vb : to, set = v => svg.setAttribute('viewBox', v.map(x => x.toFixed(1)).join(' '));
+  cam.slug = slug; cam.vb = from; set(from);
+  if (from === to) return;
+  const t0 = performance.now();
+  const tick = t => { const p = Math.min((t - t0) / 650, 1), e = easeIO(p); cam.vb = p < 1 ? from.map((v, k) => v + (to[k] - v) * e) : to; set(cam.vb); if (p < 1) cam.raf = requestAnimationFrame(tick); };
+  cam.raf = requestAnimationFrame(tick);
+}
 function drawDiagram(l, s) {
   const PX = n => ({ x: 90 + n.x / 100 * (W - 180), y: 100 + n.y / 100 * (H - 190) });
   const P = id => PX(l.nodes.find(x => x.id === id));
@@ -286,67 +298,99 @@ function drawDiagram(l, s) {
   const real = l.nodes.filter(n => n.kind !== 'region');
   for (let a = 0; a < real.length; a++) for (let b = a + 1; b < real.length; b++) {
     const p = PX(real[a]), q = PX(real[b]);
-    K = Math.min(K, Math.max(Math.abs(p.x - q.x) / 164, Math.abs(p.y - q.y) / 126));
+    K = Math.min(K, Math.max(Math.abs(p.x - q.x) / 180, Math.abs(p.y - q.y) / 138));
   }
   K = Math.max(0.7, Math.min(1.45, K * 0.98));
   const focus = new Set(s.focus || []), flows = s.flows || [];
   const si = l.steps.indexOf(s), first = firstSeen(l);
+  const prevFocus = !reducedMotion && lastDraw.slug === l.slug ? lastDraw.focus : null;
+  lastDraw.slug = l.slug; lastDraw.focus = focus;
   const vis = n => first[n.id] <= si, shown = l.nodes.filter(vis), shownIds = new Set(shown.map(n => n.id));
   const slot = 1.15, T = Math.max(flows.length, 1) * slot + 0.9;
   const key = (a, b) => [a, b].sort().join('|');
-  const hot = new Map(); flows.forEach(f => { if (!hot.has(key(f.from, f.to))) hot.set(key(f.from, f.to), f.kind); });
   // iso-routed elbow along the two iso axes (rounded corner), canonical per sorted pair; straight when the detour would be large
   const route = (ida, idb) => {
     const [i1, i2] = [ida, idb].sort(), a = P(i1), b = P(i2), dx = b.x - a.x, dy = b.y - a.y;
     const du = (dx / .866 + 2 * dy) / 2, dv = (2 * dy - dx / .866) / 2, m = { x: a.x + du * .866, y: a.y + du * .5 };
     const c = Math.hypot(dx, dy) || 1, off = Math.abs((m.x - a.x) * dy - (m.y - a.y) * dx) / c, s1 = Math.abs(du), s2 = Math.abs(dv), r = Math.min(16, s1 / 2, s2 / 2);
-    if (off > 60 || r < 2) return { d: `M${a.x},${a.y}L${b.x},${b.y}`, mid: [(a.x + b.x) / 2, (a.y + b.y) / 2], fwd: ida === i1 };
+    if (off > 60 || r < 2) return { d: `M${a.x},${a.y}L${b.x},${b.y}`, mid: [(a.x + b.x) / 2, (a.y + b.y) / 2], fwd: ida === i1, n: [-dy / c, dx / c] };
     const e1 = [Math.sign(du) * .866, Math.sign(du) * .5], e2 = [-Math.sign(dv) * .866, Math.sign(dv) * .5], h = (s1 + s2) / 2;
-    return { d: `M${a.x},${a.y}L${m.x - r * e1[0]},${m.y - r * e1[1]}Q${m.x},${m.y} ${m.x + r * e2[0]},${m.y + r * e2[1]}L${b.x},${b.y}`, mid: h <= s1 ? [a.x + e1[0] * h, a.y + e1[1] * h] : [m.x + e2[0] * (h - s1), m.y + e2[1] * (h - s1)], fwd: ida === i1 };
+    return { d: `M${a.x},${a.y}L${m.x - r * e1[0]},${m.y - r * e1[1]}Q${m.x},${m.y} ${m.x + r * e2[0]},${m.y + r * e2[1]}L${b.x},${b.y}`, mid: h <= s1 ? [a.x + e1[0] * h, a.y + e1[1] * h] : [m.x + e2[0] * (h - s1), m.y + e2[1] * (h - s1)], fwd: ida === i1, n: [-dy / c, dx / c] };
   };
+  const hot = new Map(); flows.forEach(f => { if (!hot.has(key(f.from, f.to))) hot.set(key(f.from, f.to), { kind: f.kind, fwd: route(f.from, f.to).fwd }); });
+  const clsFor = (n, fs) => (fs.size ? (fs.has(n.id) ? ' focus' : ' dim') : '') + (first[n.id] === si && !reducedMotion ? ' rise' : '');
+  const prisms = new Set();
   const nodeSvg = n => {
-    const { x, y } = PX(n), cls = (focus.size ? (focus.has(n.id) ? ' focus' : ' dim') : '') + (first[n.id] === si ? ' rise' : '');
-    const a = art(n.kind), lines = blockLabel(n.label), rg = n.kind === 'region';
-    let g = `<ellipse class="shadow" cy="${K * 6}" rx="${K * (rg ? 90 : 66)}" ry="${K * (rg ? 48 : 36)}"/>`;
-    if (focus.has(n.id) && !rg) g += `<ellipse class="ring" cy="${K * 4}" rx="${K * 70}" ry="${K * 39}"/>`;
+    const { x, y } = PX(n), a = art(n.kind), lines = blockLabel(n.label), rg = n.kind === 'region';
+    const c1 = clsFor(n, focus), c0 = prevFocus ? clsFor(n, prevFocus) : c1;
+    let g = `<ellipse class="shadow" cy="${K * 6}" rx="${K * (rg ? 90 : 72)}" ry="${K * (rg ? 48 : 40)}"/>`;
+    if (focus.has(n.id) && !rg) g += `<ellipse class="ring" cy="${K * 4}" rx="${K * 78}" ry="${K * 43}"/>`;
     if (a) {
       const w = Math.max(...lines.map(t => t.length)) * 7.4 + 22, ph = lines.length * 15 + 9, py = K * a[1] + 12;
       g += a[0] + `<g class="pill"><rect x="${-w / 2}" y="${py}" width="${w}" height="${ph}" rx="${Math.min(ph / 2, 12)}"/>` + lines.map((t, k) => `<text x="0" y="${py + 16 + k * 15}">${esc(t)}</text>`).join('') + '</g>';
     } else {
-      const A = 44, h = 36, sc = K * 1.5, fs = 14.5 * Math.max(K, .85);
-      g += box(-A, A, -A, A, 0, h) + `<g class="nico" transform="matrix(${.866 * sc},${.5 * sc},${-.866 * sc},${.5 * sc},0,${-K * h}) translate(-12,-12)">${I[KIND_ICON[n.kind]] || I.service}</g>`
-        + lines.map((t, k) => `<text class="lbl${k ? ' l2' : ''}" font-size="${fs}" x="0" y="${K * (A - h / 2) + 5 + (k - (lines.length - 1) / 2) * fs * 1.1}">${esc(t)}</text>`).join('');
+      // chamfered prism: straight sides to h-b, chamfer faces up to an inset top face with a gradient
+      prisms.add(n.kind);
+      const A = 52, h = 42, b = 9, hs = h - b, t = A - b, sc = K * 1.5, fs = 15.5 * Math.max(K, .85);
+      g += poly('left', [iso(-A, A, 0), iso(A, A, 0), iso(A, A, hs), iso(-A, A, hs)]) + poly('right', [iso(A, A, 0), iso(A, -A, 0), iso(A, -A, hs), iso(A, A, hs)])
+        + poly('left', [iso(-A, A, hs), iso(A, A, hs), iso(t, t, h), iso(-t, t, h)]).replace('f-left', 'f-left ch') + poly('right', [iso(A, A, hs), iso(A, -A, hs), iso(t, -t, h), iso(t, t, h)]).replace('f-right', 'f-right ch')
+        + `<polygon class="s" fill="url(#gr-${esc(n.kind)})" points="${pts([iso(-t, -t, h), iso(t, -t, h), iso(t, t, h), iso(-t, t, h)])}"/>`
+        + `<g class="nico" transform="matrix(${.866 * sc},${.5 * sc},${-.866 * sc},${.5 * sc},0,${-K * h}) translate(-12,-12)">${I[KIND_ICON[n.kind]] || I.service}</g>`
+        + lines.map((t, k) => `<text class="lbl${k ? ' l2' : ''}" font-size="${fs}" x="0" y="${K * (A - hs / 2) + 5 + (k - (lines.length - 1) / 2) * fs * 1.1}">${esc(t)}</text>`).join('');
     }
-    return `<g class="node kind-${esc(n.kind)}${cls}" transform="translate(${x.toFixed(1)},${y.toFixed(1)})"><g class="body">${g}</g></g>`;
+    return `<g class="node kind-${esc(n.kind)}${c0}"${c0 !== c1 ? ` data-c="${c1}"` : ''} transform="translate(${x.toFixed(1)},${y.toFixed(1)})"><g class="body">${g}</g></g>`;
   };
-  // Zoom onto the area the nodes use, keeping the canvas aspect ratio.
-  const pts = l.nodes.map(PX), x0 = Math.min(...pts.map(p => p.x)) - 120 * K, x1 = Math.max(...pts.map(p => p.x)) + 120 * K;
-  const y0 = Math.min(...pts.map(p => p.y)) - 130 * K, y1 = Math.max(...pts.map(p => p.y)) + 90 * K;
-  let vw = x1 - x0, vh = y1 - y0; const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  // camera: frame only the visible nodes, with a minimum size, keeping the canvas aspect
+  const sp = (shown.length ? shown : l.nodes.slice(0, 1)).map(PX), x0 = Math.min(...sp.map(p => p.x)) - 130, x1 = Math.max(...sp.map(p => p.x)) + 130;
+  const y0 = Math.min(...sp.map(p => p.y)) - 170, y1 = Math.max(...sp.map(p => p.y)) + 100;
+  let vw = Math.max(x1 - x0, 520), vh = y1 - y0; const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
   if (vw / vh < W / H) vw = vh * W / H; else vh = vw * H / W;
-  const vb = [cx - vw / 2, cy - vh / 2, vw, vh].map(v => v.toFixed(1)).join(' ');
-  let svg = `<svg id="svg" viewBox="${vb}" preserveAspectRatio="xMidYMid meet" role="img" aria-labelledby="svg-title svg-desc"><title id="svg-title">${esc(l.title)} diagram</title><desc id="svg-desc">${esc(s.caption)} Components: ${esc(shown.map(n => n.label).join(', '))}.${flows.length ? ' Messages: ' + esc(flows.map(f => `${nodeLabel(l, f.from)} to ${nodeLabel(l, f.to)}${f.label ? ' (' + f.label + ')' : ''}`).join('; ')) + '.' : ''}</desc>`;
+  const target = [cx - vw / 2, cy - vh / 2, vw, vh];
+  let body = '';
   const order = [...shown].sort((a, b) => a.y - b.y || a.x - b.x);
-  for (const n of order) if (n.kind === 'region') svg += nodeSvg(n);
-  for (const e of l.edges) if (shownIds.has(e.from) && shownIds.has(e.to)) { const k = hot.get(key(e.from, e.to)); svg += `<path class="edge${k ? ' hot k-' + k : ''}" d="${route(e.from, e.to).d}"/>`; }
-  for (const n of order) if (n.kind !== 'region') svg += nodeSvg(n);
-  // flow labels at path midpoints, stacked when several share an edge
+  for (const n of order) if (n.kind === 'region') body += nodeSvg(n);
+  for (const e of l.edges) if (shownIds.has(e.from) && shownIds.has(e.to)) {
+    const k = hot.get(key(e.from, e.to)), isNew = Math.max(first[e.from], first[e.to]) === si && !reducedMotion;
+    body += `<path class="edge${k ? ' hot k-' + k.kind : ''}${isNew ? ' new' : ''}"${k ? ` data-f="${k.fwd ? 'f' : 'r'}"` : ''} d="${route(e.from, e.to).d}"/>`;
+  }
+  for (const n of order) if (n.kind !== 'region') body += nodeSvg(n);
+  // flow labels beside the path midpoint (offset along the normal, clear of the line), stacked when several share an edge
   const used = {};
   flows.forEach(f => {
     if (!f.label) return;
-    const rt = route(f.from, f.to), k = used[key(f.from, f.to)] = (used[key(f.from, f.to)] || 0) + 1, w = f.label.length * 8 + 22, mx = rt.mid[0], my = rt.mid[1] - 20 - (k - 1) * 30;
-    svg += `<g class="flabel k-${esc(f.kind)}"><rect x="${mx - w / 2}" y="${my - 13}" width="${w}" height="26" rx="13"/><text x="${mx}" y="${my + 4.5}">${esc(f.label)}</text></g>`;
+    const rt = route(f.from, f.to), k = used[key(f.from, f.to)] = (used[key(f.from, f.to)] || 0) + 1, w = f.label.length * 8 + 22;
+    let [nx, ny] = rt.n; if (ny > 0) { nx = -nx; ny = -ny; }
+    const d = Math.abs(nx) * w / 2 + Math.abs(ny) * 13 + 10 + (k - 1) * 30, mx = rt.mid[0] + nx * d, my = rt.mid[1] + ny * d;
+    body += `<g class="flabel k-${esc(f.kind)}"><rect x="${mx - w / 2}" y="${my - 13}" width="${w}" height="26" rx="13"/><text x="${mx}" y="${my + 4.5}">${esc(f.label)}</text></g>`;
   });
-  // packets: SMIL motion along the same path d, plus a comet streak (dash offset animated with the same keyTimes)
+  // packets: two dots per flow (staggered), SMIL motion with eased spline timing inside the flow's slot
   flows.forEach((f, i) => {
-    const rt = route(f.from, f.to), t1 = ((i * slot) / T).toFixed(3), t2 = ((i * slot + 0.95) / T).toFixed(3), fw = rt.fwd;
-    const kp = fw ? '0;0;1;1' : '1;1;0;0', kt = `0;${t1};${t2};1`, off = fw ? '10;10;-90;-90' : '-100;-100;10;10';
-    svg += `<path class="comet k-${esc(f.kind)}" d="${rt.d}" pathLength="100" stroke-dasharray="10 100"><animate attributeName="stroke-dashoffset" dur="${T}s" repeatCount="indefinite" keyTimes="${kt}" values="${off}" calcMode="linear"/></path>`
-      + `<g class="packet k-${esc(f.kind)}" opacity="0"><animateMotion dur="${T}s" repeatCount="indefinite" path="${rt.d}" keyPoints="${kp}" keyTimes="${kt}" calcMode="linear"/><animate attributeName="opacity" dur="${T}s" repeatCount="indefinite" keyTimes="0;${t1};${t1};${t2};${t2};1" values="0;0;1;1;0;0" calcMode="discrete"/><circle class="halo" r="13"/><circle r="6.5"/></g>`;
+    const rt = route(f.from, f.to), kp = rt.fwd ? '0;0;1;1' : '1;1;0;0';
+    for (const dl of [0, 0.18]) {
+      const t1 = ((i * slot + dl) / T).toFixed(3), t2 = ((i * slot + 0.95 + dl) / T).toFixed(3), kt = `0;${t1};${t2};1`;
+      body += `<g class="packet k-${esc(f.kind)}" opacity="0"><animateMotion dur="${T}s" repeatCount="indefinite" path="${rt.d}" keyPoints="${kp}" keyTimes="${kt}" calcMode="spline" keySplines="0 0 1 1;.45 0 .2 1;0 0 1 1"/><animate attributeName="opacity" dur="${T}s" repeatCount="indefinite" keyTimes="0;${t1};${t1};${t2};${t2};1" values="0;0;1;1;0;0" calcMode="discrete"/><circle r="6"/></g>`;
+    }
   });
-  svg += '</svg>';
-  $('#diagram').innerHTML = svg;
+  const defs = [...prisms].map(k => `<g class="kind-${esc(k)}"><linearGradient id="gr-${esc(k)}" x1="0" y1="0" x2="1" y2="1"><stop class="gs-a" offset="0"/><stop class="gs-b" offset="1"/></linearGradient></g>`).join('');
+  $('#diagram').innerHTML = `<svg id="svg" viewBox="${target.map(v => v.toFixed(1)).join(' ')}" preserveAspectRatio="xMidYMid meet" role="img" aria-labelledby="svg-title svg-desc"><title id="svg-title">${esc(l.title)} diagram</title><desc id="svg-desc">${esc(s.caption)} Components: ${esc(shown.map(n => n.label).join(', '))}.${flows.length ? ' Messages: ' + esc(flows.map(f => `${nodeLabel(l, f.from)} to ${nodeLabel(l, f.to)}${f.label ? ' (' + f.label + ')' : ''}`).join('; ')) + '.' : ''}</desc><defs>${defs}</defs>${body}</svg>`;
   const el = $('#svg');
+  // measure edges: draw-in length for new ones; trim hot ones short of the node and add an arrowhead at the destination
+  const R0 = 52 * K;
+  el.querySelectorAll('.edge').forEach(p => {
+    const L = p.getTotalLength(), dir = p.dataset.f;
+    if (p.classList.contains('new')) p.style.setProperty('--len', L.toFixed(1));
+    if (!dir) return;
+    const R = Math.min(R0, L / 3), at = dir === 'f' ? L - R : R, sg = dir === 'f' ? 1 : -1;
+    const q = p.getPointAtLength(at), a = p.getPointAtLength(Math.max(at - 2, 0)), b = p.getPointAtLength(Math.min(at + 2, L));
+    const ang = Math.atan2(sg * (b.y - a.y), sg * (b.x - a.x)) * 180 / Math.PI;
+    p.style.strokeDasharray = dir === 'f' ? `${L - R} ${L}` : `0 ${R} ${L - R} ${L}`;
+    const ar = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+    ar.setAttribute('class', 'arrow' + (p.classList.contains('new') ? ' new' : '')); ar.setAttribute('d', 'M-11,-6.5L3,0L-11,6.5Z');
+    ar.setAttribute('transform', `translate(${q.x.toFixed(1)} ${q.y.toFixed(1)}) rotate(${ang.toFixed(1)})`);
+    el.insertBefore(ar, el.querySelector('.flabel,.packet'));
+  });
+  flyTo(el, target, l.slug);
+  if (prevFocus) { el.getBoundingClientRect(); el.querySelectorAll('.node[data-c]').forEach(n => n.setAttribute('class', `node kind-${n.getAttribute('class').match(/kind-(\S+)/)[1]}${n.dataset.c}`)); }
   if (paused) { el.setCurrentTime(0.5); el.pauseAnimations(); }
   syncPause();
 }
