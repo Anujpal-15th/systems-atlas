@@ -382,30 +382,53 @@ h1{font-size:32px;font-weight:700;letter-spacing:-.03em}
 .timeline a{font-size:11.5px}
 
 .node .lbl{font-weight:700;letter-spacing:-.01em}
-.flabel text{font-family:var(--mono);font-size:13px}
+.flabel text{font-family:var(--mono);font-size:15px}
 /* desktop lesson view: fit exactly in the viewport, only the tree and guide scroll internally */
 @media (min-width:1281px){
   body[data-view=learn]{height:100vh;overflow:hidden;display:flex;flex-direction:column}
-  body[data-view=learn] .top{flex:none;position:static;height:58px}
-  body[data-view=learn] .shell{flex:1 1 0;min-height:0;width:100%;padding:12px 16px;gap:14px;align-items:stretch;grid-template-rows:minmax(0,1fr)}
-  body[data-view=learn] .sidebar{position:static;top:auto;max-height:none;height:100%;min-height:0}
+  body[data-view=learn] .top{flex:none;position:static;height:48px}
+  body[data-view=learn] .views a{padding:0 16px;height:34px}
+  body[data-view=learn] .shell{flex:1 1 0;min-height:0;width:100%;max-width:none;padding:13px 14px 15px;gap:14px;align-items:stretch;grid-template-rows:minmax(0,1fr);grid-template-columns:254px minmax(0,1fr)}
+  body[data-view=learn] .sidebar{position:static;top:auto;max-height:none;height:100%;min-height:0;gap:4px}
+  body[data-view=learn] .side-head{padding:4px 8px 6px}
   body[data-view=learn] .tree{min-height:0}
-  body[data-view=learn] main{height:100%;min-height:0;grid-template-rows:minmax(0,1fr);align-items:stretch;gap:14px}
-  body[data-view=learn] .lesson-main{min-height:0;height:100%;gap:10px}
-  body[data-view=learn] .stage-card{flex:1 1 0;min-height:0;display:flex;flex-direction:column;padding:10px 16px 10px}
-  body[data-view=learn] .stage-card h1{font-size:24px;margin:2px 0 0}
-  body[data-view=learn] .stage-card .sub{margin:2px 0 0}
-  body[data-view=learn] .stage{flex:1 1 0;min-height:0;margin-top:8px;padding:8px;display:flex;flex-direction:column}
+  body[data-view=learn] .tree summary{height:32px;padding:0 8px;box-sizing:border-box}
+  body[data-view=learn] .tree details{margin:0}
+  body[data-view=learn] .tree li a{font-size:13px}
+  body[data-view=learn] .progress-card{height:42px;box-sizing:border-box;padding:0 16px;grid-template-columns:1fr auto;align-content:center}
+  body[data-view=learn] .progress-card .bar{display:none}
+  body[data-view=learn] main{height:100%;min-height:0;grid-template-rows:minmax(0,1fr);align-items:stretch;gap:14px;grid-template-columns:minmax(0,1fr) clamp(300px,17.2vw,330px)}
+  body[data-view=learn] .lesson-main{min-height:0;height:100%;gap:14px}
+  body[data-view=learn] .stage-card{flex:1 1 0;min-height:0;display:flex;flex-direction:column;padding:15px;border-radius:12px}
+  body[data-view=learn] .crumb{font-size:13px;line-height:20px}
+  body[data-view=learn] .stage-card h1{font-size:30px;line-height:34px;margin:4px 0 3px}
+  body[data-view=learn] .stage-card .sub{margin:0;font-size:13px;line-height:20px}
+  body[data-view=learn] .badges span{height:24px;box-sizing:border-box;padding:0 14px;font-size:11px}
+  body[data-view=learn] .stage{flex:1 1 0;min-height:0;margin-top:10px;padding:12px;display:flex;flex-direction:column;border-radius:12px}
+  body[data-view=learn] .metric{height:48px;box-sizing:border-box;min-width:105px;padding:0 12px;display:flex;flex-direction:column;justify-content:center}
+  body[data-view=learn] .metric b{font-size:15px}
+  body[data-view=learn] .hud .btn{height:28px;padding:0 12px;box-sizing:border-box}
   body[data-view=learn] .diagram{flex:1 1 0;min-height:0;position:relative}
   body[data-view=learn] .diagram svg{position:absolute;inset:0;width:100%;height:100%}
-  body[data-view=learn] .timeline{flex:none;padding:8px 16px 4px}
-  body[data-view=learn] .timeline ol{margin-top:6px;padding-bottom:2px}
-  body[data-view=learn] .guide-col{position:static;top:auto;height:100%;max-height:none;min-height:0;gap:12px;overflow:hidden}
-  body[data-view=learn] main{grid-template-columns:minmax(0,1fr) clamp(340px,24vw,420px)}
-  body[data-view=learn] .guide{flex:1 1 0;min-height:0;overflow:hidden;padding:14px 16px;gap:10px}
+  body[data-view=learn] .timeline{flex:none;height:100px;box-sizing:border-box;padding:12px 15px 8px;border-radius:12px}
+  body[data-view=learn] .tl-head{font-size:12px}
+  body[data-view=learn] .timeline ol{margin-top:8px;padding-bottom:0;overflow:hidden}
+  body[data-view=learn] .timeline .dot{width:24px;height:24px;font-size:11px}
+  body[data-view=learn] .timeline li+li::before{top:13px}
+  body[data-view=learn] .timeline a{font-size:12px;gap:4px;max-width:100%}
+  body[data-view=learn] .timeline li{min-width:0}
+  body[data-view=learn] .timeline .tl-label{display:block;max-width:100%;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  body[data-view=learn] .guide-col{position:static;top:auto;height:100%;max-height:none;min-height:0;gap:14px;overflow:hidden}
+  body[data-view=learn] .guide{flex:1 1 0;min-height:0;overflow:hidden;padding:16px;gap:10px;border-radius:12px}
+  body[data-view=learn] .guide h2{font-size:18px;line-height:24px}
+  body[data-view=learn] .g-body{font-size:13px;line-height:20px}
   body[data-view=learn] .controls{margin-top:auto}
-  body[data-view=learn] .learn{flex:none;padding:10px 16px}
-  body[data-view=learn] .learn ul{display:none}
+  body[data-view=learn] .controls .btn{height:36px;padding:0 14px;box-sizing:border-box}
+  body[data-view=learn] .learn{flex:none;padding:14px 16px;border-radius:12px}
+  body[data-view=learn] .learn ul{margin-top:8px;gap:0;font-size:12.5px;line-height:18px}
+  body[data-view=learn] .learn li{height:24px;align-items:flex-start;padding-top:3px;box-sizing:border-box}
+  body[data-view=learn] .learn li .i{margin-top:0}
+  body[data-view=learn] .learn li span{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   body[data-view=learn] .learn .practice-link{margin-top:6px}
 }
 
@@ -426,3 +449,4 @@ h1{font-size:32px;font-weight:700;letter-spacing:-.03em}
   body.side-min .rail .i{width:22px;height:22px;fill:var(--ink);stroke:var(--ink)}
 }
 @media (prefers-reduced-motion:reduce){.shell{transition:none}}
+.idea[hidden]{display:none}

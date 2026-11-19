@@ -191,7 +191,7 @@ function lessonShell(l) {
       <div class="controls"><button id="back" class="btn">${icon('arrowL')}Back</button><button id="next" class="btn primary"></button></div>
       <p class="keys"><kbd>←</kbd><kbd>→</kbd> step · <kbd>R</kbd> replay · <kbd>Space</kbd> pause</p>
     </section>
-    <section class="card learn"><b>You'll learn</b><ul id="learn">${l.learn.map(x => `<li>${icon('check')}<span>${esc(x)}</span></li>`).join('')}</ul>
+    <section class="card learn"><b>You'll learn</b><ul id="learn">${l.learn.map(x => `<li>${icon('check')}<span title="${esc(x)}">${esc(x)}</span></li>`).join('')}</ul>
       <p class="practice-link"><a href="#/practice/${esc(l.slug)}">${icon('target')}Practice this lesson</a>${l.lab ? `<a href="#/lab/${esc(l.slug)}">${icon('flask')}Open design lab</a>` : ''}</p></section>
   </aside>`;
 }
@@ -292,7 +292,7 @@ function flyTo(svg, to, slug) {
   cam.raf = requestAnimationFrame(tick);
 }
 function drawDiagram(l, s) {
-  const PX = n => ({ x: 90 + n.x / 100 * (W - 180), y: 100 + n.y / 100 * (H - 190) });
+  let PX = n => ({ x: 90 + n.x / 100 * (W - 180), y: 100 + n.y / 100 * (H - 190) });
   const P = id => PX(l.nodes.find(x => x.id === id));
   K = 1;
   const real = l.nodes.filter(n => n.kind !== 'region');
@@ -301,6 +301,9 @@ function drawDiagram(l, s) {
     K = Math.min(K, Math.max(Math.abs(p.x - q.x) / 180, Math.abs(p.y - q.y) / 178));
   }
   K = Math.max(0.62, Math.min(1.3, K * 0.98));
+  // fit layout: keep blocks at natural size (K=1, ~170 units wide) and spread the nodes instead of shrinking them
+  const dg = $('#diagram'), cw = dg.clientWidth, ch = dg.clientHeight, fitLayout = matchMedia('(min-width:1281px)').matches && cw > 200 && ch > 100;
+  if (fitLayout) { const S = 1 / K, P0 = PX; K = 1; PX = n => { const p = P0(n); return { x: 450 + (p.x - 450) * S, y: 265 + (p.y - 265) * S }; }; }
   const focus = new Set(s.focus || []), flows = s.flows || [];
   const si = l.steps.indexOf(s), first = firstSeen(l);
   const prevFocus = !reducedMotion && lastDraw.slug === l.slug ? lastDraw.focus : null;
@@ -328,7 +331,7 @@ function drawDiagram(l, s) {
     if (a) {
       // name pill: panel fill, ink border, leading icon (user / globe / db ...)
       const ic = { client: 'cdn', user: 'user', db: 'db', storage: 'storage', queue: 'queue', region: 'region' }[n.kind] || 'cdn', tw = n.label.length * 8.6, w = tw + 54, py = K * a[1] + 14;
-      g += a[0] + `<g class="pill"><rect x="${-w / 2}" y="${py}" width="${w}" height="32" rx="16"/><g class="pico" transform="translate(${-w / 2 + 11},${py + 7}) scale(.75)">${I[ic]}</g><text x="${12}" y="${py + 21.5}">${esc(n.label)}</text></g>`;
+      g += a[0] + `<g class="pill"><rect x="${-w / 2}" y="${py}" width="${w}" height="34" rx="17"/><g class="pico" transform="translate(${-w / 2 + 11},${py + 8}) scale(.75)">${I[ic]}</g><text x="${12}" y="${py + 22.5}">${esc(n.label)}</text></g>`;
     } else {
       // hexagonal prism seen from above: flat-top hexagon (rounded) + side depth under the three lower edges; label inside the top face
       prisms.add(n.kind);
@@ -352,7 +355,14 @@ function drawDiagram(l, s) {
   const y0 = Math.min(...sp.map(p => p.y)) - 150 * K - 50, y1 = Math.max(...sp.map(p => p.y)) + 95 * K + 40;
   let vw = Math.max(x1 - x0, 600), vh = y1 - y0; const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
   if (vw / vh < W / H) vw = vh * W / H; else vh = vw * H / W;
-  const target = [cx - vw / 2, cy - vh / 2, vw, vh];
+  let target = [cx - vw / 2, cy - vh / 2, vw, vh];
+  // fit layout: fixed comfortable scale (1 SVG unit = 1 CSS px), only zooming out when the visible nodes would not fit
+  if (fitLayout) {
+    const ext = ns => { const q = ns.map(PX), X0 = Math.min(...q.map(p => p.x)) - 115, X1 = Math.max(...q.map(p => p.x)) + 115, Y0 = Math.min(...q.map(p => p.y)) - 120, Y1 = Math.max(...q.map(p => p.y)) + 125; return { X0, X1, Y0, Y1, sc: Math.min(1, cw / (X1 - X0), ch / (Y1 - Y0)) }; };
+    const e1 = ext(cn), e2 = ext(shown), e = shown.length && e2.sc >= .75 ? e2 : e1; // prefer framing everything revealed so far when it still reads at a comfortable scale
+    const ex = (e.X0 + e.X1) / 2, ey = (e.Y0 + e.Y1) / 2;
+    target = [ex - cw / e.sc / 2, ey - ch / e.sc / 2, cw / e.sc, ch / e.sc];
+  }
   let body = '';
   const order = [...shown].sort((a, b) => a.y - b.y || a.x - b.x);
   for (const n of order) if (n.kind === 'region') body += nodeSvg(n);
@@ -365,10 +375,10 @@ function drawDiagram(l, s) {
   const used = {};
   flows.forEach(f => {
     if (!f.label) return;
-    const rt = route(f.from, f.to), k = used[key(f.from, f.to)] = (used[key(f.from, f.to)] || 0) + 1, w = f.label.length * 8.4 + 26;
+    const rt = route(f.from, f.to), k = used[key(f.from, f.to)] = (used[key(f.from, f.to)] || 0) + 1, w = f.label.length * 9.2 + 30;
     let [nx, ny] = rt.n; if (ny > 0) { nx = -nx; ny = -ny; }
-    const d = Math.abs(nx) * w / 2 + Math.abs(ny) * 14 + 14 + (k - 1) * 32, mx = rt.mid[0] + nx * d, my = rt.mid[1] + ny * d;
-    body += `<g class="flabel k-${esc(f.kind)}"><rect x="${mx - w / 2}" y="${my - 14}" width="${w}" height="28" rx="14"/><text x="${mx}" y="${my + 5}">${esc(f.label)}</text></g>`;
+    const d = Math.abs(nx) * w / 2 + Math.abs(ny) * 18 + 14 + (k - 1) * 40, mx = rt.mid[0] + nx * d, my = rt.mid[1] + ny * d;
+    body += `<g class="flabel k-${esc(f.kind)}"><rect x="${mx - w / 2}" y="${my - 18}" width="${w}" height="36" rx="18"/><text x="${mx}" y="${my + 5.5}">${esc(f.label)}</text></g>`;
   });
   // packets: two dots per flow (staggered), SMIL motion with eased spline timing inside the flow's slot
   flows.forEach((f, i) => {
@@ -539,11 +549,13 @@ route();
 // Shrink the guide text a step at a time until the panel fits without scrolling (desktop fit layout only).
 function fitGuide() {
   const g = $('.guide'); if (!g) return;
-  let size = 15; g.style.fontSize = '';
+  let size = 13; g.style.fontSize = '';
   const body = $('#g-body'); body.style.fontSize = '';
   const ch = $('#changes'); ch.hidden = false;
-  while (g.scrollHeight > g.clientHeight + 1 && size > 12.5) { size -= 0.5; body.style.fontSize = size + 'px'; }
+  const idea = $('.idea'); if (idea) idea.hidden = false;
+  while (g.scrollHeight > g.clientHeight + 1 && size > 12) { size -= 0.5; body.style.fontSize = size + 'px'; }
   if (g.scrollHeight > g.clientHeight + 1) ch.hidden = true;
   while (g.scrollHeight > g.clientHeight + 1 && size > 11) { size -= 0.5; body.style.fontSize = size + 'px'; }
+  if (idea && g.scrollHeight > g.clientHeight + 1) idea.hidden = true; // last resort at short viewports
 }
 addEventListener('resize', () => { if (cur.view === 'learn') fitGuide(); });
