@@ -465,3 +465,6 @@ h1{font-size:32px;font-weight:700;letter-spacing:-.03em}
 .tree .fold{width:18px;height:18px}
 .side-head{padding:2px 8px 8px}
 .side-head a{font-size:15px}
+
+/* "new topic" badges removed by request */
+.new,.b-new,.foot{display:none!important}
