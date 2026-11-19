@@ -246,62 +246,102 @@ function setMetric(m, v) {
   requestAnimationFrame(tick);
 }
 
-// ---------- diagram: isometric blocks in SVG; packets use SMIL so pause/replay are native ----------
+// ---------- diagram: illustrated isometric scene in SVG; packets use SMIL so pause/replay are native ----------
 const W = 900, H = 520;
-let HW = 82, HH = 41, D = 28;
-function blockLabel(label) {
-  if (label.length <= 12 || !label.includes(' ')) return [label];
-  const mid = label.length / 2; let best = -1;
-  for (let k = 0; k < label.length; k++) if (label[k] === ' ' && (best < 0 || Math.abs(k - mid) < Math.abs(best - mid))) best = k;
-  return [label.slice(0, best), label.slice(best + 1)];
+let K = 1; // auto "fit" scale baked into iso() so strokes keep their weight
+const iso = (u, v, z = 0) => [K * 0.866 * (u - v), K * (0.5 * (u + v) - z)];
+const pts = a => a.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
+const poly = (c, a, x = '') => `<polygon class="s f-${c}" points="${pts(a)}"${x}/>`;
+const box = (u0, u1, v0, v1, z0, z1, x = '') =>
+  poly('left', [iso(u0, v1, z0), iso(u1, v1, z0), iso(u1, v1, z1), iso(u0, v1, z1)], x) + poly('right', [iso(u1, v1, z0), iso(u1, v0, z0), iso(u1, v0, z1), iso(u1, v1, z1)], x) + poly('top', [iso(u0, v0, z1), iso(u1, v0, z1), iso(u1, v1, z1), iso(u0, v1, z1)], x);
+const seg = (a, b) => `<path class="d" d="M${a[0].toFixed(1)} ${a[1].toFixed(1)}L${b[0].toFixed(1)} ${b[1].toFixed(1)}"/>`;
+function cyl(r, z0, z1, bands = []) {
+  const rx = K * 1.2247 * r, ry = K * 0.7071 * r, y0 = -K * z0, y1 = -K * z1;
+  return `<path class="s f-left" d="M${-rx},${y0}A${rx},${ry} 0 0 0 ${rx},${y0}L${rx},${y1}L${-rx},${y1}Z"/>`
+    + bands.map(z => `<path class="d" d="M${-rx},${-K * z}A${rx},${ry} 0 0 0 ${rx},${-K * z}"/>`).join('') + `<ellipse class="s f-top" cy="${y1}" rx="${rx}" ry="${ry}"/>`;
+}
+// per-kind illustration: [svg, ground-front y (unscaled) where the label pill hangs], or null for a labelled prism
+function art(kind) {
+  const led = (u, v, z) => { const [x, y] = iso(u, v, z); return `<circle class="led" cx="${x}" cy="${y}" r="${2.4 * Math.max(K, .8)}"/>`; };
+  if (kind === 'client') {
+    let s = box(-44, 44, -44, 44, 0, 8) + box(-22, -18, -22, 22, 12, 46) + box(-16, 24, -24, 24, 8, 12);
+    for (const z of [24, 30, 36, 42]) s += seg(iso(-18, -14, z), iso(-18, z % 12 ? 14 : 6, z));
+    return [s + [-8, 4, 14].map(u => seg(iso(u, -16, 12), iso(u, 16, 12))).join(''), 44];
+  }
+  if (kind === 'user') { const [hx, hy] = iso(0, 0, 40); return [cyl(26, 0, 5) + cyl(10, 5, 28) + `<circle class="s f-top" cx="${hx}" cy="${hy}" r="${9 * K}"/>`, 20]; }
+  if (kind === 'server') {
+    let s = box(-18, 18, -18, 18, 0, 74);
+    for (const z of [16, 32, 48]) s += seg(iso(18, -12, z), iso(18, 4, z)) + led(18, 10, z) + seg(iso(-12, 18, z), iso(4, 18, z)) + led(10, 18, z);
+    return [s, 18];
+  }
+  if (kind === 'db' || kind === 'storage') return [cyl(30, 0, 42, kind === 'db' ? [14, 28] : [10, 21, 32]), 21];
+  if (kind === 'queue') { let s = ''; for (let i = 0; i < 4; i++) s += box(-36 + i * 18, -26 + i * 18, -22, 22, 0, 26) + seg(iso(-26 + i * 18, -14, 13), iso(-26 + i * 18, 14, 13)); return [s, 29]; }
+  if (kind === 'region') return [box(-72, 72, -72, 72, 0, 5, ' stroke-dasharray="7 5"'), 72];
+  return null;
 }
 function drawDiagram(l, s) {
-  const PX = n => ({ x: 70 + n.x / 100 * (W - 140), y: 46 + n.y / 100 * (H - 112) });
+  const PX = n => ({ x: 90 + n.x / 100 * (W - 180), y: 100 + n.y / 100 * (H - 190) });
   const P = id => PX(l.nodes.find(x => x.id === id));
-  // Shrink blocks for crowded layouts: the closest pair of nodes must not overlap.
-  let fit = 1;
-  for (let a = 0; a < l.nodes.length; a++) for (let b = a + 1; b < l.nodes.length; b++) {
-    const p = PX(l.nodes[a]), q = PX(l.nodes[b]);
-    fit = Math.min(fit, Math.max(Math.abs(p.x - q.x) / 172, Math.abs(p.y - q.y) / 116));
+  K = 1;
+  const real = l.nodes.filter(n => n.kind !== 'region');
+  for (let a = 0; a < real.length; a++) for (let b = a + 1; b < real.length; b++) {
+    const p = PX(real[a]), q = PX(real[b]);
+    K = Math.min(K, Math.max(Math.abs(p.x - q.x) / 164, Math.abs(p.y - q.y) / 126));
   }
-  fit = Math.max(0.62, Math.min(1, fit * 0.98));
-  HW = 82 * fit; HH = 41 * fit; D = 28 * fit;
-  const focus = new Set(s.focus || []);
-  const flows = s.flows || [];
+  K = Math.max(0.7, Math.min(1.45, K * 0.98));
+  const focus = new Set(s.focus || []), flows = s.flows || [];
+  const si = l.steps.indexOf(s), prevF = new Set(si > 0 ? l.steps[si - 1].focus || [] : []);
   const slot = 1.15, T = Math.max(flows.length, 1) * slot + 0.9;
-  const hot = new Map(); flows.forEach(f => { const k = [f.from, f.to].sort().join('|'); if (!hot.has(k)) hot.set(k, f.kind); });
-  let svg = `<svg id="svg" viewBox="0 0 ${W} ${H}" role="img" aria-labelledby="svg-title svg-desc"><title id="svg-title">${esc(l.title)} diagram</title><desc id="svg-desc">${esc(s.caption)} Components: ${esc(l.nodes.map(n => n.label).join(', '))}.${flows.length ? ' Messages: ' + esc(flows.map(f => `${nodeLabel(l, f.from)} to ${nodeLabel(l, f.to)}${f.label ? ' (' + f.label + ')' : ''}`).join('; ')) + '.' : ''}</desc>`;
-  // edges (from block base centres)
-  for (const e of l.edges) {
-    const a = P(e.from), b = P(e.to), k = hot.get([e.from, e.to].sort().join('|'));
-    svg += `<line class="edge${k ? ' hot k-' + k : ''}" x1="${a.x}" y1="${a.y + D / 2}" x2="${b.x}" y2="${b.y + D / 2}"/>`;
-  }
-  // blocks, back to front so lower blocks overlap upper ones
-  for (const n of [...l.nodes].sort((a, b) => a.y - b.y)) {
-    const { x, y } = P(n.id), cls = focus.size ? (focus.has(n.id) ? ' focus' : ' dim') : '';
-    const top = `${x},${y - HH} ${x + HW},${y} ${x},${y + HH} ${x - HW},${y}`;
-    const left = `${x - HW},${y} ${x},${y + HH} ${x},${y + HH + D} ${x - HW},${y + D}`;
-    const right = `${x},${y + HH} ${x + HW},${y} ${x + HW},${y + D} ${x},${y + HH + D}`;
-    const lines = blockLabel(n.label);
-    svg += `<g class="node kind-${esc(n.kind)}${cls}"><polygon class="shadow" points="${x - HW + 8},${y + D + 6} ${x + 8},${y + HH + D + 6} ${x + HW + 8},${y + D + 6} ${x + 8},${y - HH + D + 6}"/><polygon class="f-left" points="${left}"/><polygon class="f-right" points="${right}"/><polygon class="f-top" points="${top}"/>`
-      + `<svg class="nico" x="${x - 14 * fit}" y="${y - 30 * fit}" width="${28 * fit}" height="${28 * fit}" viewBox="0 0 24 24">${I[KIND_ICON[n.kind]] || I.service}</svg>`
-      + lines.map((t, k) => `<text class="lbl${k ? ' l2' : ''}" font-size="${(k ? 13.5 : 16) * Math.max(fit, 0.8)}" x="${x}" y="${y + 13 * fit + k * 16 * fit - (lines.length - 1) * 4}">${esc(t)}</text>`).join('') + '</g>';
-  }
-  // static flow labels at edge midpoints, stacked when several share an edge
+  const key = (a, b) => [a, b].sort().join('|');
+  const hot = new Map(); flows.forEach(f => { if (!hot.has(key(f.from, f.to))) hot.set(key(f.from, f.to), f.kind); });
+  // iso-routed elbow along the two iso axes (rounded corner), canonical per sorted pair; straight when the detour would be large
+  const route = (ida, idb) => {
+    const [i1, i2] = [ida, idb].sort(), a = P(i1), b = P(i2), dx = b.x - a.x, dy = b.y - a.y;
+    const du = (dx / .866 + 2 * dy) / 2, dv = (2 * dy - dx / .866) / 2, m = { x: a.x + du * .866, y: a.y + du * .5 };
+    const c = Math.hypot(dx, dy) || 1, off = Math.abs((m.x - a.x) * dy - (m.y - a.y) * dx) / c, s1 = Math.abs(du), s2 = Math.abs(dv), r = Math.min(16, s1 / 2, s2 / 2);
+    if (off > 60 || r < 2) return { d: `M${a.x},${a.y}L${b.x},${b.y}`, mid: [(a.x + b.x) / 2, (a.y + b.y) / 2], fwd: ida === i1 };
+    const e1 = [Math.sign(du) * .866, Math.sign(du) * .5], e2 = [-Math.sign(dv) * .866, Math.sign(dv) * .5], h = (s1 + s2) / 2;
+    return { d: `M${a.x},${a.y}L${m.x - r * e1[0]},${m.y - r * e1[1]}Q${m.x},${m.y} ${m.x + r * e2[0]},${m.y + r * e2[1]}L${b.x},${b.y}`, mid: h <= s1 ? [a.x + e1[0] * h, a.y + e1[1] * h] : [m.x + e2[0] * (h - s1), m.y + e2[1] * (h - s1)], fwd: ida === i1 };
+  };
+  const nodeSvg = n => {
+    const { x, y } = PX(n), cls = focus.size ? (focus.has(n.id) ? ' focus' + (!prevF.has(n.id) && focus.size < l.nodes.length ? ' rise' : '') : ' dim') : '';
+    const a = art(n.kind), lines = blockLabel(n.label), rg = n.kind === 'region';
+    let g = `<ellipse class="shadow" cy="${K * 6}" rx="${K * (rg ? 90 : 66)}" ry="${K * (rg ? 48 : 36)}"/>`;
+    if (focus.has(n.id) && !rg) g += `<ellipse class="ring" cy="${K * 4}" rx="${K * 70}" ry="${K * 39}"/>`;
+    if (a) {
+      const w = Math.max(...lines.map(t => t.length)) * 7.4 + 22, ph = lines.length * 15 + 9, py = K * a[1] + 12;
+      g += a[0] + `<g class="pill"><rect x="${-w / 2}" y="${py}" width="${w}" height="${ph}" rx="${Math.min(ph / 2, 12)}"/>` + lines.map((t, k) => `<text x="0" y="${py + 16 + k * 15}">${esc(t)}</text>`).join('') + '</g>';
+    } else {
+      const A = 44, h = 36, sc = K * 1.5, fs = 14.5 * Math.max(K, .85);
+      g += box(-A, A, -A, A, 0, h) + `<g class="nico" transform="matrix(${.866 * sc},${.5 * sc},${-.866 * sc},${.5 * sc},0,${-K * h}) translate(-12,-12)">${I[KIND_ICON[n.kind]] || I.service}</g>`
+        + lines.map((t, k) => `<text class="lbl${k ? ' l2' : ''}" font-size="${fs}" x="0" y="${K * (A - h / 2) + 5 + (k - (lines.length - 1) / 2) * fs * 1.1}">${esc(t)}</text>`).join('');
+    }
+    return `<g class="node kind-${esc(n.kind)}${cls}" transform="translate(${x.toFixed(1)},${y.toFixed(1)})"><g class="body">${g}</g></g>`;
+  };
+  // Zoom onto the area the nodes use, keeping the canvas aspect ratio.
+  const pts = l.nodes.map(PX), x0 = Math.min(...pts.map(p => p.x)) - 120 * K, x1 = Math.max(...pts.map(p => p.x)) + 120 * K;
+  const y0 = Math.min(...pts.map(p => p.y)) - 130 * K, y1 = Math.max(...pts.map(p => p.y)) + 90 * K;
+  let vw = x1 - x0, vh = y1 - y0; const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  if (vw / vh < W / H) vw = vh * W / H; else vh = vw * H / W;
+  const vb = [cx - vw / 2, cy - vh / 2, vw, vh].map(v => v.toFixed(1)).join(' ');
+  let svg = `<svg id="svg" viewBox="${vb}" role="img" aria-labelledby="svg-title svg-desc"><title id="svg-title">${esc(l.title)} diagram</title><desc id="svg-desc">${esc(s.caption)} Components: ${esc(l.nodes.map(n => n.label).join(', '))}.${flows.length ? ' Messages: ' + esc(flows.map(f => `${nodeLabel(l, f.from)} to ${nodeLabel(l, f.to)}${f.label ? ' (' + f.label + ')' : ''}`).join('; ')) + '.' : ''}</desc>`;
+  const order = [...l.nodes].sort((a, b) => a.y - b.y || a.x - b.x);
+  for (const n of order) if (n.kind === 'region') svg += nodeSvg(n);
+  for (const e of l.edges) { const k = hot.get(key(e.from, e.to)); svg += `<path class="edge${k ? ' hot k-' + k : ''}" d="${route(e.from, e.to).d}"/>`; }
+  for (const n of order) if (n.kind !== 'region') svg += nodeSvg(n);
+  // flow labels at path midpoints, stacked when several share an edge
   const used = {};
   flows.forEach(f => {
     if (!f.label) return;
-    const a = P(f.from), b = P(f.to), key = [f.from, f.to].sort().join('|'), k = used[key] = (used[key] || 0) + 1;
-    const vertical = Math.abs(b.x - a.x) < Math.abs(b.y - a.y);
-    const w = f.label.length * 8.4 + 22;
-    const mx = (a.x + b.x) / 2 + (vertical ? w / 2 + 14 : 0), my = (a.y + b.y) / 2 + D / 2 + (vertical ? (k - 1) * 30 - 12 : -26 - (k - 1) * 30);
+    const rt = route(f.from, f.to), k = used[key(f.from, f.to)] = (used[key(f.from, f.to)] || 0) + 1, w = f.label.length * 8 + 22, mx = rt.mid[0], my = rt.mid[1] - 20 - (k - 1) * 30;
     svg += `<g class="flabel k-${esc(f.kind)}"><rect x="${mx - w / 2}" y="${my - 13}" width="${w}" height="26" rx="13"/><text x="${mx}" y="${my + 4.5}">${esc(f.label)}</text></g>`;
   });
-  // animated packets
+  // packets: SMIL motion along the same path d, plus a comet streak (dash offset animated with the same keyTimes)
   flows.forEach((f, i) => {
-    const a = P(f.from), b = P(f.to), t1 = (i * slot) / T, t2 = (i * slot + 0.95) / T;
-    const path = `M${a.x},${a.y + D / 2} L${b.x},${b.y + D / 2}`;
-    svg += `<g class="packet k-${esc(f.kind)}" opacity="0"><animateMotion dur="${T}s" repeatCount="indefinite" path="${path}" keyPoints="0;0;1;1" keyTimes="0;${t1.toFixed(3)};${t2.toFixed(3)};1" calcMode="linear"/><animate attributeName="opacity" dur="${T}s" repeatCount="indefinite" keyTimes="0;${t1.toFixed(3)};${t1.toFixed(3)};${t2.toFixed(3)};${t2.toFixed(3)};1" values="0;0;1;1;0;0" calcMode="discrete"/><circle class="halo" r="13"/><circle r="7"/></g>`;
+    const rt = route(f.from, f.to), t1 = ((i * slot) / T).toFixed(3), t2 = ((i * slot + 0.95) / T).toFixed(3), fw = rt.fwd;
+    const kp = fw ? '0;0;1;1' : '1;1;0;0', kt = `0;${t1};${t2};1`, off = fw ? '10;10;-90;-90' : '-100;-100;10;10';
+    svg += `<path class="comet k-${esc(f.kind)}" d="${rt.d}" pathLength="100" stroke-dasharray="10 100"><animate attributeName="stroke-dashoffset" dur="${T}s" repeatCount="indefinite" keyTimes="${kt}" values="${off}" calcMode="linear"/></path>`
+      + `<g class="packet k-${esc(f.kind)}" opacity="0"><animateMotion dur="${T}s" repeatCount="indefinite" path="${rt.d}" keyPoints="${kp}" keyTimes="${kt}" calcMode="linear"/><animate attributeName="opacity" dur="${T}s" repeatCount="indefinite" keyTimes="0;${t1};${t1};${t2};${t2};1" values="0;0;1;1;0;0" calcMode="discrete"/><circle class="halo" r="13"/><circle r="6.5"/></g>`;
   });
   svg += '</svg>';
   $('#diagram').innerHTML = svg;
@@ -312,7 +352,13 @@ function drawDiagram(l, s) {
 const nodeLabel = (l, id) => (l.nodes.find(n => n.id === id) || {}).label || id;
 function replay() { const el = $('#svg'); if (el) { el.setCurrentTime(0); if (paused) togglePause(); } }
 function togglePause() { const el = $('#svg'); paused = !paused; if (el) paused ? el.pauseAnimations() : el.unpauseAnimations(); syncPause(); }
-function syncPause() { const b = $('#pause'); if (b) { b.innerHTML = paused ? icon('play') + 'Play' : icon('pause') + 'Pause'; b.setAttribute('aria-pressed', String(paused)); } }
+function syncPause() { const b = $('#pause'); $('#diagram').classList.toggle('paused', paused); if (b) { b.innerHTML = paused ? icon('play') + 'Play' : icon('pause') + 'Pause'; b.setAttribute('aria-pressed', String(paused)); } }
+function blockLabel(label) {
+  if (label.length <= 12 || !label.includes(' ')) return [label];
+  const mid = label.length / 2; let best = -1;
+  for (let k = 0; k < label.length; k++) if (label[k] === ' ' && (best < 0 || Math.abs(k - mid) < Math.abs(best - mid))) best = k;
+  return [label.slice(0, best), label.slice(best + 1)];
+}
 
 // ---------- practice ----------
 function showPractice() {
