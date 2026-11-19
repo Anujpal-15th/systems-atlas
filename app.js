@@ -231,6 +231,7 @@ function updateStep(l, i) {
   for (const m of l.metrics) setMetric(m, metricAt(l, m.id, i));
   drawDiagram(l, s);
   $('#live').textContent = `Step ${i + 1} of ${n}: ${s.title}`;
+  fitGuide();
 }
 
 function setMetric(m, v) {
@@ -518,3 +519,15 @@ document.querySelectorAll('[data-icon]').forEach(el => el.insertAdjacentHTML('af
 addEventListener('hashchange', route);
 syncTheme();
 route();
+
+// Shrink the guide text a step at a time until the panel fits without scrolling (desktop fit layout only).
+function fitGuide() {
+  const g = $('.guide'); if (!g) return;
+  let size = 15; g.style.fontSize = '';
+  const body = $('#g-body'); body.style.fontSize = '';
+  const ch = $('#changes'); ch.hidden = false;
+  while (g.scrollHeight > g.clientHeight + 1 && size > 12.5) { size -= 0.5; body.style.fontSize = size + 'px'; }
+  if (g.scrollHeight > g.clientHeight + 1) ch.hidden = true;
+  while (g.scrollHeight > g.clientHeight + 1 && size > 11) { size -= 0.5; body.style.fontSize = size + 'px'; }
+}
+addEventListener('resize', () => { if (cur.view === 'learn') fitGuide(); });

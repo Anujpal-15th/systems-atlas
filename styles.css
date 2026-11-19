@@ -400,5 +400,11 @@ h1{font-size:32px;font-weight:700;letter-spacing:-.03em}
   body[data-view=learn] .diagram svg{position:absolute;inset:0;width:100%;height:100%}
   body[data-view=learn] .timeline{flex:none;padding:8px 16px 4px}
   body[data-view=learn] .timeline ol{margin-top:6px;padding-bottom:2px}
-  body[data-view=learn] .guide-col{position:static;top:auto;height:100%;max-height:none;min-height:0;gap:12px}
+  body[data-view=learn] .guide-col{position:static;top:auto;height:100%;max-height:none;min-height:0;gap:12px;overflow:hidden}
+  body[data-view=learn] main{grid-template-columns:minmax(0,1fr) clamp(340px,24vw,420px)}
+  body[data-view=learn] .guide{flex:1 1 0;min-height:0;overflow:hidden;padding:14px 16px;gap:10px}
+  body[data-view=learn] .controls{margin-top:auto}
+  body[data-view=learn] .learn{flex:none;padding:10px 16px}
+  body[data-view=learn] .learn ul{display:none}
+  body[data-view=learn] .learn .practice-link{margin-top:6px}
 }
