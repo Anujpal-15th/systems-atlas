@@ -470,10 +470,10 @@ h1{font-size:32px;font-weight:700;letter-spacing:-.03em}
 .new,.b-new,.foot{display:none!important}
 
 /* illustrated diagram style (lessons with "style": "illustrated") */
-.ill{--ink-line:var(--ink);--i-server:#cfe0f6;--i-dns:#f8dc8e;--i-lb:#dccdf6;--i-db:#f8cfae;--i-cdn:#c4e9e4}
-:root[data-theme=dark] .ill{--i-server:#35517a;--i-dns:#6b5424;--i-lb:#4a3d70;--i-db:#6a4630;--i-cdn:#25595a}
-@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .ill{--i-server:#35517a;--i-dns:#6b5424;--i-lb:#4a3d70;--i-db:#6a4630;--i-cdn:#25595a}}
-.ill .kind-server{--nc:var(--i-server)}.ill .kind-dns{--nc:var(--i-dns)}.ill .kind-lb{--nc:var(--i-lb)}.ill .kind-db{--nc:var(--i-db)}.ill .kind-cdn{--nc:var(--i-cdn)}
+.ill{--ink-line:var(--ink);--i-server:#cfe0f6;--i-dns:#f8dc8e;--i-lb:#dccdf6;--i-db:#d4c4f3;--i-cdn:#c4e9e4}
+:root[data-theme=dark] .ill{--i-server:#35517a;--i-dns:#6b5424;--i-lb:#4a3d70;--i-db:#5a4a86;--i-cdn:#25595a}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .ill{--i-server:#35517a;--i-dns:#6b5424;--i-lb:#4a3d70;--i-db:#5a4a86;--i-cdn:#25595a}}
+.ill .kind-server{--nc:var(--i-server)}.ill .kind-dns{--nc:var(--i-dns)}.ill .kind-lb{--nc:var(--i-lb)}.ill .kind-db,.ill .kind-storage{--nc:var(--i-db)}.ill .kind-cdn{--nc:var(--i-cdn)}
 .ill .ga{stop-color:color-mix(in srgb,var(--nc) 55%,#fff)}.ill .gb{stop-color:color-mix(in srgb,var(--nc) 94%,#fff)}
 .ill .gc{stop-color:color-mix(in srgb,var(--nc) 90%,var(--ink))}.ill .gd{stop-color:color-mix(in srgb,var(--nc) 80%,var(--ink))}
 .ill .ge{stop-color:color-mix(in srgb,var(--nc) 80%,var(--ink))}.ill .gf{stop-color:color-mix(in srgb,var(--nc) 68%,var(--ink))}
@@ -501,7 +501,7 @@ h1{font-size:32px;font-weight:700;letter-spacing:-.03em}
 .ill .iedge.hot{stroke:var(--ink);stroke-dasharray:none;stroke-width:2.5}
 .ill .iedge.fresh,.ill .iarrow.fresh{animation:fadein .4s .2s backwards}
 .ill .iarrow{fill:var(--ink);stroke:var(--ink);stroke-width:1.5;stroke-linejoin:round}.ill .iarrow.idle{fill:var(--line-2);stroke:var(--line-2)}
-.ill .ipacket circle{stroke:var(--ink);stroke-width:2;fill:var(--fc)}
+.ill .ipacket circle{stroke:var(--ink);stroke-width:2;fill:var(--fc)}.ill .ipacket.tail circle{fill:var(--panel);stroke:var(--fc);stroke-width:2.4}
 .ill .inode{transition:opacity .4s}.ill .inode.dim{opacity:.6}
 .ill .inode.rise .body{transform-box:view-box;transform-origin:0 0;animation:rise .5s cubic-bezier(.34,1.56,.64,1) both}
 .ill.gs .ichip,.ill.gs .inode.rise .body,.ill.gs .iedge.fresh,.ill.gs .iarrow.fresh{animation:none}

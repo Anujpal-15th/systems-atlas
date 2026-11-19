@@ -13,3 +13,12 @@ Left / ideas:
 - Packets play once per step (no endless loop any more); add a repeating sub-timeline if wanted.
 - Compare with images/8.webp once more at 1281px+ widths (fit layout) and on mobile.
 - Show the user lesson 1 only; roll out to other lessons only after approval.
+
+## Plan (agreed with the user)
+Iterate on lesson 1 (request-lifecycle) only until the user approves the final look and animation. Only then roll the illustrated style out to all lessons.
+
+## Update: db cylinder + smooth lines (still lesson 1 only, uncommitted)
+- db/storage kinds draw as a soft isometric cylinder (lighter radial top, vertical-gradient lilac body, 2.5px outline, db icon on the front); name pill sits beside it on the right (obstacle for routes/labels).
+- Edges: one elbow, quadratic rounded corner (R=22); route() tries both iso elbows and keeps the one that crosses fewer other blocks. Arrowheads are smaller rounded triangles (idle ones scaled .72), both ends for two-way edges. Polyline sampled every 3px.
+- Packets r=6; trailing packet is hollow (panel fill, kind-coloured stroke).
+- Ideas left: compare again at 1920px / mobile; hollow packet currently on every flow kind, restrict to responses if preferred.

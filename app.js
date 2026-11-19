@@ -314,13 +314,18 @@ function drawDiagram(l, s) {
   const slot = 1.15, T = Math.max(flows.length, 1) * slot + 0.9;
   const key = (a, b) => [a, b].sort().join('|');
   // iso-routed elbow along the two iso axes (rounded corner), canonical per sorted pair; straight when the detour would be large
+  // single-elbow route along the two iso axes with a quadratic rounded corner; of the two possible elbows pick the one that keeps clear of other blocks
+  const routes = {}, U = [.866, .5], V = [.866, -.5], R = 22;
   const route = (ida, idb) => {
-    const [i1, i2] = [ida, idb].sort(), a = P(i1), b = P(i2), dx = b.x - a.x, dy = b.y - a.y;
-    const du = (dx / .866 + 2 * dy) / 2, dv = (2 * dy - dx / .866) / 2, m = { x: a.x + du * .866, y: a.y + du * .5 };
-    const c = Math.hypot(dx, dy) || 1, off = Math.abs((m.x - a.x) * dy - (m.y - a.y) * dx) / c, s1 = Math.abs(du), s2 = Math.abs(dv), r = Math.min(24, s1 / 2, s2 / 2);
-    if (off > 60 || r < 2) return { d: `M${a.x},${a.y}L${b.x},${b.y}`, mid: [(a.x + b.x) / 2, (a.y + b.y) / 2], fwd: ida === i1, n: [-dy / c, dx / c] };
-    const e1 = [Math.sign(du) * .866, Math.sign(du) * .5], e2 = [-Math.sign(dv) * .866, Math.sign(dv) * .5], h = (s1 + s2) / 2;
-    return { d: `M${a.x},${a.y}L${m.x - r * e1[0]},${m.y - r * e1[1]}Q${m.x},${m.y} ${m.x + r * e2[0]},${m.y + r * e2[1]}L${b.x},${b.y}`, mid: h <= s1 ? [a.x + e1[0] * h, a.y + e1[1] * h] : [m.x + e2[0] * (h - s1), m.y + e2[1] * (h - s1)], fwd: ida === i1, n: [-dy / c, dx / c] };
+    const [i1, i2] = [ida, idb].sort(), ck = i1 + '|' + i2; if (routes[ck]) return routes[ck];
+    const a = P(i1), b = P(i2), dx = b.x - a.x, dy = b.y - a.y, du = (dx / .866 + 2 * dy) / 2, dv = (dx / .866 - 2 * dy) / 2;
+    const c = Math.hypot(dx, dy) || 1, nrm = [-dy / c, dx / c], straight = { i1, i2, d: `M${a.x},${a.y}L${b.x},${b.y}`, mid: [(a.x + b.x) / 2, (a.y + b.y) / 2], n: nrm };
+    const m1 = { x: a.x + du * U[0], y: a.y + du * U[1] }, off = Math.abs((m1.x - a.x) * dy - (m1.y - a.y) * dx) / c, r = Math.min(R, Math.abs(du) / 2, Math.abs(dv) / 2);
+    if (off > 90 || r < 2) return routes[ck] = straight;
+    const mk = (first, s1, s2, e1, e2) => { const m = { x: a.x + first[0] * s1, y: a.y + first[1] * s1 }, rr = Math.min(R, Math.abs(s1) / 2, Math.abs(s2) / 2), q1 = [Math.sign(s1) * e1[0], Math.sign(s1) * e1[1]], q2 = [Math.sign(s2) * e2[0], Math.sign(s2) * e2[1]]; return { i1, i2, m, n: nrm, mid: [m.x, m.y], d: `M${a.x},${a.y}L${m.x - rr * q1[0]},${m.y - rr * q1[1]}Q${m.x},${m.y} ${m.x + rr * q2[0]},${m.y + rr * q2[1]}L${b.x},${b.y}`, a, b }; };
+    const A = mk(U, du, dv, U, V), B = mk(V, dv, du, V, U);
+    const bad = o => { let k = 0; const p = document.createElementNS(NS, 'path'); p.setAttribute('d', o.d); const L = p.getTotalLength(); for (let t = 0; t <= L; t += 4) { const q = p.getPointAtLength(t); for (const id in nodeRect) { if (id === i1 || id === i2) continue; const r4 = nodeRect[id]; if (q.x > r4[0] - 10 && q.x < r4[2] + 10 && q.y > r4[1] - 10 && q.y < r4[3] + 10) k++; } } return k; };
+    return routes[ck] = bad(B) < bad(A) ? B : A;
   };
   const hot = new Map(); flows.forEach(f => { if (!hot.has(key(f.from, f.to))) hot.set(key(f.from, f.to), { kind: f.kind, fwd: route(f.from, f.to).fwd }); });
   const clsFor = (n, fs) => (fs.size ? (fs.has(n.id) ? ' focus' : ' dim') : '') + (first[n.id] === si && !reducedMotion ? ' rise' : '');
@@ -455,6 +460,15 @@ function cubeSvg(n) {
     + `<g class="nico" transform="translate(${-ico / 2},${w2 ? -37 : -32}) scale(${ico / 24})">${I[ILL_ICON[k] || KIND_ICON[k]] || I.service}</g>`
     + `<text class="ilbl" font-size="18" x="0" y="${w2 ? 11 : 16}">${esc(w1)}</text>` + (w2 ? `<text class="ilbl l2" font-size="13" x="0" y="29">${esc(w2)}</text>` : '');
 }
+// database / storage: soft cylinder (elliptical top with highlight, vertical-gradient body); name pill sits beside it
+const CRX = 72, CRY = 30, CTY = -22, CBY = 52, isCyl = n => n.kind === 'db' || n.kind === 'storage';
+const CYL = (() => { const q = []; for (let i = 0; i <= 24; i++) { const t = Math.PI + Math.PI * i / 24; q.push([CRX * Math.cos(t), CTY + CRY * Math.sin(t)]); } for (let i = 0; i <= 24; i++) { const t = Math.PI * i / 24; q.push([CRX * Math.cos(t), CBY + CRY * Math.sin(t)]); } return q; })();
+function cylSvg(n) {
+  const k = esc(n.kind), body = `M${-CRX},${CTY}L${-CRX},${CBY}A${CRX},${CRY} 0 0 0 ${CRX},${CBY}L${CRX},${CTY}`;
+  return `<ellipse class="ishadow" cx="6" cy="${CBY + CRY - 2}" rx="${CRX + 22}" ry="22"/><path fill="url(#ig-l-${k})" d="${body}Z"/><ellipse fill="url(#ig-t-${k})" cx="0" cy="${CTY}" rx="${CRX}" ry="${CRY}"/>`
+    + `<ellipse class="ihi" cx="-6" cy="${CTY - 3}" rx="${CRX - 22}" ry="${CRY - 11}"/><path class="iout" d="${body}"/><ellipse class="iout" cx="0" cy="${CTY}" rx="${CRX}" ry="${CRY}"/>`
+    + `<g class="nico" transform="translate(-14,${CTY + CRY + 3}) scale(${28 / 24})">${I[KIND_ICON[n.kind]] || I.db}</g>`;
+}
 // pill / chip builders: return {svg, w} centred on (cx, cy)
 function pillSvg(cx, cy, text, ic, cls = 'ipill', h = 36, fs = 15) {
   const w = text.length * fs * 0.61 + (ic ? 50 : 30), x = cx - w / 2, y = cy - h / 2;
@@ -469,6 +483,7 @@ function chipSvg(cx, cy, c) {
 const inPoly = (x, y, pl) => { let c = false; for (let i = 0, j = pl.length - 1; i < pl.length; j = i++) if ((pl[i][1] > y) !== (pl[j][1] > y) && x < (pl[j][0] - pl[i][0]) * (y - pl[i][1]) / (pl[j][1] - pl[i][1]) + pl[i][0]) c = !c; return c; };
 let lapPolys = null;
 const inSil = (n, x, y) => {
+  if (isCyl(n)) return inPoly(x, y, CYL);
   if (n.kind !== 'client') return inPoly(x, y, CUBE);
   if (!lapPolys) { K = 1; lapPolys = [[iso(-72, -72, 0), iso(72, -72, 0), iso(72, -72, -16), iso(72, 72, -16), iso(-72, 72, -16), iso(-72, 72, 0)], [iso(-39, -46, 62), iso(-39, 46, 62), iso(-30, 46, 6), iso(-30, -46, 6)]]; }
   return lapPolys.some(pl => inPoly(x, y, pl));
@@ -480,7 +495,7 @@ function trimPath(d, in1, in2) {
   while (a < L * .45 && in1(p.getPointAtLength(a))) a += 2;
   while (b > L * .55 && in2(p.getPointAtLength(b))) b -= 2;
   a = Math.min(a + 6, L * .45); b = Math.max(b - 6, L * .55);
-  const n = Math.max(2, Math.ceil((b - a) / 5)), q = [];
+  const n = Math.max(2, Math.ceil((b - a) / 3)), q = [];
   for (let i = 0; i <= n; i++) q.push(p.getPointAtLength(a + (b - a) * i / n));
   const ang = (p0, p1) => Math.atan2(p1.y - p0.y, p1.x - p0.x) * 180 / Math.PI;
   return { d: 'M' + q.map(o => o.x.toFixed(1) + ',' + o.y.toFixed(1)).join('L'), s: q[0], e: q[n], as: ang(q[0], q[1]), ae: ang(q[n - 1], q[n]), len: b - a, at: t => p.getPointAtLength(a + t), pts: q.map(o => [o.x, o.y]) };
@@ -505,21 +520,26 @@ function drawIllustrated(l, s) {
   };
   const hot = new Map(); flows.forEach(f => { const k = key(f.from, f.to), o = hot.get(k) || { kind: f.kind, to: new Set() }; o.to.add(f.to); hot.set(k, o); });
   const clsFor = (n, fs) => (fs.size ? (fs.has(n.id) ? ' focus' : ' dim') : '') + (first[n.id] === si && !reducedMotion ? ' rise' : '');
-  const used = new Set(), rects = [], arrows = [], epts = [];
+  const used = new Set(), rects = [], arrows = [], epts = [], nodeRect = {};
   let nodes = '', edges = '', over = '';
   const order = [...shown].sort((a, b) => a.y - b.y || a.x - b.x);
   for (const n of order) {
     const { x, y } = PX(n), lap = n.kind === 'client', c1 = clsFor(n, focus), c0 = prevFocus ? clsFor(n, prevFocus) : c1;
     used.add(n.kind);
-    let g = lap ? laptopSvg() : cubeSvg(n);
+    let g = lap ? laptopSvg() : isCyl(n) ? cylSvg(n) : cubeSvg(n), nr;
     if (lap) {
       const p1 = pillSvg(0, -128, n.url || n.label, 'cdn'), p2 = pillSvg(-52, 124, n.you || 'you', 'user');
       g += p1.svg + p2.svg; rects.push([x - 126, y - 106, x + 126, y + 92], [x - p1.w / 2, y - 146, x + p1.w / 2, y - 110], [x - 52 - p2.w / 2, y + 106, x - 52 + p2.w / 2, y + 142]);
-    } else rects.push([x - IA - 4, y - IB - 4, x + IA + 4, y + IB + ID + 6]);
+    nr = [x - 126, y - 146, x + 126, y + 142];
+    } else if (isCyl(n)) {
+      const pl = pillSvg(0, 0, n.label, KIND_ICON[n.kind], 'ipill', 36, 15), px = CRX + 14 + pl.w / 2, q = pillSvg(px, CTY + 4, n.label, KIND_ICON[n.kind]);
+      g += q.svg; nr = [x - CRX - 4, y + CTY - CRY - 4, x + px + pl.w / 2 + 4, y + CBY + CRY + 6]; rects.push(nr);
+    } else rects.push(nr = [x - IA - 4, y - IB - 4, x + IA + 4, y + IB + ID + 6]);
+    nodeRect[n.id] = nr;
     nodes += `<g class="inode kind-${esc(n.kind)}${c0}"${c0 !== c1 ? ` data-c="${c1}"` : ''} transform="translate(${x.toFixed(1)},${y.toFixed(1)})"><g class="body">${g}</g></g>`;
   }
   // edges: clipped to the block silhouettes (start/end just outside them) and drawn before the nodes, so they stay behind blocks
-  const head = (pt, ang, cls) => { arrows.push([pt.x - 14, pt.y - 14, pt.x + 14, pt.y + 14]); return `<path class="iarrow${cls}" d="M-17,-9L2,0L-17,9Z" transform="translate(${pt.x.toFixed(1)} ${pt.y.toFixed(1)}) rotate(${ang.toFixed(1)})"/>`; };
+  const head = (pt, ang, cls) => { arrows.push([pt.x - 14, pt.y - 14, pt.x + 14, pt.y + 14]); return `<path class="iarrow${cls}" d="M-16,-8.5Q-15,-8 1,0Q-15,8 -16,8.5Z" transform="translate(${pt.x.toFixed(1)} ${pt.y.toFixed(1)}) rotate(${ang.toFixed(1)})${cls.includes('idle') ? ' scale(.72)' : ''}"/>`; };
   const trims = {}, eIdx = new Map(), sil = id => p => { const n = nodeById(id), c = PX(n); return inSil(n, p.x - c.x, p.y - c.y); };
   let ei = 0;
   for (const e of l.edges) if (shownIds.has(e.from) && shownIds.has(e.to)) {
@@ -534,7 +554,7 @@ function drawIllustrated(l, s) {
     const rev = f.from === rt.i1 ? 0 : 1, kp = rev ? '1;1;0;0' : '0;0;1;1';
     for (const dl of [0, 0.18]) {
       const t1 = ((i * slot + dl) / T).toFixed(3), t2 = ((i * slot + 0.95 + dl) / T).toFixed(3), kt = `0;${t1};${t2};1`;
-      over += `<g class="ipacket k-${esc(f.kind)}" data-e="${eIdx.get(k)}" data-r="${rev}" data-i="${i}" data-d="${dl}" opacity="0"><animateMotion dur="${T}s" repeatCount="indefinite" path="${tm.d}" keyPoints="${kp}" keyTimes="${kt}" calcMode="spline" keySplines="0 0 1 1;.45 0 .2 1;0 0 1 1"/><animate attributeName="opacity" dur="${T}s" repeatCount="indefinite" keyTimes="0;${t1};${t1};${t2};${t2};1" values="0;0;1;1;0;0" calcMode="discrete"/><circle r="7.5"/></g>`;
+      over += `<g class="ipacket k-${esc(f.kind)}${dl ? ' tail' : ''}" data-e="${eIdx.get(k)}" data-r="${rev}" data-i="${i}" data-d="${dl}" opacity="0"><animateMotion dur="${T}s" repeatCount="indefinite" path="${tm.d}" keyPoints="${kp}" keyTimes="${kt}" calcMode="spline" keySplines="0 0 1 1;.45 0 .2 1;0 0 1 1"/><animate attributeName="opacity" dur="${T}s" repeatCount="indefinite" keyTimes="0;${t1};${t1};${t2};${t2};1" values="0;0;1;1;0;0" calcMode="discrete"/><circle r="6"/></g>`;
     }
   });
   // collision avoidance: every pill/chip/label gets a box; candidates are tried until the box keeps >= GAP from blocks, pills, chips, arrowheads and edge lines
