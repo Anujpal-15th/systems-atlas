@@ -1,9 +1,14 @@
-@font-face{font-family:"JBM";src:url(fonts/jbm-400.woff2) format("woff2");font-weight:400;font-display:swap}
-@font-face{font-family:"JBM";src:url(fonts/jbm-500.woff2) format("woff2");font-weight:500;font-display:swap}
-@font-face{font-family:"JBM";src:url(fonts/jbm-700.woff2) format("woff2");font-weight:600 700;font-display:swap}
-@font-face{font-family:"JBM";src:url(fonts/jbm-800.woff2) format("woff2");font-weight:800;font-display:swap}
+@font-face{font-family:"Inter";src:url(fonts/inter-400.woff2) format("woff2");font-weight:400;font-display:swap}
+@font-face{font-family:"Inter";src:url(fonts/inter-500.woff2) format("woff2");font-weight:500;font-display:swap}
+@font-face{font-family:"Inter";src:url(fonts/inter-600.woff2) format("woff2");font-weight:600;font-display:swap}
+@font-face{font-family:"Inter";src:url(fonts/inter-700.woff2) format("woff2");font-weight:700 800;font-display:swap}
+@font-face{font-family:"Space Grotesk";src:url(fonts/sg-500.woff2) format("woff2");font-weight:500;font-display:swap}
+@font-face{font-family:"Space Grotesk";src:url(fonts/sg-700.woff2) format("woff2");font-weight:600 800;font-display:swap}
+@font-face{font-family:"JBM";src:url(fonts/jbm-400.woff2) format("woff2");font-weight:400 500;font-display:swap}
+@font-face{font-family:"JBM";src:url(fonts/jbm-700.woff2) format("woff2");font-weight:600 800;font-display:swap}
 
 :root{
+  --sans:"Inter",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;--display:"Space Grotesk","Inter",system-ui,sans-serif;--mono:"JBM",ui-monospace,Consolas,monospace;
   --paper:#f3ede1;--panel:#f9f5ec;--panel-2:#efe8da;--ink:#2b2822;--ink-2:#4a453c;--muted:#7a7366;--line:#ddd3c2;--line-2:#cfc4b0;--grid:#e6dece;
   --lime:#d4eab0;--lime-2:#b7d98b;--lime-ink:#26401a;--violet:#e6dcf6;--violet-line:#c8b6e6;--amber:#f6dfb0;--amber-line:#e4c27f;--sky:#d7e8f6;
   --shadow:#2b2822;--focus:#2f6fde;
@@ -36,10 +41,10 @@
 
 *{box-sizing:border-box}
 html{scroll-padding-top:70px;-webkit-text-size-adjust:100%}
-body{margin:0;background:var(--paper);color:var(--ink);font:13.5px/1.6 "JBM",ui-monospace,"Cascadia Mono",Consolas,monospace;font-feature-settings:"calt" 0}
+body{margin:0;background:var(--paper);color:var(--ink);font:15px/1.6 var(--sans);font-feature-settings:"cv11","ss01";-webkit-font-smoothing:antialiased}
 a{color:inherit}
 button{font:inherit;color:inherit;cursor:pointer}
-h1,h2,h3{font-weight:800;letter-spacing:-.02em}
+h1,h2,h3{font-family:var(--display);font-weight:700;letter-spacing:-.025em}
 .i{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.9;stroke-linecap:round;stroke-linejoin:round;vertical-align:-3px}
 :focus-visible{outline:2.5px solid var(--focus);outline-offset:2px;border-radius:6px}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
@@ -132,7 +137,7 @@ h1{font-size:30px;line-height:1.15;margin:6px 0 2px}
 .metric.last{border-left:4px solid var(--lime-2)}
 .hud-btns{display:flex;gap:8px;margin-left:auto}
 .diagram{margin-top:8px;border-radius:9px;background-color:var(--paper);background-image:repeating-linear-gradient(30deg,var(--grid) 0 1px,transparent 1px 28px),repeating-linear-gradient(150deg,var(--grid) 0 1px,transparent 1px 28px)}
-.diagram svg{display:block;width:100%;height:auto;font-family:"JBM",ui-monospace,monospace}
+.diagram svg{display:block;width:100%;height:auto;font-family:var(--sans)}
 .edge{stroke:var(--line-2);stroke-width:2.5;stroke-dasharray:2 7;stroke-linecap:round}
 .edge.hot{stroke-width:3.5;stroke-dasharray:9 7}
 .edge.k-request{stroke:var(--request)}.edge.k-response{stroke:var(--response)}.edge.k-handshake{stroke:var(--handshake)}.edge.k-async{stroke:var(--async)}.edge.k-replicate{stroke:var(--replicate)}.edge.k-fail{stroke:var(--fail)}
@@ -339,3 +344,28 @@ dialog::backdrop{background:#0007;backdrop-filter:blur(2px)}
   .page-head{padding:18px}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
+
+/* typography: Inter for reading, Space Grotesk for display, mono only for numbers and keys */
+.brand,.stats b,.mod h2,.qset h2,.cs-mod h2,.lab h2,.side-head a,.tree summary .mt{font-family:var(--display)}
+.brand{font-size:19px;font-weight:700}
+h1{font-size:32px;font-weight:700;letter-spacing:-.03em}
+.hero h1{letter-spacing:-.035em}
+.guide h2{font-size:21px;line-height:1.25}
+.g-body{font-size:15px;line-height:1.7;color:var(--ink-2)}
+.sub{font-size:14.5px}
+.metric b,.stats b,kbd,.dot,.score,.progress-card b,.tree summary small,.mod .pct,.badges span,.tag,.step-label,.crumb,.rtype,.letter{font-family:var(--mono)}
+.metric b{font-size:17px;font-weight:700}
+.tree summary{font-weight:600;font-size:14px}
+.tree li a{font-size:13.5px}
+.views a{font-size:14px}
+.btn{font-weight:600}
+.idea,.changes ul,.learn ul{font-size:13.5px;line-height:1.55}
+.idea span{font-weight:500}
+.eyebrow,.tl-head b,.learn>b,.changes b,.idea b,.progress-card,.metric span{font-weight:600;letter-spacing:.08em}
+.opt{font-size:14px}
+.q legend{font-size:15px;font-weight:600}
+.cs-item dt{font-family:var(--display);font-size:15px;font-weight:700}
+.cs-item dd{font-size:13.5px;line-height:1.55}
+.timeline a{font-size:11.5px}
+.node .lbl{font-weight:700;letter-spacing:-.01em}
+.flabel text{font-family:var(--mono);font-size:13px}

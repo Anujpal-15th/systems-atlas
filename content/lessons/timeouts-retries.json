@@ -123,7 +123,7 @@
     {
       "tag": "CONCEPT",
       "title": "Set a timeout first",
-      "body": "With no timeout, a hung call holds a thread and a connection until the OS gives up, often after minutes. Enough hung calls and checkout itself runs out of threads. A timeout caps the wait. A common rule of thumb is to set the request timeout a little above the dependency's p99, so 500 ms here, then adjust from real data. Too low and you abort calls that would have worked. Set a short connect timeout (for example 100-200 ms) separately from the request timeout, and keep a caller's timeout longer than its callee's. The per-attempt timeout times your attempt count, plus backoff, must fit inside the overall deadline.",
+      "body": "With no timeout, a hung call holds a thread and a connection for as long as the OS allows, which can be minutes or even forever. Enough hung calls and checkout itself runs out of threads. A timeout caps the wait. A common rule of thumb is to set the request timeout a little above the dependency's p99, so 500 ms here, then adjust from real data. Too low and you abort calls that would have worked. Set a short connect timeout (for example 100-200 ms) separately from the request timeout, and keep a caller's timeout longer than its callee's. The per-attempt timeout times your attempt count, plus backoff, must fit inside the overall deadline.",
       "idea": "A timeout turns an unbounded wait into a bounded one; base it on measured p99, not on hope.",
       "caption": "Checkout stops waiting at 500 ms and frees its thread.",
       "focus": [
@@ -220,17 +220,11 @@
           "to": "payment",
           "kind": "request",
           "label": "after 200 ms"
-        },
-        {
-          "from": "checkout",
-          "to": "payment",
-          "kind": "request",
-          "label": "after 400 ms"
         }
       ],
       "metrics": {
-        "attempts": "4",
-        "load": "852"
+        "attempts": "3",
+        "load": "834"
       }
     },
     {
@@ -277,7 +271,7 @@
     {
       "tag": "WHAT IF",
       "title": "The retry storm",
-      "body": "Now the payment API is truly overloaded: it slows down and capacity halves. Callers time out and retry. Worse, both the client app and checkout each allow 3 attempts, so one user tap can become up to 9 calls to payment. In the worst case, normal load of 600 requests per second could balloon to as much as 5,400, and other callers add their own retries on top. That extra load slows payment further and causes more retries. The helper has become the attacker.",
+      "body": "Now the payment API is truly overloaded and its capacity halves. Say it normally serves about 1,000 requests per second, so it can now answer about 500, under a tenth of 5,400. Callers time out and retry. Worse, both the client app and checkout each allow 3 attempts, so one user tap can become up to 9 calls to payment. In the worst case, normal load of 600 requests per second could balloon to as much as 5,400. That extra load slows payment further and causes more retries. The helper has become the attacker.",
       "idea": "Retries at every layer multiply: 3 attempts across 2 layers is up to 9 calls per user action.",
       "caption": "Layered retries pile load onto the already struggling Payment API.",
       "focus": [
@@ -314,13 +308,14 @@
       ],
       "metrics": {
         "attempts": "9",
-        "load": "5400"
+        "load": "5400",
+        "ok": "10"
       }
     },
     {
       "tag": "TRADE-OFF",
       "title": "Cap it with a retry budget",
-      "body": "A retry budget limits retries as a share of total traffic, for example no more than 10 percent of recent requests may be retries. It is usually a token bucket: each first attempt earns a fraction of a token, and each retry spends one. When the bucket is empty, the call fails right away. During a real outage load rises only about 10 percent, so the dependency can recover.",
+      "body": "A retry budget limits retries as a share of total traffic, for example no more than 10 percent of recent requests may be retries. It is often implemented as a token bucket: each first attempt earns a fraction of a token, and each retry spends one. When the bucket is empty, the call fails right away. The price is that some calls which a retry would have rescued now fail, so success edges up from 70 to about 77 rather than back to 97. During a real outage load rises only about 10 percent, so the dependency can recover.",
       "idea": "A retry budget puts a hard ceiling on extra load no matter how many things fail.",
       "caption": "Once the budget is spent, checkout fails fast instead of retrying.",
       "focus": [
@@ -351,13 +346,13 @@
       "metrics": {
         "attempts": "1 + 10%",
         "load": "660",
-        "ok": "70"
+        "ok": "77"
       }
     },
     {
       "tag": "CONCEPT",
       "title": "Retry only what is safe, within a deadline",
-      "body": "Retry connection errors, timeouts, 502, 503, 504 and 429, and honour a Retry-After hint on 429 or 503. Do not retry 400, 403 or 404, because the same request fails again. A timeout on a write leaves it unknown whether the work happened, so retrying a charge can bill twice unless the operation is idempotent or carries an idempotency key (the Idempotency lesson covers this). Also give the whole user action a deadline, say 2 seconds, and pass the remaining time downstream so no layer keeps retrying after the user has left. Three 500 ms attempts plus backoff is about 1.7 s, which nearly fills that deadline.",
+      "body": "Retry connection errors, timeouts, 502, 503, 504 and 429, and honour a Retry-After hint on 429 or 503. Do not retry 400, 403 or 404, because the same request fails again. A timeout on a write leaves it unknown whether the work happened, so retrying a charge can bill twice unless the operation is idempotent or carries an idempotency key (the Idempotency lesson covers this). Also give the whole user action a deadline, say 2 seconds, and pass the remaining time downstream so no layer keeps retrying after the user has left. Three 500 ms attempts plus up to 300 ms of backoff is at most about 1.8 s, which nearly fills that deadline.",
       "idea": "Retry only transient, safe errors, and stop when the overall deadline runs out.",
       "caption": "The remaining time shrinks as the request moves downstream.",
       "focus": [
@@ -389,7 +384,7 @@
         "timeout": "500",
         "attempts": "1 + 10%",
         "load": "660",
-        "ok": "76"
+        "ok": "77"
       }
     },
     {
@@ -409,7 +404,7 @@
         "timeout": "500",
         "attempts": "1 + 10%",
         "load": "660",
-        "ok": "76"
+        "ok": "77"
       }
     }
   ],
@@ -464,7 +459,7 @@
         "It makes backoff delays too long",
         "It disables jitter",
         "It aborts calls that would have succeeded and triggers extra retries",
-        "It prevents the connection from being reused"
+        "It makes the connect timeout longer than the request timeout"
       ],
       "answer": 2,
       "why": "If the timeout is under p99, a large share of healthy but slow calls get cancelled and retried, which adds load and wastes the work already done."

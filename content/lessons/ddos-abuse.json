@@ -12,58 +12,519 @@
     "Why the origin must be hidden and why defense is layered"
   ],
   "nodes": [
-    {"id":"users","label":"Real users","kind":"user","x":8,"y":22},
-    {"id":"botnet","label":"Botnet","kind":"external","x":8,"y":78},
-    {"id":"edge","label":"Anycast edge","kind":"cdn","x":30,"y":50},
-    {"id":"scrub","label":"Scrubbing","kind":"service","x":30,"y":88},
-    {"id":"waf","label":"WAF + bot check","kind":"gateway","x":54,"y":24},
-    {"id":"limiter","label":"Rate limiter","kind":"gateway","x":54,"y":72},
-    {"id":"app","label":"Origin app","kind":"server","x":77,"y":48},
-    {"id":"db","label":"Database","kind":"db","x":92,"y":82}
+    {
+      "id": "users",
+      "label": "Real users",
+      "kind": "user",
+      "x": 8,
+      "y": 22
+    },
+    {
+      "id": "botnet",
+      "label": "Botnet",
+      "kind": "external",
+      "x": 8,
+      "y": 78
+    },
+    {
+      "id": "edge",
+      "label": "Anycast edge",
+      "kind": "cdn",
+      "x": 30,
+      "y": 50
+    },
+    {
+      "id": "scrub",
+      "label": "Scrubbing",
+      "kind": "service",
+      "x": 30,
+      "y": 88
+    },
+    {
+      "id": "waf",
+      "label": "WAF + bot check",
+      "kind": "gateway",
+      "x": 54,
+      "y": 24
+    },
+    {
+      "id": "limiter",
+      "label": "Rate limiter",
+      "kind": "gateway",
+      "x": 54,
+      "y": 72
+    },
+    {
+      "id": "app",
+      "label": "Origin app",
+      "kind": "server",
+      "x": 77,
+      "y": 48
+    },
+    {
+      "id": "db",
+      "label": "Database",
+      "kind": "db",
+      "x": 92,
+      "y": 82
+    }
   ],
   "edges": [
-    {"from":"users","to":"edge"},
-    {"from":"botnet","to":"edge"},
-    {"from":"botnet","to":"app"},
-    {"from":"edge","to":"scrub"},
-    {"from":"edge","to":"waf"},
-    {"from":"waf","to":"limiter"},
-    {"from":"limiter","to":"app"},
-    {"from":"edge","to":"app"},
-    {"from":"app","to":"db"}
+    {
+      "from": "users",
+      "to": "edge"
+    },
+    {
+      "from": "botnet",
+      "to": "edge"
+    },
+    {
+      "from": "botnet",
+      "to": "app"
+    },
+    {
+      "from": "edge",
+      "to": "scrub"
+    },
+    {
+      "from": "edge",
+      "to": "waf"
+    },
+    {
+      "from": "waf",
+      "to": "limiter"
+    },
+    {
+      "from": "limiter",
+      "to": "app"
+    },
+    {
+      "from": "edge",
+      "to": "app"
+    },
+    {
+      "from": "app",
+      "to": "db"
+    }
   ],
   "metrics": [
-    {"id":"attack","label":"Attack traffic","unit":"Gbps"},
-    {"id":"origin","label":"Reaching origin","unit":"req/s"},
-    {"id":"legit","label":"Real users OK","unit":"%"},
-    {"id":"blocked","label":"Junk blocked","unit":"%"}
+    {
+      "id": "attack",
+      "label": "Attack traffic",
+      "unit": "Gbps"
+    },
+    {
+      "id": "origin",
+      "label": "Reaching origin",
+      "unit": "req/s"
+    },
+    {
+      "id": "legit",
+      "label": "Real users OK",
+      "unit": "%"
+    },
+    {
+      "id": "blocked",
+      "label": "Junk blocked",
+      "unit": "%"
+    }
   ],
   "steps": [
-    {"tag":"QUESTION","title":"A quiet shop, then a flood","body":"A shop normally serves about 500 requests per second from real customers on a 10 Gbps origin link. At 9 a.m. a botnet of 200,000 hacked devices starts sending traffic at it. Some of that traffic tries to fill the network pipe; some looks like ordinary page loads. How do you keep customers shopping while the attack runs?","idea":"An attack is not one problem: the pipe, the servers, and the business logic can each be the target.","caption":"Normal traffic: real users reach the origin.","focus":["users","edge","app"],"flows":[{"from":"users","to":"edge","kind":"request","label":"GET /shop"},{"from":"edge","to":"app","kind":"request","label":"GET /shop"},{"from":"app","to":"edge","kind":"response","label":"200 OK"}],"metrics":{"attack":"0","origin":"500","legit":"100","blocked":"0"}},
-    {"tag":"CONCEPT","title":"Volumetric attack: clog the pipe","body":"A volumetric attack tries to use up bandwidth or packet capacity, often with spoofed UDP floods or reflection and amplification (a small query to an open DNS or NTP server returns a response many times bigger, aimed at the victim). Here the botnet pushes 400 Gbps at a site with a 10 Gbps link. The servers are fine; the road to them is simply full, and real users cannot get in.","idea":"Volumetric attacks win on raw size, so no single origin can absorb them alone.","caption":"400 Gbps of junk swamps a 10 Gbps link.","focus":["botnet","app"],"flows":[{"from":"botnet","to":"app","kind":"fail","label":"UDP flood"},{"from":"botnet","to":"app","kind":"fail","label":"reflected junk"}],"metrics":{"attack":"400","legit":"2","origin":"10"}},
-    {"tag":"CONCEPT","title":"Anycast: spread the blow","body":"With anycast, the same IP address is announced from dozens to hundreds of locations, and internet routing sends each sender to a nearby one (nearest in network terms). A botnet spread across the world therefore lands on many edge sites, each seeing only a slice: if the botnet were spread evenly over 100 sites that is about 4 Gbps each (real attacks are uneven, so operators can also shift or withdraw announcements per site). Edge networks are built with far more total capacity than any one customer, so the pipe no longer clogs. Real users also connect to their nearest site, which is faster.","idea":"Anycast turns one big target into many small ones, so capacity adds up instead of piling onto a single link.","caption":"Attack splits across many edge sites.","focus":["botnet","users","edge"],"flows":[{"from":"botnet","to":"edge","kind":"request","label":"~4 Gbps per site"},{"from":"users","to":"edge","kind":"request","label":"GET /shop"}],"metrics":{"attack":"400","legit":"60","origin":"300"}},
-    {"tag":"FLOW","title":"Scrubbing: drop the junk early","body":"At each edge, network-layer defenses drop packets that cannot be legitimate: spoofed sources, malformed packets, floods on ports you do not use, and traffic matching known attack signatures. Heavily hit traffic can be sent to a dedicated scrubbing center, which filters it and forwards only clean traffic. SYN cookies let the edge survive a SYN flood without keeping state for each fake connection. Dropping a packet this early costs almost nothing compared to letting it reach your servers.","idea":"Filter as far from the origin as possible, because the cost of a dropped packet rises the deeper it travels.","caption":"Scrubbing removes the volumetric flood.","focus":["edge","scrub"],"flows":[{"from":"edge","to":"scrub","kind":"request","label":"suspect traffic"},{"from":"scrub","to":"edge","kind":"request","label":"clean traffic"}],"metrics":{"attack":"400","origin":"500","legit":"95","blocked":"99"}},
-    {"tag":"QUESTION","title":"The quiet attack that remains","body":"Now the attacker changes tactics. Instead of garbage packets, the botnet sends perfectly valid HTTPS requests: 8,000 per second for the search page and login form, each looking like a browser. This is an application-layer (layer 7) attack. It is only a few tens of Mbps, tiny next to the flood, but search runs a costly database query, so the origin buckles. Packet filters cannot help because every packet is legitimate.","idea":"Layer 7 attacks are cheap for the attacker and expensive for you, so volume is the wrong thing to measure.","caption":"Valid-looking requests reach the origin.","focus":["botnet","edge","app","db"],"flows":[{"from":"botnet","to":"edge","kind":"request","label":"GET /search?q=..."},{"from":"edge","to":"app","kind":"request","label":"GET /search?q=..."},{"from":"app","to":"db","kind":"fail","label":"slow query x8000"}],"metrics":{"attack":"0.05","origin":"8500","legit":"30","blocked":"0"}},
-    {"tag":"FLOW","title":"WAF and bot detection","body":"A web application firewall (WAF) reads HTTP itself and applies rules: block known exploit patterns such as SQL injection strings, reject odd methods, and drop requests with bad headers. Bot detection then scores each client using signals like IP reputation, TLS fingerprint, header order, and whether it runs JavaScript and behaves like a person. Requests that look human pass, clearly automated ones are blocked, and uncertain ones get a challenge (a cheap test such as a JavaScript check, proof-of-work, or CAPTCHA). Scoring is statistical, so some bots slip through and some humans get challenged.","idea":"A WAF recognizes known-bad patterns; bot detection estimates who is probably automated. Both are probabilistic.","caption":"Edge inspects HTTP and challenges suspects.","focus":["edge","waf","limiter"],"flows":[{"from":"edge","to":"waf","kind":"request","label":"score each request"},{"from":"waf","to":"edge","kind":"fail","label":"block / challenge"},{"from":"waf","to":"limiter","kind":"request","label":"likely human"}],"metrics":{"origin":"2000","legit":"90","blocked":"80"}},
-    {"tag":"FLOW","title":"Per-client limits on costly routes","body":"Some bots look human enough to pass. A rate limiter caps what any one client can do, with tighter limits on expensive routes: for example 60 searches per minute per client and only 5 login attempts per minute per account. Pick the key carefully. A single IP address is weak because a botnet has thousands and many real users share one office or mobile-carrier address, so combine IP, session or API key, and account. Over-limit requests get HTTP 429 with Retry-After. Per-account limits can be abused to lock out the real owner, so prefer slowing or challenging over a hard lock.","idea":"Limit by who is asking and what it costs you; the key you choose decides who gets caught.","caption":"Limiter caps each client, sparing the origin.","focus":["limiter","app"],"flows":[{"from":"waf","to":"limiter","kind":"request","label":"passed checks"},{"from":"limiter","to":"waf","kind":"fail","label":"429 too many"},{"from":"limiter","to":"app","kind":"request","label":"within quota"},{"from":"app","to":"limiter","kind":"response","label":"200 OK"}],"metrics":{"origin":"730","legit":"98","blocked":"97"}},
-    {"tag":"TRADE-OFF","title":"False positives and a hidden origin","body":"Every rule can hurt real users. A blocked shopper during a sale costs money, so new rules often start in log-only mode and a challenge is gentler than a block. Also protect the back door: if the attacker learns the real origin IP, they can bypass the edge entirely. Accept traffic at the origin only from the edge, using firewall allow-lists plus an authenticated origin pull (mutual TLS or a secret header) or a tunnel, and set autoscaling caps and spend alerts so an attack cannot run up a huge bill.","idea":"Defense is a dial between blocking attackers and annoying customers, and it fails if the origin is reachable directly.","caption":"Origin only accepts traffic from the edge.","focus":["botnet","edge","waf","app"],"flows":[{"from":"botnet","to":"app","kind":"fail","label":"direct to origin"},{"from":"edge","to":"waf","kind":"request","label":"allowed path only"}],"metrics":{"origin":"600","legit":"97","blocked":"98"}},
-    {"tag":"RECAP","title":"Layers, each cheaper than the last","body":"Anycast spreads volume across many sites, scrubbing drops junk packets at the edge, the WAF and bot scoring filter bad HTTP, and per-client limits cap whatever remains on costly routes. Each layer is cheaper to run than the one behind it, and the origin sees only about its normal load. Both attacks are still running. No layer is perfect, so you combine them, watch false positives, and keep the origin hidden.","idea":"Stop abuse as early and cheaply as possible, and assume each layer leaks a little.","caption":"Origin back near 570 req/s, users served.","focus":["users","botnet","edge","scrub","waf","limiter","app","db"],"flows":[],"metrics":{"attack":"400","origin":"570","legit":"98","blocked":"99"}}
+    {
+      "tag": "QUESTION",
+      "title": "A quiet shop, then a flood",
+      "body": "A shop normally serves about 500 requests per second from real customers on a 10 Gbps origin link. At 9 a.m. a botnet of 200,000 hacked devices starts sending traffic at it. Some of that traffic tries to fill the network pipe; some looks like ordinary page loads. How do you keep customers shopping while the attack runs?",
+      "idea": "An attack is not one problem: the pipe, the servers, and the business logic can each be the target.",
+      "caption": "Normal traffic: real users reach the origin.",
+      "focus": [
+        "users",
+        "edge",
+        "app"
+      ],
+      "flows": [
+        {
+          "from": "users",
+          "to": "edge",
+          "kind": "request",
+          "label": "GET /shop"
+        },
+        {
+          "from": "edge",
+          "to": "app",
+          "kind": "request",
+          "label": "GET /shop"
+        },
+        {
+          "from": "app",
+          "to": "edge",
+          "kind": "response",
+          "label": "200 OK"
+        }
+      ],
+      "metrics": {
+        "attack": "0",
+        "origin": "500",
+        "legit": "100",
+        "blocked": "0"
+      }
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "Volumetric attack: clog the pipe",
+      "body": "A volumetric attack tries to use up bandwidth or packet capacity, often with spoofed UDP floods or reflection and amplification (a small query to an open DNS or NTP server returns a response many times bigger, aimed at the victim). Here the botnet pushes 400 Gbps at a site with a 10 Gbps link. The botnet aims straight at the origin's own IP address. The servers are fine; the road to them is simply full, and real users cannot get in.",
+      "idea": "Volumetric attacks win on raw size, so no single origin can absorb them alone.",
+      "caption": "400 Gbps of junk swamps a 10 Gbps link.",
+      "focus": [
+        "botnet",
+        "app"
+      ],
+      "flows": [
+        {
+          "from": "botnet",
+          "to": "app",
+          "kind": "fail",
+          "label": "UDP flood"
+        },
+        {
+          "from": "botnet",
+          "to": "app",
+          "kind": "fail",
+          "label": "reflected junk"
+        }
+      ],
+      "metrics": {
+        "attack": "400",
+        "legit": "2",
+        "origin": "10"
+      }
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "Anycast: spread the blow",
+      "body": "With anycast, the same IP address is announced from dozens to hundreds of locations, and internet routing sends each sender to a nearby one (nearest in network terms). A botnet spread across the world therefore lands on many edge sites, each seeing only a slice: if the botnet were spread evenly over 100 sites that is about 4 Gbps each. Edge networks are built with far more total capacity than any one customer, so the edge sites are not overwhelmed. The junk still has to be filtered before it travels on to your origin, which is the next step.",
+      "idea": "Anycast turns one big target into many small ones, so capacity adds up instead of piling onto a single link.",
+      "caption": "Attack splits across many edge sites; origin still gets junk.",
+      "focus": [
+        "botnet",
+        "users",
+        "edge"
+      ],
+      "flows": [
+        {
+          "from": "botnet",
+          "to": "edge",
+          "kind": "request",
+          "label": "~4 Gbps per site"
+        },
+        {
+          "from": "users",
+          "to": "edge",
+          "kind": "request",
+          "label": "GET /shop"
+        }
+      ],
+      "metrics": {
+        "attack": "400",
+        "legit": "60",
+        "origin": "300"
+      }
+    },
+    {
+      "tag": "FLOW",
+      "title": "Scrubbing: drop the junk early",
+      "body": "At each edge, network-layer defenses drop packets that cannot be legitimate: spoofed sources, malformed packets, floods on ports you do not use, and traffic matching known attack signatures. Heavily hit traffic can be sent to a dedicated scrubbing center, which filters it and forwards only clean traffic. SYN cookies let the edge survive a SYN flood without keeping state for each fake connection. Dropping a packet this early costs almost nothing compared to letting it reach your servers.",
+      "idea": "Filter as far from the origin as possible, because the cost of a dropped packet rises the deeper it travels.",
+      "caption": "Scrubbing removes the volumetric flood.",
+      "focus": [
+        "edge",
+        "scrub"
+      ],
+      "flows": [
+        {
+          "from": "edge",
+          "to": "scrub",
+          "kind": "request",
+          "label": "suspect traffic"
+        },
+        {
+          "from": "scrub",
+          "to": "edge",
+          "kind": "request",
+          "label": "clean (forwarded)"
+        }
+      ],
+      "metrics": {
+        "attack": "400",
+        "origin": "500",
+        "legit": "95",
+        "blocked": "99"
+      }
+    },
+    {
+      "tag": "QUESTION",
+      "title": "The quiet attack that remains",
+      "body": "The flood is still being scrubbed, but the attacker adds a second attack. Instead of garbage packets, about 2,000 of the bots also send perfectly valid HTTPS requests to the search page and login form, roughly 4 per second each (8,000 per second in total), each looking like a browser. This is an application-layer (layer 7) attack. It is only a few tens of Mbps, tiny next to the flood, but search runs a costly database query, so the origin buckles. Packet filters cannot help because every packet is legitimate.",
+      "idea": "Layer 7 attacks are cheap for the attacker and expensive for you, so volume is the wrong thing to measure.",
+      "caption": "Valid-looking requests reach the origin.",
+      "focus": [
+        "botnet",
+        "edge",
+        "app",
+        "db"
+      ],
+      "flows": [
+        {
+          "from": "botnet",
+          "to": "edge",
+          "kind": "request",
+          "label": "GET /search?q=..."
+        },
+        {
+          "from": "edge",
+          "to": "app",
+          "kind": "request",
+          "label": "GET /search?q=..."
+        },
+        {
+          "from": "app",
+          "to": "db",
+          "kind": "fail",
+          "label": "slow query x8000"
+        }
+      ],
+      "metrics": {
+        "attack": "400",
+        "origin": "8500",
+        "legit": "30",
+        "blocked": "0"
+      }
+    },
+    {
+      "tag": "FLOW",
+      "title": "WAF and bot detection",
+      "body": "A web application firewall (WAF) reads HTTP and applies rules: block known exploit patterns such as SQL injection strings, reject odd methods, drop bad headers. Rules like these do nothing against a perfectly valid search request, which is why bot scoring is needed. Both work because the edge ends the TLS connection and can read the HTTP. Bot detection scores each client by IP reputation, TLS fingerprint, header order, and whether it runs JavaScript and acts like a person. Humans pass, clear bots are blocked, and uncertain ones get a challenge (JavaScript check, proof-of-work, or CAPTCHA). Scoring is statistical, so some bots slip through and some humans get challenged.",
+      "idea": "A WAF recognizes known-bad patterns; bot detection estimates who is probably automated. Both are probabilistic.",
+      "caption": "Edge inspects HTTP and challenges suspects.",
+      "focus": [
+        "edge",
+        "waf",
+        "limiter"
+      ],
+      "flows": [
+        {
+          "from": "edge",
+          "to": "waf",
+          "kind": "request",
+          "label": "score each request"
+        },
+        {
+          "from": "waf",
+          "to": "edge",
+          "kind": "fail",
+          "label": "block / challenge"
+        },
+        {
+          "from": "waf",
+          "to": "limiter",
+          "kind": "request",
+          "label": "likely human"
+        }
+      ],
+      "metrics": {
+        "origin": "2000",
+        "legit": "90",
+        "blocked": "80"
+      }
+    },
+    {
+      "tag": "FLOW",
+      "title": "Per-client limits on costly routes",
+      "body": "Some bots look human enough to pass. A rate limiter caps what any one client can do, with tighter limits on expensive routes: for example 60 searches per minute per client and only 5 login attempts per minute per account. Pick the key carefully. A single IP address is weak because a botnet has thousands and many real users share one office or mobile-carrier address, so combine IP, session or API key, and account. Over-limit requests get HTTP 429 with Retry-After. Per-account limits can be abused to lock out the real owner, so prefer slowing or challenging over a hard lock.",
+      "idea": "Limit by who is asking and what it costs you; the key you choose decides who gets caught.",
+      "caption": "Limiter caps each client, sparing the origin.",
+      "focus": [
+        "waf",
+        "limiter",
+        "app"
+      ],
+      "flows": [
+        {
+          "from": "waf",
+          "to": "limiter",
+          "kind": "request",
+          "label": "passed checks"
+        },
+        {
+          "from": "limiter",
+          "to": "waf",
+          "kind": "fail",
+          "label": "429 too many"
+        },
+        {
+          "from": "limiter",
+          "to": "app",
+          "kind": "request",
+          "label": "within quota"
+        },
+        {
+          "from": "app",
+          "to": "limiter",
+          "kind": "response",
+          "label": "200 OK"
+        }
+      ],
+      "metrics": {
+        "origin": "730",
+        "legit": "98",
+        "blocked": "97"
+      }
+    },
+    {
+      "tag": "TRADE-OFF",
+      "title": "False positives and a hidden origin",
+      "body": "Every rule can hurt real users (a few real customers get challenged). A blocked shopper during a sale costs money, so new rules often start in log-only mode and a challenge is gentler than a block. Also protect the back door: if the attacker learns the real origin IP, they can bypass the edge entirely. Accept traffic at the origin only from the edge, using firewall allow-lists plus an authenticated origin pull (mutual TLS or a secret header) or a tunnel, and set autoscaling caps and spend alerts so an attack cannot run up a huge bill.",
+      "idea": "Defense is a dial between blocking attackers and annoying customers, and it fails if the origin is reachable directly.",
+      "caption": "Origin only accepts traffic from the edge.",
+      "focus": [
+        "botnet",
+        "edge",
+        "waf",
+        "app"
+      ],
+      "flows": [
+        {
+          "from": "botnet",
+          "to": "app",
+          "kind": "fail",
+          "label": "direct to origin"
+        },
+        {
+          "from": "edge",
+          "to": "waf",
+          "kind": "request",
+          "label": "allowed path only"
+        }
+      ],
+      "metrics": {
+        "origin": "645",
+        "legit": "97",
+        "blocked": "98"
+      }
+    },
+    {
+      "tag": "RECAP",
+      "title": "Layers, each cheaper than the last",
+      "body": "Anycast spreads volume across many sites, scrubbing drops junk packets at the edge, the WAF and bot scoring filter bad HTTP, and per-client limits cap whatever remains on costly routes. Each layer is cheaper to run than the one behind it, and the origin sees only about its normal load. Both attacks are still running. No layer is perfect, so you combine them, watch false positives, and keep the origin hidden.",
+      "idea": "Stop abuse as early and cheaply as possible, and assume each layer leaks a little.",
+      "caption": "Origin back near 570 req/s, users served.",
+      "focus": [
+        "users",
+        "botnet",
+        "edge",
+        "scrub",
+        "waf",
+        "limiter",
+        "app",
+        "db"
+      ],
+      "flows": [],
+      "metrics": {
+        "attack": "400",
+        "origin": "570",
+        "legit": "98",
+        "blocked": "99"
+      }
+    }
   ],
   "quiz": [
-    {"q":"A flood of 300 Gbps of spoofed UDP packets is aimed at a site with a 10 Gbps link. Which defense addresses the real problem?","options":["Anycast capacity plus packet scrubbing","A WAF rule that blocks SQL injection strings","More app servers behind the load balancer","A per-user rate limit of 60 requests per minute"],"answer":0,"why":"The link itself is full, so extra servers or HTTP rules never see the traffic. Only far larger distributed capacity and packet filtering upstream of the origin helps."},
-    {"q":"An attacker sends only 200 valid-looking requests per second to /search, yet the database falls over. Why are packet-level scrubbers unlikely to help?","options":["Scrubbers only inspect UDP, so HTTPS requests pass through untouched","The traffic is too small for a scrubber to notice or bother filtering","Every packet is valid; the harm is the work each request triggers","HTTPS is encrypted, so no defense can ever inspect it at any layer"],"answer":2,"why":"Layer 7 attacks abuse expensive application work with well-formed requests. They need HTTP-aware defenses: WAF rules, bot scoring, and per-client limits on costly routes."},
-    {"q":"You limit login to 5 attempts per minute per source IP. A botnet of 50,000 devices tries one password each against one account. What weakness does this show?","options":["The limit of 5 per minute is too generous for any single IP address","IP-only limits are evaded by distributed attackers; key on account too","Login endpoints cannot be rate limited without breaking real users","429 responses leak which account names exist to the attacker's tools"],"answer":1,"why":"Each device makes one attempt, so none trips an IP limit. A limit keyed on the target account, plus bot detection, catches distributed attacks."},
-    {"q":"Your edge protection is solid, yet the origin still goes down under attack. The attacker found the origin's real IP from an old DNS record. What fix matters most?","options":["Accept origin traffic only from the edge; replace the leaked IP","Make the WAF rules much stricter so that more requests are blocked","Lower the DNS TTL so that cached copies of the record expire much sooner","Add a second database replica so reads are shared during an attack"],"answer":0,"why":"Traffic sent straight to the origin skips every edge layer. Restricting the origin to edge-only traffic closes that bypass; a new IP replaces the leaked one."},
-    {"q":"A new bot rule blocks 99% of attack traffic in testing but also challenges 3% of real checkout users. What is a sensible rollout?","options":["Enable full blocking immediately; attacks are worse than lost sales","Discard it, since any false positive at all is unacceptable for checkout","Apply it only to traffic from the countries attackers usually come from","Log-only first, tune, then soft challenge before any hard block"],"answer":3,"why":"Bot scoring is probabilistic. Observing first and escalating from log to challenge to block limits harm to real customers while you tune thresholds."}
+    {
+      "q": "A flood of 300 Gbps of spoofed UDP packets is aimed at a site with a 10 Gbps link. Which defense addresses the real problem?",
+      "options": [
+        "Anycast capacity plus packet scrubbing",
+        "A WAF rule that blocks SQL injection strings",
+        "More app servers behind the load balancer",
+        "A per-user rate limit of 60 requests per minute"
+      ],
+      "answer": 0,
+      "why": "The link itself is full, so extra servers or HTTP rules never see the traffic. Only far larger distributed capacity and packet filtering upstream of the origin helps."
+    },
+    {
+      "q": "An attacker sends only 200 valid-looking requests per second to /search, yet the database falls over. Why are packet-level scrubbers unlikely to help?",
+      "options": [
+        "Scrubbers only inspect UDP, so HTTPS requests pass through untouched",
+        "Scrubbers only act after the request has reached the database",
+        "Every packet is valid; the harm is the work each request triggers",
+        "HTTPS is encrypted, so no defense can ever inspect it at any layer"
+      ],
+      "answer": 2,
+      "why": "Layer 7 attacks abuse expensive application work with well-formed requests. They need HTTP-aware defenses: WAF rules, bot scoring, and per-client limits on costly routes."
+    },
+    {
+      "q": "You limit login to 5 attempts per minute per source IP. A botnet of 50,000 devices tries one password each against one account. What weakness does this show?",
+      "options": [
+        "The limit of 5 per minute is too generous for any single IP address",
+        "IP-only limits are evaded by distributed attackers; key on account too",
+        "Login endpoints cannot be rate limited without breaking real users",
+        "429 responses leak which account names exist to the attacker's tools"
+      ],
+      "answer": 1,
+      "why": "Each device makes one attempt, so none trips an IP limit. A limit keyed on the target account, plus bot detection, catches distributed attacks."
+    },
+    {
+      "q": "Your edge protection is solid, yet the origin still goes down under attack. The attacker found the origin's real IP from an old DNS record. What fix matters most?",
+      "options": [
+        "Accept origin traffic only from the edge; replace the leaked IP",
+        "Make the WAF rules much stricter so that more requests are blocked",
+        "Lower the DNS TTL so that cached copies of the record expire much sooner",
+        "Add a second database replica so reads are shared during an attack"
+      ],
+      "answer": 0,
+      "why": "Traffic sent straight to the origin skips every edge layer. Restricting the origin to edge-only traffic closes that bypass; a new IP replaces the leaked one."
+    },
+    {
+      "q": "A new bot rule blocks 99% of attack traffic in testing but also challenges 3% of real checkout users. What is a sensible rollout?",
+      "options": [
+        "Enable full blocking immediately; attacks are worse than lost sales",
+        "Discard it, since any false positive at all is unacceptable for checkout",
+        "Apply it only to traffic from the countries attackers usually come from",
+        "Log-only first, tune, then soft challenge before any hard block"
+      ],
+      "answer": 3,
+      "why": "Bot scoring is probabilistic. Observing first and escalating from log to challenge to block limits harm to real customers while you tune thresholds."
+    }
   ],
   "cheatsheet": [
-    {"term":"Volumetric attack","def":"Tries to exhaust bandwidth or packet capacity (UDP floods, reflection and amplification). Needs huge distributed capacity to absorb."},
-    {"term":"Application-layer (L7) attack","def":"Valid-looking HTTP requests aimed at expensive endpoints like search or login. Low volume, high cost per request."},
-    {"term":"Anycast","def":"One IP announced from many sites; routing sends each sender to the nearest. Splits attack traffic and cuts latency for users."},
-    {"term":"Scrubbing","def":"Filtering junk packets (spoofed, malformed, wrong ports) upstream of the origin, often at the edge or a dedicated center."},
-    {"term":"WAF","def":"Firewall that understands HTTP and blocks known-bad patterns such as injection strings. Weak against valid-looking abuse on its own."},
-    {"term":"Bot detection","def":"Scores clients using IP reputation, TLS and header fingerprints, and behavior; allows, challenges, or blocks. Probabilistic, so expect errors."},
-    {"term":"Per-client rate limit","def":"Caps requests per key (IP, session, API key, account), tighter on costly routes. Return 429 with Retry-After."},
-    {"term":"Hide the origin","def":"Accept traffic only from the edge network, authenticated (mutual TLS, secret header, or tunnel); a leaked origin IP lets attackers bypass every upstream layer."}
+    {
+      "term": "Volumetric attack",
+      "def": "Tries to exhaust bandwidth or packet capacity (UDP floods, reflection and amplification). Needs huge distributed capacity to absorb."
+    },
+    {
+      "term": "Application-layer (L7) attack",
+      "def": "Valid-looking HTTP requests aimed at expensive endpoints like search or login. Low volume, high cost per request."
+    },
+    {
+      "term": "Anycast",
+      "def": "One IP announced from many sites; routing sends each sender to the nearest. Splits attack traffic and cuts latency for users."
+    },
+    {
+      "term": "Scrubbing",
+      "def": "Filtering junk packets (spoofed, malformed, wrong ports) upstream of the origin, often at the edge or a dedicated center."
+    },
+    {
+      "term": "WAF",
+      "def": "Firewall that understands HTTP and blocks known-bad patterns such as injection strings. Weak against valid-looking abuse on its own."
+    },
+    {
+      "term": "Bot detection",
+      "def": "Scores clients using IP reputation, TLS and header fingerprints, and behavior; allows, challenges, or blocks. Probabilistic, so expect errors."
+    },
+    {
+      "term": "Per-client rate limit",
+      "def": "Caps requests per key (IP, session, API key, account), tighter on costly routes. Return 429 with Retry-After."
+    },
+    {
+      "term": "Hide the origin",
+      "def": "Accept traffic only from the edge network, authenticated (mutual TLS, secret header, or tunnel); a leaked origin IP lets attackers bypass every upstream layer."
+    }
   ]
 }

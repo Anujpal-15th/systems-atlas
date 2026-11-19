@@ -435,12 +435,12 @@
     {
       "q": "Who should own a mobile BFF?",
       "options": [
-        "A central platform team, so every client gets identical APIs",
         "The team that builds the mobile app, so it can change the API shape without waiting on a central team",
+        "A central platform team, so every client gets identical APIs",
         "The database team, since the BFF reads shared data",
         "Nobody; a BFF is generated automatically by the gateway"
       ],
-      "answer": 1,
+      "answer": 0,
       "why": "A BFF exists to let one client team shape its own API quickly. If a central team owns it, every change queues behind them and the BFF becomes another shared bottleneck."
     },
     {

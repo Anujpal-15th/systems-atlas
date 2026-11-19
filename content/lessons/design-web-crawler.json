@@ -198,13 +198,13 @@
       ],
       "metrics": {
         "dns": "1",
-        "workers": "2"
+        "workers": "1"
       }
     },
     {
       "tag": "POLITE",
       "title": "Fetch, but politely",
-      "body": "The fetcher first reads the site's robots.txt (cached for a day) to learn which paths are off limits and any Crawl-delay. Then it downloads the page, with a timeout so a slow server cannot pin a worker. Rule of thumb: one request at a time per host, a few seconds apart. Many crawlers scale the delay with the server's response time, honour 429 and 503 Retry-After, and send an identifying User-Agent with a contact URL.",
+      "body": "The fetcher first reads the site's robots.txt (cached for a day) to learn which paths are off limits and any Crawl-delay (a non-standard hint some crawlers honour); the robots.txt fetch counts toward the host's rate limit. Then it downloads the page, with a timeout so a slow server cannot pin a worker. Rule of thumb: one request at a time per host, a few seconds apart. At an average of about 0.5 s per fetch, 60 fetches in flight gives about 120 pg/s (Little's law). Many crawlers scale the delay with the server's response time, honour 429 and 503 Retry-After, and send an identifying User-Agent with a contact URL.",
       "idea": "Politeness is per host: the crawler can be huge overall while each website sees a trickle.",
       "caption": "Fetcher requests the page, honouring robots.txt and delay.",
       "focus": [
@@ -249,15 +249,15 @@
         }
       ],
       "metrics": {
-        "rate": "400"
+        "rate": "120"
       }
     },
     {
       "tag": "DEDUP",
       "title": "Skip what we have seen",
-      "body": "Each candidate URL is checked against a seen-URL set. Storing 10 billion URLs exactly costs hundreds of GB, so a Bloom filter keeps it in memory: a 'no' means certainly new; a 'yes' is treated as seen, accepting about 1% of new URLs wrongly skipped, or confirmed against an exact store if that loss is unacceptable. The page body is also hashed; a matching exact hash, or a SimHash within a few bits of Hamming distance, marks a mirror or near-copy, so we skip storing it.",
-      "idea": "Dedup happens twice: by URL before fetching (saves bandwidth) and by content after fetching (saves storage and index noise). In a mature crawl, for example, most extracted links are repeats.",
-      "caption": "In a mature crawl, most extracted links are already known and dropped.",
+      "body": "Each candidate URL is checked against a seen-URL set. Storing 10 billion URLs exactly costs about 1 TB as strings, or about 80 GB even as 8-byte fingerprints, so a Bloom filter (roughly 12 GB) keeps the check in memory: a 'no' means certainly new; a 'yes' is treated as seen, accepting about 1% of new URLs wrongly skipped, or confirmed against an exact store if that loss is unacceptable. The page body is also hashed; a matching exact hash, or a SimHash within a few bits of Hamming distance, marks a mirror or near-copy, so we skip storing it.",
+      "idea": "Dedup happens twice: by URL before fetching (saves bandwidth) and by content after fetching (saves storage and index noise).",
+      "caption": "Of 40 extracted links only 9 are new, about 78% dupes.",
       "focus": [
         "parser",
         "dedup"
@@ -283,7 +283,7 @@
     {
       "tag": "LOOP",
       "title": "New URLs return to the frontier",
-      "body": "Only genuinely new URLs go back into the frontier, with a priority, in their host's queue. A page is stored (object storage, compressed, keyed by URL and fetch time) only if its content hash was not seen. A page that changes often earns a short recrawl interval, a static page a long one; recrawls send conditional GETs so unchanged pages cost a 304, not a full download.",
+      "body": "Only genuinely new URLs go back into the frontier, with a priority, in their host's queue. A page is stored (object storage, compressed, keyed by URL and fetch time) only if its content hash was not seen. A page that changes often earns a short recrawl interval, a static page a long one; recrawls are re-enqueued by the scheduler, bypassing the seen-URL filter, and send conditional GETs so that, when the server provides ETag or Last-Modified, unchanged pages cost a 304, not a full download.",
       "idea": "The frontier is both the input and the output of the loop; recrawl scheduling lives there too.",
       "caption": "New links feed the frontier; the page is saved.",
       "focus": [
@@ -301,22 +301,28 @@
         },
         {
           "from": "parser",
+          "to": "dedup",
+          "kind": "request",
+          "label": "content hash?"
+        },
+        {
+          "from": "parser",
           "to": "store",
           "kind": "async",
           "label": "new page + hash"
         }
       ],
       "metrics": {
-        "rate": "400",
-        "workers": "200"
+        "rate": "120",
+        "workers": "60"
       }
     },
     {
       "tag": "SCALE",
       "title": "Distribute the workers",
-      "body": "One machine could nearly hold 200 fetches in flight on paper, but not reliably. The average load is about 320 Mbps and 100 TB of storage a month, peaks reach several times that, parsing and dedup need CPU and memory, and one box is a single point of failure. So we shard URLs by host hash across many workers. Links a worker finds are forwarded to the worker owning their host, so each holds the seen-URL filter, queues and politeness state for its slice only. Use consistent hashing (see the Key-Value Store lesson) so adding a worker moves few hosts.",
+      "body": "At 400 pages/s one well-tuned machine could handle the connections and bandwidth, so we spread out for headroom and safety: peaks several times the 320 Mbps average, parsing and dedup CPU and memory, 100 TB a month of storage, no single point of failure. At about 0.5 s per fetch, 400 pg/s is about 200 fetches in flight. Shard by host hash (in practice the registered domain, or limit per IP, since many hostnames share one server). Links are forwarded to the owning worker, which dedups on receipt, then enqueues. Use consistent hashing so adding a worker moves few hosts.",
       "idea": "Shard by host, not by URL: politeness, DNS, and robots.txt all become local decisions.",
-      "caption": "Each worker owns a slice of hosts; links are forwarded to the owner.",
+      "caption": "Links are routed to the owning shard, which dedups and enqueues them.",
       "focus": [
         "frontier",
         "fetcher",
@@ -333,7 +339,7 @@
           "from": "dedup",
           "to": "frontier",
           "kind": "async",
-          "label": "to host owner"
+          "label": "forward to owner"
         },
         {
           "from": "fetcher",
@@ -350,9 +356,9 @@
     {
       "tag": "WHAT IF",
       "title": "A spider trap and a dead worker",
-      "body": "Some sites generate infinite URLs, like a calendar with a next-month link forever. Defences: cap URL length, depth, and pages per host. If a worker dies mid-fetch, its URL was only leased, not removed, so the lease expires and it is retried. The dead worker's host range is reassigned to another worker. Fetches that keep failing are retried with growing delays, then given up.",
+      "body": "Some sites generate infinite URLs, like a calendar with a next-month link forever. Defences: cap URL length, depth, and pages per host. A lease is a temporary claim: the URL stays in the frontier, hidden until a deadline, and is removed only on ack. If a worker dies, its leases expire and the URLs are retried. Each shard's frontier and seen-URL log are persisted, so the new owner reloads queues and leases and rebuilds the Bloom filter; a few repeat fetches are fine. A host that keeps timing out gets its whole back queue delayed.",
       "idea": "Assume the web is hostile and machines fail: use limits on crawl depth and per-host budgets, and lease URLs instead of deleting them.",
-      "caption": "A failed fetch is retried, not lost.",
+      "caption": "Traps are capped by limits; a failed fetch is retried later, not lost.",
       "focus": [
         "fetcher",
         "web",

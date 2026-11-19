@@ -8,7 +8,7 @@
     "How heartbeats let one node judge whether another is alive",
     "Why a fixed timeout is a blunt tool and what a phi-accrual detector does instead",
     "How gossip spreads membership news to every node in roughly log N rounds",
-    "Why a failure detector can only suspect, never know, and how that causes false alarms",
+    "Why, over an unreliable network, a failure detector can only suspect and never know, and how that causes false alarms",
     "What split brain is and why a majority rule contains it"
   ],
   "nodes": [
@@ -124,7 +124,7 @@
       "tag": "QUESTION",
       "title": "Is that node dead or just quiet?",
       "body": "A five-node cluster stores data and must route around machines that fail. One node, A, is the leader that coordinates writes. But no node can look at another's power light. All it can see is messages arriving or not arriving. Silence could mean a crash, a slow disk, a long garbage-collection pause, or a broken network cable. This lesson shows how a cluster turns silence into a decision.",
-      "idea": "Failure detection is inference from missing messages, never direct observation.",
+      "idea": "Over an unreliable network, failure detection is inference from missing messages, never direct observation.",
       "caption": "Five peers and a client; nobody can see another node's health.",
       "focus": [],
       "flows": [],
@@ -167,7 +167,7 @@
     {
       "tag": "CONCEPT",
       "title": "The fixed timeout",
-      "body": "Now E crashes. The simplest rule is a fixed timeout: if no heartbeat arrives for 5 seconds, declare E dead. It is easy to reason about but rigid. On a quiet LAN, 5 seconds wastes time before reacting. On a congested or cross-region link where delays vary a lot, 5 seconds fires on healthy nodes. One number cannot fit every network or every moment.",
+      "body": "Now E crashes. The simplest rule is a fixed timeout: if no heartbeat arrives for 5 seconds, declare E dead. It is easy to reason about but rigid. On a quiet LAN it is slower than it needs to be. On a congested or cross-region link where delays vary a lot, 5 seconds fires on healthy nodes. One number cannot fit every network or every moment.",
       "idea": "A fixed timeout trades detection speed against false alarms, and the right value changes with conditions.",
       "caption": "E has crashed; D waits for the 5 s timer to expire (phi is introduced next).",
       "focus": [
@@ -190,7 +190,7 @@
     {
       "tag": "CONCEPT",
       "title": "Phi-accrual detection",
-      "body": "A phi-accrual detector (used by Cassandra and Akka) learns how late beats normally are. It reports a suspicion score, phi, that grows the longer the silence lasts compared with history. Phi 1 means about a 10% chance the node is still fine, phi 2 about 1%, phi 8 about one in a hundred million. The application picks a threshold, commonly 8 in Cassandra, instead of a time. With beats normally one second apart, Cassandra-style estimates put phi 8 at about 18 seconds of silence.",
+      "body": "A phi-accrual detector (Cassandra, Akka) learns how late beats normally are and reports a suspicion score, phi, that grows with silence. Phi 1 means a gap this long would occur about 10% of the time if the node were healthy, phi 2 about 1%, phi 8 about one in a hundred million. With a 1 s mean, threshold 8 needs about 18.5 s of silence. That is slower than the 5 s rule on a steady link, because threshold 8 is deliberately cautious; the gain is that the same threshold stretches on a jittery link (mean 4 s gives about 74 s) and tightens on a fast one (mean 100 ms gives about 1.8 s). A lower threshold detects sooner at the price of more false alarms.",
       "idea": "Phi adapts to observed network jitter and outputs a graded suspicion level, not a yes or no.",
       "caption": "Silence grows; phi climbs past the threshold of 8.",
       "focus": [
@@ -206,7 +206,7 @@
         }
       ],
       "metrics": {
-        "gap": "18400",
+        "gap": "18600",
         "phi": "8.1",
         "aware": "1"
       }
@@ -214,7 +214,7 @@
     {
       "tag": "FLOW",
       "title": "Gossip starts",
-      "body": "D now suspects E, but a cluster needs every node to converge on the same membership view. Rather than D messaging everyone, nodes use gossip: every second each node picks a few random peers and swaps what it knows, including a version number per member. D tells B and C that E looks down. New nodes join by contacting a seed node and then appear in everyone's list by gossip. No coordinator is needed, so none can become a bottleneck.",
+      "body": "D now suspects E, but a cluster needs every node to converge on one membership view. Instead of D messaging everyone, nodes gossip: every second each node picks a few random peers and swaps what it knows, with a version number per member. D tells B and C that E looks down. Systems differ here: Cassandra gossips heartbeat counters and each node judges for itself, while SWIM-style systems (SWIM is a gossip membership protocol) gossip suspicion itself, as this cluster does. New nodes join via a seed node and spread by gossip; no coordinator is needed.",
       "idea": "Gossip is periodic random pairwise exchange of state, with no central coordinator.",
       "caption": "D tells two random peers that E is suspected.",
       "focus": [
@@ -243,7 +243,7 @@
     {
       "tag": "FLOW",
       "title": "The rumor spreads",
-      "body": "In the next round, B and C each pick their own random peers, and A hears it. With one peer per round, the informed set roughly doubles in the early rounds, so news reaches N nodes in about log2(N) rounds plus a few more for stragglers: roughly 15 to 17 rounds for 1,000 nodes. Contacting a few peers per round makes it faster. Each node sends only a few small messages per round no matter how large the cluster is.",
+      "body": "In the next round, B and C each pick their own random peers, and A hears it. With one peer per round, the informed set roughly doubles in the early rounds, so news reaches N nodes in about log2(N) rounds plus a few more for stragglers: roughly 15 to 17 rounds for 1,000 nodes. Contacting a few peers per round makes it faster. Each node sends a constant number of messages per round no matter how large the cluster is; real systems keep them small by exchanging digests and only the newer entries.",
       "idea": "Informed nodes roughly double each early round, so spread time grows with log N while per-node load stays flat.",
       "caption": "A, B and C now agree; the live cluster converges.",
       "focus": [
@@ -273,13 +273,12 @@
     {
       "tag": "TRADE-OFF",
       "title": "False alarms",
-      "body": "Suppose instead that E is fine, but a 20 s garbage-collection pause froze it. Its heartbeats stop, phi passes the threshold of 8, and the cluster marks it down. When E wakes up it bumps its own version (heartbeat counter or incarnation number), and because newer versions win in gossip, the 'suspect' entry is overwritten. SWIM-style detectors also ask other nodes to probe the suspect (indirect probes) to cut false alarms from one bad link. Too sensitive a threshold causes flapping: nodes repeatedly shunned and readmitted, triggering needless data movement. Too lax a threshold leaves real failures undetected longer.",
+      "body": "Suppose instead that E is fine, but a 20 s garbage-collection pause froze it. Its heartbeats stop, phi passes the threshold of 8, and the cluster marks it down. When E wakes it can refute: SWIM lets a suspect raise its incarnation number, a counter only that node increments, and the higher number overwrites the suspect entry in gossip. SWIM also uses indirect probes: other nodes ping the suspect on your behalf, cutting false alarms from one bad link. Too sensitive a threshold causes flapping, with nodes shunned and readmitted and data moving needlessly. Too lax a threshold leaves real failures undetected longer.",
       "idea": "A detector is never certain; threshold choice balances slow detection against false positives.",
-      "caption": "A paused but healthy E looks identical to a dead one.",
+      "caption": "In this alternate run E was only paused, yet all four peers think it is down until E refutes.",
       "focus": [
         "e",
-        "c",
-        "d"
+        "c"
       ],
       "flows": [
         {
@@ -298,7 +297,7 @@
       "metrics": {
         "gap": "20000",
         "phi": "8.7",
-        "aware": "0"
+        "aware": "4"
       }
     },
     {
@@ -348,6 +347,9 @@
         }
       ],
       "metrics": {
+        "gap": "20000",
+        "phi": "8.7",
+        "aware": "2",
         "leaders": "2"
       }
     },
@@ -418,7 +420,7 @@
         "It guarantees a suspected node is really dead"
       ],
       "answer": 1,
-      "why": "Phi compares the current silence with the learned distribution of past inter-arrival times, so a jittery link tolerates longer gaps while a steady one reacts faster."
+      "why": "Phi compares the current silence with the learned arrival pattern, so the same threshold tolerates longer gaps on a jittery link and shorter ones on a steady link, instead of one fixed number for both."
     },
     {
       "q": "A 1,000-node cluster gossips once per second and each node contacts one random peer. About how long until a rumor reaches nearly everyone?",

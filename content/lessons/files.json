@@ -24,14 +24,14 @@
       "label": "API server",
       "kind": "server",
       "x": 34,
-      "y": 50
+      "y": 24
     },
     {
       "id": "meta",
       "label": "Metadata DB",
       "kind": "db",
       "x": 58,
-      "y": 16
+      "y": 10
     },
     {
       "id": "store",
@@ -122,9 +122,9 @@
     {
       "tag": "CONCEPT",
       "title": "Block, file, object",
-      "body": "Block storage is a raw disk: fixed-size blocks you read and write at an offset, ideal for a database's data files or a VM disk. File storage adds folders and paths on top and lets many machines share them (NFS-style). Object storage, like S3, is a flat bucket of whole objects found by key: you PUT or GET the entire thing, and you cannot edit bytes in the middle on classic S3-style stores (you replace the whole object). In exchange you get huge scale, cheap cost per GB, and very high durability (S3 advertises 11 nines).",
+      "body": "Block storage is a raw disk: fixed-size blocks you read and write at an offset, ideal for a database's data files or a VM disk. File storage adds folders and paths on top and lets many machines share them (NFS-style). Object storage, like S3, is a flat bucket of whole objects found by key: you write a whole object with PUT, and read it with GET (optionally just a byte range). You cannot edit bytes in the middle on classic S3-style stores; you replace the whole object. In exchange you get huge scale, cheap cost per GB, and very high durability (S3 advertises 11 nines).",
       "idea": "Block is for databases and VMs, file is for shared folders, object is for blobs at scale.",
-      "caption": "The object store holds whole, immutable blobs addressed by key.",
+      "caption": "The object store holds whole blobs addressed by key.",
       "focus": [
         "store"
       ],
@@ -134,7 +134,7 @@
     {
       "tag": "TRADE-OFF",
       "title": "The naive path: proxy it",
-      "body": "The simplest design: client sends the file to the API, and the API forwards it to the object store. It works, but now every upload ties up an API connection for the whole transfer. Ten thousand users each uploading 2 GB means your API fleet moves 20 TB, and each byte crosses your API fleet's network twice (in from the client, out to the store). A slow phone on bad Wi-Fi holds a worker for minutes.",
+      "body": "The simplest design: client sends the file to the API, and the API forwards it to the object store. It works, but now every upload ties up an API connection for the whole transfer. Each 2 GB upload (the tile below) passes through the API; ten thousand users doing that means your API fleet moves 20 TB, and each byte crosses your API fleet's network twice (in from the client, out to the store). A slow phone on bad Wi-Fi holds a worker for minutes.",
       "idea": "Proxying uploads makes your API a bandwidth pipe, which is the wrong thing to scale.",
       "caption": "Every byte passes through the API server twice.",
       "focus": [
@@ -191,12 +191,14 @@
           "label": "id + key"
         }
       ],
-      "metrics": {}
+      "metrics": {
+        "apibytes": "0"
+      }
     },
     {
       "tag": "CONCEPT",
       "title": "Presigned URL",
-      "body": "The API now asks its storage library to sign a URL for exactly one operation: PUT this key, valid for 15 minutes. Signing is local math with a secret the client never sees, so it costs microseconds and no storage call. The client receives the URL and can upload to the store directly. For a small file, one signed PUT URL is enough; for big files see the next step. Anyone holding the URL can use it until it expires, so keep lifetimes short and scope it to one key.",
+      "body": "The API now asks its storage library to sign a URL for exactly one operation: PUT this key, valid for 15 minutes. Signing is local math with a secret the client never sees, so it costs microseconds and no storage call. The client receives the URL and can upload to the store directly. For a small file, one signed PUT URL is enough; for big files see the next step. Anyone holding the URL can use it until it expires, so keep lifetimes short and scope it to one key. A signed PUT does not limit size by itself, so validate after upload (or use a presigned POST policy with a size limit).",
       "idea": "A presigned URL is a short-lived permission slip: the API grants it, the store honors it.",
       "caption": "API hands the client a signed, expiring upload URL.",
       "focus": [
@@ -225,7 +227,7 @@
     {
       "tag": "MULTIPART",
       "title": "Upload in parts",
-      "body": "A single 2 GB PUT is fragile: if the connection drops at 95 percent, you start over. For a big file the API starts a multipart upload, then signs one URL per part (here 32 parts of 64 MB; S3 needs 5 MiB or more per part except the last). The client PUTs the parts straight to the store, in parallel, and collects an ETag for each. Then it sends the ETag list to the API, which calls complete and the store stitches the parts into one object. A failed part is retried alone.",
+      "body": "A single 2 GB PUT is fragile: if the connection drops at 95 percent, you start over. For a big file the API starts a multipart upload, then signs one URL per part (here 32 parts of 64 MB; S3 needs 5 MiB or more per part except the last). The client PUTs the parts straight to the store, in parallel, and collects an ETag for each. Then it sends the ETag list to the API, which calls complete and the store stitches the parts into one object. A failed part is retried alone. Save the upload ID in the row so a restarted client can list finished parts and continue. Each part URL has its own lifetime, so a slow client asks the API for fresh URLs for the remaining parts.",
       "idea": "Multipart makes big uploads parallel and resumable: retry a part, not the file.",
       "caption": "API signs 32 part URLs; client uploads parts straight to the store.",
       "focus": [
@@ -234,6 +236,12 @@
         "store"
       ],
       "flows": [
+        {
+          "from": "api",
+          "to": "store",
+          "kind": "request",
+          "label": "start multipart"
+        },
         {
           "from": "client",
           "to": "api",
@@ -278,7 +286,7 @@
     {
       "tag": "ASYNC",
       "title": "React to the upload",
-      "body": "When the object appears, the store emits an event (for example ObjectCreated) onto a queue. A worker picks it up and treats the upload as untrusted: it checks type and size, generates thumbnails or transcodes, then flips the row from pending to ready. If the worker crashes, the message is redelivered. Delivery is at-least-once, so processing must be safe to run twice. S3 reads of new objects are strongly consistent, so the worker sees the file right away.",
+      "body": "When the object appears, the store emits an event (for example ObjectCreated) to a queue or function trigger; a worker picks it up. The worker then reads the object from the store and treats the upload as untrusted: it checks type and size, generates thumbnails or transcodes, then flips the row from pending to ready. If the worker crashes, the message is redelivered. Delivery is at-least-once, so processing must be safe to run twice. S3 reads of new objects are strongly consistent, so the worker sees the file right away.",
       "idea": "Use storage events to trigger background work and flip the row to ready.",
       "caption": "Object arrives, event fires, worker marks the row ready.",
       "focus": [
@@ -311,6 +319,7 @@
       "focus": [
         "client",
         "api",
+        "meta",
         "cdn",
         "store"
       ],
@@ -320,6 +329,18 @@
           "to": "api",
           "kind": "request",
           "label": "where is it?"
+        },
+        {
+          "from": "api",
+          "to": "meta",
+          "kind": "request",
+          "label": "lookup row"
+        },
+        {
+          "from": "meta",
+          "to": "api",
+          "kind": "response",
+          "label": "object key"
         },
         {
           "from": "api",
@@ -357,7 +378,7 @@
     {
       "tag": "WHAT IF",
       "title": "The upload is abandoned",
-      "body": "The user closes the app after 20 of 32 parts. Those parts sit in the store, invisible but billed, and the row is stuck on pending. Two cleanups fix this: a lifecycle rule that aborts incomplete multipart uploads after, say, 7 days, and a job that deletes pending rows older than a day and aborts their multipart upload. The mirror problem is deleting a row but forgetting the blob, so deletes should remove both.",
+      "body": "The user closes the app after 20 of 32 parts. Those parts sit in the store, invisible but billed, and the row is stuck on pending. Two cleanups fix this: a job deletes pending rows older than a day and aborts their multipart upload, and a lifecycle rule aborts incomplete multipart uploads after, say, 7 days. The job reclaims abandoned rows after a day; the 7-day lifecycle rule is the backstop for anything the job misses. The mirror problem is deleting a row but forgetting the blob, so deletes should remove both.",
       "idea": "Two systems mean two cleanups: expire stale multipart parts and stale pending rows.",
       "caption": "A dropped upload leaves orphaned parts behind.",
       "focus": [
@@ -404,9 +425,9 @@
       "q": "Why do most designs hand the client a presigned URL instead of proxying the upload through the API?",
       "options": [
         "Object stores refuse requests that come from API servers",
-        "Presigned URLs encrypt the file, and the API cannot",
-        "The file bytes skip your API, so it only handles a tiny request and scales independently of upload volume",
-        "It removes the need for a metadata database"
+        "Presigned URLs encrypt the file in transit, which an API server cannot do",
+        "The bytes skip your API, so it only handles tiny requests and scales independently of upload volume",
+        "Presigned URLs remove the need for a metadata database"
       ],
       "answer": 2,
       "why": "The signature is created locally and the client sends bytes directly to the store, so API servers do not carry upload bandwidth. You still need a database for metadata."
@@ -425,10 +446,10 @@
     {
       "q": "Why store the object key and attributes in a database row rather than relying on the bucket alone?",
       "options": [
-        "Buckets cannot hold more than 1 million objects",
-        "Object keys cannot contain the user's name",
-        "Objects are encrypted so they cannot be read back",
-        "The database can query by owner, date or status, while a bucket mainly lists keys by prefix"
+        "Object stores cannot attach any metadata to an object at all",
+        "Object keys are not allowed to contain a user's name or ID",
+        "Objects are encrypted at rest so they cannot be read back by key",
+        "A database can query by owner, date or status; a bucket mainly lists keys by prefix"
       ],
       "answer": 3,
       "why": "Object stores are good at get-by-key and prefix listing. Questions like all videos owned by user 42 this week belong in a database that can index those fields."
@@ -438,7 +459,7 @@
       "options": [
         "Object storage, rewriting the object each time",
         "Block storage, which supports reads and writes at an offset",
-        "A CDN with a short TTL",
+        "File storage, because it stores folders of objects",
         "A presigned URL with a long lifetime"
       ],
       "answer": 1,
@@ -456,7 +477,7 @@
     },
     {
       "term": "Object storage",
-      "def": "Flat bucket of whole objects found by key. Cheap, huge, durable, but no partial edits: replace the whole object."
+      "def": "Flat bucket of whole objects found by key. Cheap, huge, durable, but no in-place partial edits: replace the whole object."
     },
     {
       "term": "Metadata DB + blob",

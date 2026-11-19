@@ -16,43 +16,43 @@
       "id": "app",
       "label": "Shop app server",
       "kind": "server",
-      "x": 10,
+      "x": 12,
       "y": 50
     },
     {
       "id": "sql",
       "label": "Relational (SQL)",
       "kind": "db",
-      "x": 42,
-      "y": 12
+      "x": 60,
+      "y": 10
     },
     {
       "id": "kv",
       "label": "Key-value store",
       "kind": "cache",
-      "x": 42,
-      "y": 32
+      "x": 60,
+      "y": 30
     },
     {
       "id": "doc",
       "label": "Document store",
       "kind": "db",
-      "x": 42,
-      "y": 52
+      "x": 60,
+      "y": 50
     },
     {
       "id": "wide",
       "label": "Wide-column store",
       "kind": "db",
-      "x": 42,
-      "y": 72
+      "x": 60,
+      "y": 70
     },
     {
       "id": "graph",
       "label": "Graph database",
       "kind": "db",
-      "x": 80,
-      "y": 50
+      "x": 60,
+      "y": 90
     }
   ],
   "edges": [
@@ -75,10 +75,6 @@
     {
       "from": "app",
       "to": "graph"
-    },
-    {
-      "from": "sql",
-      "to": "kv"
     }
   ],
   "metrics": [
@@ -169,7 +165,7 @@
       "title": "Sessions: give me the value for this key",
       "body": "A login session is read on every request and is only ever fetched by its session id. A key-value store such as Redis (or the simplest use of DynamoDB) maps a key to a value and is built around lookup by that key. Because there are no joins or ad hoc queries to plan, and Redis keeps data in memory, a lookup takes about half a millisecond and one node serves 100 thousand or more operations per second. Disk-based stores like DynamoDB are typically single-digit milliseconds. Sessions in an in-memory store need persistence or replication if they must survive a restart.",
       "idea": "A key-value store is the fastest design when the only question is 'what is stored under this key?'",
-      "caption": "GET by session id returns in well under 1 ms.",
+      "caption": "GET by session id returns in under 1 ms.",
       "focus": [
         "app",
         "kv"
@@ -196,7 +192,7 @@
     {
       "tag": "DOCUMENT",
       "title": "Catalog: one product, one document",
-      "body": "A laptop has RAM and ports; a T-shirt has size and fabric. Forcing both into one table means many empty columns or many joined tables. A document store such as MongoDB keeps each product as one JSON-like document with whatever fields it needs, so a single read returns the whole product page. The cost is that by default the shape is enforced by your code rather than the database (some stores let you opt in to validation), and cross-document joins are limited or slow.",
+      "body": "A laptop has RAM and ports; a T-shirt has size and fabric. Forcing both into one table means many empty columns or many joined tables. A document store such as MongoDB keeps each product as one JSON-like document with whatever fields it needs, so a single read returns the whole product page. The cost is that by default the shape is enforced by your code rather than the database (some stores let you opt in to validation), and cross-document joins are limited and often slower at scale.",
       "idea": "Documents fit data that is read and written as a self-contained unit with varying fields.",
       "caption": "One read returns the full product document.",
       "focus": [
@@ -225,7 +221,7 @@
     {
       "tag": "WIDE-COLUMN",
       "title": "Click events: huge write volume",
-      "body": "The shop logs 200 thousand click events per second during a sale. A wide-column store such as Cassandra or ScyllaDB spreads data over many nodes by a partition key (say user id) and keeps rows inside a partition sorted by a clustering key such as time. Writes are cheap appends, and 'latest 50 events for user 42' reads one sorted slice. You must choose the table layout per query, because queries on other columns are not supported efficiently.",
+      "body": "The shop logs 200 thousand click events per second during a sale, spread over a 5-node cluster (about 40 thousand writes per node). A wide-column store such as Cassandra or ScyllaDB spreads data by a partition key (say user id) and keeps rows inside a partition sorted by a clustering key such as time. Writes are cheap appends, and 'latest 50 events for user 42' reads one sorted slice. Design the table per query; other columns are not queried efficiently. Such stores usually favor availability and can return slightly stale reads by default (see Replication).",
       "idea": "Wide-column stores scale writes by making every query hit one partition, so the table is designed around the query.",
       "caption": "Writes fan out by partition key across the cluster.",
       "focus": [
@@ -262,7 +258,7 @@
       "title": "Recommendations: follow the relationships",
       "body": "'Customers who bought this also bought...' means walking from a product to buyers to their other purchases, two or three hops deep. In SQL each hop is another join, here a self-join (a table joined to itself, following product-buyer-product links). With indexes two or three hops are fine, but intermediate results multiply and deep or variable-length paths become awkward and slow. Many graph databases store each node's neighbours directly, so a traversal costs about the edges visited rather than the table sizes. Real recommendation systems often precompute results, so graphs earn their place when live path queries are the product.",
       "idea": "Pick a graph store when queries are about paths and neighbours several hops deep.",
-      "caption": "A 3-hop traversal follows stored edges.",
+      "caption": "A multi-hop traversal follows stored edges.",
       "focus": [
         "app",
         "graph"
@@ -272,7 +268,7 @@
           "from": "app",
           "to": "graph",
           "kind": "request",
-          "label": "3 hops from item"
+          "label": "2-3 hops from item"
         },
         {
           "from": "graph",
@@ -289,7 +285,7 @@
     {
       "tag": "WHAT IF",
       "title": "Run the finance report on the document store",
-      "body": "Suppose orders had been put in the document store because it was fashionable. The revenue-by-category question now needs data from three collections. A document store can join across them (MongoDB has $lookup), but those joins are limited and slow compared with a relational engine and are not what the data model is built for. So you either combine orders, products and customers in application code, or copy product and customer fields into every order. The extra round trips make it slower, and the copies must be kept in sync.",
+      "body": "Suppose orders had been put in the document store because it was fashionable. The revenue-by-category question now needs data from three collections. A document store can join across them (MongoDB has $lookup), but those joins are limited compared with a relational engine's and are not what the data model is optimized for. So you either combine orders, products and customers in application code, or copy product and customer fields into every order. Assume the app fetches a quarter of orders and joins in code; that takes seconds. Copies must be kept in sync.",
       "idea": "NoSQL stores make known queries fast by pre-shaping data; unplanned queries then cost you code or copies.",
       "caption": "Cross-collection joins are limited, so the app does the work.",
       "focus": [
@@ -311,14 +307,14 @@
         }
       ],
       "metrics": {
-        "latency": "900",
-        "ops": "40"
+        "latency": "3000",
+        "ops": "2"
       }
     },
     {
       "tag": "TRADE-OFF",
       "title": "Start boring, add stores on evidence",
-      "body": "A common mistake is to adopt five databases on day one. As a rule of thumb, a single relational database, with good indexes and read replicas, handles most products well past a million users, and it gives transactions, constraints and joins for free. Add a key-value cache when reads hurt, a wide-column or time-series store when write volume outgrows one node, a graph store when traversals dominate. Each added store means more operations work, and cached copies can go stale, so you must decide when to expire or refresh them.",
+      "body": "A common mistake is to adopt five databases on day one. As a rule of thumb, a single relational database, with good indexes and read replicas, handles most products well past a million users, and it gives transactions, constraints and joins for free. Add a key-value cache when reads hurt: the app checks it first, reads SQL only on a miss, then fills the cache. Add wide-column or time-series storage when writes outgrow one node, a graph store when traversals dominate. Each added store means more operations work, and cached copies can go stale, so you must decide when to expire or refresh them.",
       "idea": "Every extra database is a new thing to run, back up and keep in sync, so add one only for a measured need.",
       "caption": "SQL is the source of truth; others serve special reads.",
       "focus": [
@@ -418,7 +414,7 @@
         "It is true because NoSQL stores never need indexes and so avoid the overhead that limits SQL"
       ],
       "answer": 2,
-      "why": "Scale-out comes mostly from restricting queries to one partition, not from the data model's label. One relational node serves most products, and databases that spread SQL across many nodes also exist."
+      "why": "Scale-out comes mostly from restricting queries to one partition, not from the data model's label. One relational node often serves many products, and databases that spread SQL across many nodes also exist."
     },
     {
       "q": "You store each order as a document that embeds a copy of the product name and price. A product is renamed. What is the main consequence?",
@@ -451,7 +447,7 @@
     },
     {
       "term": "Document store",
-      "def": "Stores self-contained JSON-like records with flexible fields. Good for read-as-a-unit data such as catalogs. Joins across collections exist (MongoDB $lookup) but are limited. Example: MongoDB."
+      "def": "Stores self-contained JSON-like records with flexible fields. Good for read-as-a-unit data such as catalogs. Joins across collections exist (MongoDB $lookup) but are limited compared with a relational engine's joins. Example: MongoDB."
     },
     {
       "term": "Wide-column store",

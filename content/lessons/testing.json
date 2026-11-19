@@ -1,15 +1,15 @@
 {
   "slug": "testing",
   "title": "Testing Distributed Systems",
-  "subtitle": "Watch one Orders service get tested with five kinds of test, from unit tests to injected network faults, and see what each layer catches.",
+  "subtitle": "Watch one Orders service get tested with five kinds of test, from unit tests to load tests, and see what each layer catches.",
   "minutes": 12,
   "level": "Intermediate",
   "learn": [
     "Why a test pyramid keeps most tests fast and few tests broad",
     "How contract tests catch API drift between teams without a shared staging environment",
     "Why integration tests should use a real database, not a mock",
-    "How a load test finds limits such as connection pool exhaustion",
-    "How to inject latency and failures to prove timeouts and fallbacks work"
+    "How to inject latency and failures to prove timeouts and fallbacks work",
+    "How a load test finds limits such as connection pool exhaustion"
   ],
   "nodes": [
     {
@@ -49,7 +49,7 @@
     },
     {
       "id": "db",
-      "label": "Postgres (container)",
+      "label": "Postgres",
       "kind": "db",
       "x": 88,
       "y": 22
@@ -128,7 +128,7 @@
     {
       "tag": "PYRAMID",
       "title": "Many fast unit tests",
-      "body": "The base of the pyramid is unit tests: pure logic such as price totals and state transitions, run in memory with no network. Take 1,200 of them at about 5 ms each, so a few seconds of test time plus about 30 s of build and startup, roughly 40 seconds in total. They are cheap, so run them on every commit and write lots of them. Above integration tests sit a handful of end-to-end tests that drive the whole system through its UI or public API: realistic but slow and flaky. The pyramid is a rule of thumb: the higher a layer, the slower, costlier and flakier it is, so keep fewer of them.",
+      "body": "The base of the pyramid is unit tests: pure logic such as price totals and state transitions, run in memory with no network. Take 1,200 of them at about 5 ms each, so a few seconds of test time plus about 30 s of build and startup, roughly 40 seconds in total. They are cheap, so run them on every commit and write lots of them. Later steps add contract and integration tests above these, and at the very top a handful of end-to-end tests that drive the whole system through its UI or public API. They are realistic but slow and flaky, meaning they sometimes fail for no code reason. The pyramid is a rule of thumb: the higher a layer, the slower, costlier and flakier it is, so keep fewer of them.",
       "idea": "Put most tests where feedback is fastest and failures are easiest to diagnose.",
       "caption": "Runner exercises Orders logic in memory.",
       "focus": [
@@ -157,7 +157,7 @@
     {
       "tag": "CONTRACT",
       "title": "Contract tests for the API gap",
-      "body": "Orders is the consumer of the Payments API. Its tests record what it relies on, such as a POST /charges reply containing amount and status, and publish that contract to a broker. The Payments team's build downloads every consumer contract and verifies its real code against them. If Payments renames status, their build fails before release. No shared staging environment is needed.",
+      "body": "Orders is the consumer of the Payments API. Its tests record what it relies on, such as a POST /charges reply containing amount and status, and publish that contract to a broker. Payments is the provider, the side that serves the API. Its build downloads the relevant consumer contracts and verifies its real code against them. If Payments renames status, their build fails before release. Say 40 contract tests add about 15 seconds. No shared staging environment is needed.",
       "idea": "A contract test catches breaking API changes at the provider's build, where they are cheapest to fix.",
       "caption": "Orders publishes; Payments verifies in its build.",
       "focus": [
@@ -173,16 +173,16 @@
           "label": "publish contract"
         },
         {
-          "from": "broker",
-          "to": "pay",
+          "from": "pay",
+          "to": "broker",
           "kind": "request",
-          "label": "verify provider"
+          "label": "fetch contracts"
         },
         {
           "from": "pay",
           "to": "broker",
-          "kind": "response",
-          "label": "verified"
+          "kind": "async",
+          "label": "publish result"
         }
       ],
       "metrics": {
@@ -222,9 +222,9 @@
     {
       "tag": "FAULT",
       "title": "Inject latency and failures",
-      "body": "Payments is stubbed behind a fault proxy that can delay, drop or error on command. The test makes Payments take 5 seconds, then asserts that Orders gives up after its 500 ms timeout and returns a clear 'try again' response instead of hanging. Without this test, the timeout code is untested and probably wrong. Other faults to try: connection reset, HTTP 503, duplicate delivery.",
+      "body": "Payments is replaced by a stub (a fake that returns canned replies) behind a fault proxy that can delay, drop or error on command, and the contract test from step 3 is what keeps that stub honest. The test makes Payments take 5 seconds, then asserts that Orders gives up after its 2 s timeout and returns a clear \"payment pending, we will confirm shortly\" response instead of hanging. A second test replays the retry with the same idempotency key and asserts the customer is charged once. Without these tests, the timeout code is untested and probably wrong. Say 15 fault tests add about 30 seconds. Other faults: connection reset, HTTP 503, duplicate delivery.",
       "idea": "Failure-handling code only works if you have watched it run against a failure.",
-      "caption": "Proxy stalls Payments; Orders must time out.",
+      "caption": "Proxy stalls Payments; Orders must time out at 2 s.",
       "focus": [
         "svc",
         "proxy",
@@ -247,7 +247,7 @@
           "from": "svc",
           "to": "proxy",
           "kind": "fail",
-          "label": "gave up at 500 ms"
+          "label": "gave up at 2 s"
         }
       ],
       "metrics": {
@@ -294,9 +294,9 @@
     {
       "tag": "WHAT IF",
       "title": "Push past the limit",
-      "body": "Raise the rate to 1,500 requests per second. Assume each request holds a connection for about 20 ms, so 20 connections serve about 1,000 req/s. Beyond that the service uses up its 20 database connections, and the unserved third queues until requests time out. The p99 climbs to 2.4 seconds and about 30 percent of requests fail. No unit test could show this, because the limit comes from how pieces interact under concurrency. The fix might be faster queries, a pooler such as PgBouncer, a cache, or shedding load early; a bigger pool alone often just moves the queue to the database.",
+      "body": "Raise the rate to 1,500 requests per second. Assume each request holds a database connection for about 20 ms and the service keeps a pool of 20 (a fixed set of reusable connections), so it serves about 1,000 req/s. Beyond that, the unserved third waits until the 2.5 s client timeout. The p99 climbs to 2.4 seconds and about 33 percent of requests fail. No unit test could show this, because the limit comes from how pieces interact under concurrency. The fix might be faster queries, a pooler such as PgBouncer, a cache, or shedding load early; a bigger pool alone often just moves the queue to the database.",
       "idea": "Load tests find the knee in the curve where queues build and latency explodes.",
-      "caption": "Pool exhausted at 1,500 req/s: about 30% of requests fail.",
+      "caption": "Pool exhausted at 1,500 req/s: about a third of requests fail.",
       "focus": [
         "load",
         "svc",
@@ -318,7 +318,7 @@
       ],
       "metrics": {
         "p99": "2400",
-        "errors": "30"
+        "errors": "33"
       }
     },
     {

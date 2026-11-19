@@ -31,3 +31,17 @@ Running record of what was done, decided and found. Newest last.
 **Interruption and resume**
 - The first workflow run (`wf_adcece11-c7c`) stopped when the session ended. Audit afterwards: 38 lessons authored and recorded, 3 more (batch-stream, service-discovery, timeouts-retries) finished on disk and validating, 3 broken files (event-sourcing-cqrs, outbox-cdc, redundancy), 32 never started. No fact-check had run yet, because the authoring jobs filled the concurrency slots first.
 - Second run (`wf_55787986-e63`) does no re-work: the 42 validating lessons go straight to adversarial verification; only the 35 missing or broken ones are authored.
+
+**Publishing (2026-11-18)**
+- GitHub: `Anujpal-15th/systems-atlas` (public), containing only this folder. Vercel project `systems-atlas` imports it and redeploys on every push to `main`.
+- Live: https://systems-atlas-course.vercel.app (also `systems-atlas-lac.vercel.app`). `systems-atlas.vercel.app` is someone else's app, not ours.
+- Vercel Deployment Protection ("Require Log In") was turned off so deployment URLs are public.
+- The Vercel connector lacked permission to create projects (403); import was done in the browser, and the user entered the 2FA code.
+
+## 2026-11-19
+
+- The usage limit interrupted the second run; resuming re-ran only the 56 refused calls (cached results reused). Totals: 278 agent runs in that run, 0 errors at the end.
+- Review outcome: 71 / 76 lessons passed an independent reviewer; the other 5 got lead fixes by hand (see `conversation.md`, Phase 3).
+- **Frontend redesign** (the user asked for reference-level polish or better): isometric 3D component blocks that auto-size to the layout, flow labels on edges, course home page, module colors, offset-shadow buttons, pill badges, "What changed" list from metric deltas, "You'll learn" ticks with progress, connected step timeline, restyled Practice / Design Lab / Cheatsheets, mobile diagram that scrolls at readable size.
+- **Typography** (the user disliked the all-monospace look): Inter for body text, Space Grotesk for headings, JetBrains Mono only for numbers, keys and tags. All self-hosted from `fonts/` under the SIL Open Font License (license files included).
+- Checked: all 737 steps render without errors; desktop and mobile; light and dark; strict CSP kept (no inline style or script).

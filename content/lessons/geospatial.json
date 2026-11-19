@@ -90,10 +90,6 @@
     {
       "from": "worker",
       "to": "db"
-    },
-    {
-      "from": "worker",
-      "to": "db"
     }
   ],
   "metrics": [
@@ -144,7 +140,7 @@
     {
       "tag": "PROBLEM",
       "title": "The naive scan",
-      "body": "The simplest answer computes the distance to every driver and sorts. That is 200,000 distance calculations per request. An ordinary B-tree index on latitude does not rescue you: it narrows one axis to a long horizontal stripe across the whole city, and you still filter the rest. Even a composite (lat, lon) index only narrows well on the first column. Databases offer spatial indexes (R-trees in PostGIS), and Redis GEO uses geohash under the hood; this lesson shows the idea they build on. Assume the full scan costs roughly 400 ms; that is slow at thousands of requests per second.",
+      "body": "The simplest answer computes the distance to every driver and sorts. That is 200,000 distance calculations per request. An ordinary B-tree index on latitude does not rescue you: it narrows one axis to a long horizontal stripe across the whole city, and you still filter the rest. Even a composite (lat, lon) index only narrows well on the first column. Real databases ship spatial indexes (PostGIS uses an R-tree, a tree of nested bounding rectangles; Redis GEO uses geohash). The next steps show the cell-based idea. Assume the full scan costs roughly 400 ms; that is slow at thousands of requests per second.",
       "idea": "A one-dimensional index cannot answer a two-dimensional 'nearby' question efficiently.",
       "caption": "Scanning every driver takes about 400 ms.",
       "focus": [
@@ -167,7 +163,7 @@
     {
       "tag": "GEOHASH",
       "title": "Geohash: space as a string",
-      "body": "Geohash repeatedly halves the map, alternating longitude and latitude, and writes the resulting bits as a short string such as 'tdr1v7'. Points in the same box share the same prefix. At 6 characters a cell is roughly 1.2 km by 0.6 km; at 7 it is about 150 m square. Now 'nearby' becomes an ordinary lookup: fetch the drivers stored under the rider's cell key. Assume an in-memory index answers in a few ms (about 4 here). Assume an in-memory index answers in a few ms (about 4 here).",
+      "body": "Geohash repeatedly halves the map, alternating longitude and latitude, and writes the resulting bits as a short string such as 'tdr1v7'. Points in the same box share the same prefix. At 6 characters a cell is roughly 1.2 km by 0.6 km; at 7 it is about 150 m square. Now 'nearby' becomes an ordinary lookup: fetch the drivers stored under the rider's cell key. Assume an in-memory index answers in a few ms (about 4 here).",
       "idea": "Geohash turns a 2D position into a string key, so a plain key lookup or prefix scan finds a neighbourhood.",
       "caption": "Look up one cell key, not every driver.",
       "focus": [
@@ -215,19 +211,19 @@
           "from": "cache",
           "to": "search",
           "kind": "response",
-          "label": "~70 candidates"
+          "label": "~100 candidates"
         }
       ],
       "metrics": {
         "cells": "9",
-        "candidates": "70",
+        "candidates": "100",
         "latency": "8"
       }
     },
     {
       "tag": "QUADTREE",
       "title": "Quadtree: cells that adapt",
-      "body": "A quadtree starts with the whole map as one box. Whenever a box holds more than a set number of points, say 100, it splits into four children, and so on. Dense downtown ends up in tiny boxes while an empty suburb stays one big box. Lookups descend the tree. The catch is that it usually lives in memory on one node, and moving drivers mean constant inserts and removals. A quadtree has the same edge problem, so you also read the neighbouring leaves. A quadtree has the same edge problem, so you also read the neighbouring leaves.",
+      "body": "A quadtree starts with the whole map as one box. Whenever a box holds more than a set number of points, say 100, it splits into four children, and so on. Dense downtown ends up in tiny boxes while an empty suburb stays one big box. Lookups descend the tree. The catch is that it usually lives in memory on one node, and moving drivers mean constant inserts and removals. A quadtree has the same edge problem, so you also read the neighbouring leaves. Count a leaf plus 4 adjacent leaves for simplicity; neighbouring leaves are quieter.",
       "idea": "A quadtree splits only where data is dense, so every leaf holds a similar number of points.",
       "caption": "Tree descends to a small leaf box.",
       "focus": [
@@ -287,14 +283,15 @@
     {
       "tag": "UPDATES",
       "title": "Keeping drivers fresh",
-      "body": "Each driver app sends a GPS ping every 4 seconds, so 200,000 drivers produce about 50,000 writes per second. Pings go onto a stream, and an updater reads them. The updater refreshes the driver's last-seen time on every ping, which is a cheap in-memory write. It moves the id between cell sets only when the driver crosses into a new cell: remove from the old set, add to the new one. Entries not refreshed within about 30 seconds (a TTL, time to live) are dropped, so drivers who go offline disappear on their own. The latest coordinates go to the driver store.",
+      "body": "Each driver app sends a GPS ping every 4 seconds, so 200,000 drivers produce about 50,000 writes per second. Pings go onto a stream, and an updater reads them. The updater refreshes the driver's last-seen time on every ping, a cheap in-memory write. It moves the id between cell sets only when the driver crosses into a new cell. Each entry carries a last-seen time, and a periodic sweep (or a per-driver key with a TTL, time to live) drops anything not refreshed within about 30 seconds, so offline drivers disappear on their own. The latest coordinates are written to the driver store too (a key-value store handles this rate, or you can batch or throttle writes).",
       "idea": "Refresh last-seen on every ping, move cell membership only on a cell change, and let stale entries expire.",
       "caption": "Pings refresh; cell changes move the id.",
       "focus": [
         "driver",
         "queue",
         "worker",
-        "cache"
+        "cache",
+        "db"
       ],
       "flows": [
         {
@@ -314,12 +311,6 @@
           "to": "cache",
           "kind": "request",
           "label": "move cell A to B"
-        },
-        {
-          "from": "worker",
-          "to": "db",
-          "kind": "async",
-          "label": "latest position"
         },
         {
           "from": "worker",
@@ -396,12 +387,12 @@
         {
           "from": "cache",
           "to": "search",
-          "kind": "fail",
+          "kind": "response",
           "label": "5,000 ids"
         }
       ],
       "metrics": {
-        "cells": "1",
+        "cells": "9",
         "candidates": "5000",
         "latency": "60"
       }
@@ -473,7 +464,7 @@
         "Most pings keep the driver in the same cell, so only a last-seen refresh is needed"
       ],
       "answer": 3,
-      "why": "A cell is hundreds of metres wide, so most pings leave the driver in the same cell. The updater just refreshes last-seen and moves set membership only on a cell change, which keeps index churn low."
+      "why": "A cell is roughly 150 m to a kilometre wide, so most pings leave the driver in the same cell. The updater just refreshes last-seen and moves set membership only on a cell change, which keeps index churn low."
     },
     {
       "q": "After a concert, one cell returns 5,000 candidates and queries slow down. What is the most sensible response?",
