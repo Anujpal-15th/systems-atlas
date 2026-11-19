@@ -385,7 +385,7 @@ h1{font-size:32px;font-weight:700;letter-spacing:-.03em}
 .flabel text{font-family:var(--mono);font-size:15px}
 /* desktop lesson view: fit exactly in the viewport, only the tree and guide scroll internally */
 @media (min-width:1281px){
-  body[data-view=learn]{height:100vh;overflow:hidden;display:flex;flex-direction:column}
+  body[data-view=learn]{height:calc(100vh / var(--z,1));overflow:hidden;display:flex;flex-direction:column}
   body[data-view=learn] .top{flex:none;position:static;height:48px}
   body[data-view=learn] .views a{padding:0 16px;height:34px}
   body[data-view=learn] .shell{flex:1 1 0;min-height:0;width:100%;max-width:none;padding:13px 14px 15px;gap:14px;align-items:stretch;grid-template-rows:minmax(0,1fr);grid-template-columns:254px minmax(0,1fr)}

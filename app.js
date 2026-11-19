@@ -559,3 +559,15 @@ function fitGuide() {
   if (idea && g.scrollHeight > g.clientHeight + 1) idea.hidden = true; // last resort at short viewports
 }
 addEventListener('resize', () => { if (cur.view === 'learn') fitGuide(); });
+
+// Desktop lesson layout is tuned for a 1920px-wide viewport; scale it uniformly on smaller screens
+// (e.g. 125% Windows scaling gives a 1536px viewport) so proportions stay identical.
+function applyZoom() {
+  const de = document.documentElement;
+  const z = cur.view === 'learn' && innerWidth >= 1281 ? Math.max(0.66, Math.min(1, innerWidth / 1920)) : 1;
+  de.style.zoom = z === 1 ? '' : String(z);
+  de.style.setProperty('--z', String(z));
+}
+addEventListener('resize', applyZoom);
+addEventListener('hashchange', applyZoom);
+applyZoom();
