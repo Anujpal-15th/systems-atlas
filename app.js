@@ -290,7 +290,8 @@ function drawDiagram(l, s) {
   }
   K = Math.max(0.7, Math.min(1.45, K * 0.98));
   const focus = new Set(s.focus || []), flows = s.flows || [];
-  const si = l.steps.indexOf(s), prevF = new Set(si > 0 ? l.steps[si - 1].focus || [] : []);
+  const si = l.steps.indexOf(s), first = firstSeen(l);
+  const vis = n => first[n.id] <= si, shown = l.nodes.filter(vis), shownIds = new Set(shown.map(n => n.id));
   const slot = 1.15, T = Math.max(flows.length, 1) * slot + 0.9;
   const key = (a, b) => [a, b].sort().join('|');
   const hot = new Map(); flows.forEach(f => { if (!hot.has(key(f.from, f.to))) hot.set(key(f.from, f.to), f.kind); });
@@ -304,7 +305,7 @@ function drawDiagram(l, s) {
     return { d: `M${a.x},${a.y}L${m.x - r * e1[0]},${m.y - r * e1[1]}Q${m.x},${m.y} ${m.x + r * e2[0]},${m.y + r * e2[1]}L${b.x},${b.y}`, mid: h <= s1 ? [a.x + e1[0] * h, a.y + e1[1] * h] : [m.x + e2[0] * (h - s1), m.y + e2[1] * (h - s1)], fwd: ida === i1 };
   };
   const nodeSvg = n => {
-    const { x, y } = PX(n), cls = focus.size ? (focus.has(n.id) ? ' focus' + (!prevF.has(n.id) && focus.size < l.nodes.length ? ' rise' : '') : ' dim') : '';
+    const { x, y } = PX(n), cls = (focus.size ? (focus.has(n.id) ? ' focus' : ' dim') : '') + (first[n.id] === si ? ' rise' : '');
     const a = art(n.kind), lines = blockLabel(n.label), rg = n.kind === 'region';
     let g = `<ellipse class="shadow" cy="${K * 6}" rx="${K * (rg ? 90 : 66)}" ry="${K * (rg ? 48 : 36)}"/>`;
     if (focus.has(n.id) && !rg) g += `<ellipse class="ring" cy="${K * 4}" rx="${K * 70}" ry="${K * 39}"/>`;
@@ -324,10 +325,10 @@ function drawDiagram(l, s) {
   let vw = x1 - x0, vh = y1 - y0; const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
   if (vw / vh < W / H) vw = vh * W / H; else vh = vw * H / W;
   const vb = [cx - vw / 2, cy - vh / 2, vw, vh].map(v => v.toFixed(1)).join(' ');
-  let svg = `<svg id="svg" viewBox="${vb}" role="img" aria-labelledby="svg-title svg-desc"><title id="svg-title">${esc(l.title)} diagram</title><desc id="svg-desc">${esc(s.caption)} Components: ${esc(l.nodes.map(n => n.label).join(', '))}.${flows.length ? ' Messages: ' + esc(flows.map(f => `${nodeLabel(l, f.from)} to ${nodeLabel(l, f.to)}${f.label ? ' (' + f.label + ')' : ''}`).join('; ')) + '.' : ''}</desc>`;
-  const order = [...l.nodes].sort((a, b) => a.y - b.y || a.x - b.x);
+  let svg = `<svg id="svg" viewBox="${vb}" preserveAspectRatio="xMidYMid meet" role="img" aria-labelledby="svg-title svg-desc"><title id="svg-title">${esc(l.title)} diagram</title><desc id="svg-desc">${esc(s.caption)} Components: ${esc(shown.map(n => n.label).join(', '))}.${flows.length ? ' Messages: ' + esc(flows.map(f => `${nodeLabel(l, f.from)} to ${nodeLabel(l, f.to)}${f.label ? ' (' + f.label + ')' : ''}`).join('; ')) + '.' : ''}</desc>`;
+  const order = [...shown].sort((a, b) => a.y - b.y || a.x - b.x);
   for (const n of order) if (n.kind === 'region') svg += nodeSvg(n);
-  for (const e of l.edges) { const k = hot.get(key(e.from, e.to)); svg += `<path class="edge${k ? ' hot k-' + k : ''}" d="${route(e.from, e.to).d}"/>`; }
+  for (const e of l.edges) if (shownIds.has(e.from) && shownIds.has(e.to)) { const k = hot.get(key(e.from, e.to)); svg += `<path class="edge${k ? ' hot k-' + k : ''}" d="${route(e.from, e.to).d}"/>`; }
   for (const n of order) if (n.kind !== 'region') svg += nodeSvg(n);
   // flow labels at path midpoints, stacked when several share an edge
   const used = {};
@@ -348,6 +349,13 @@ function drawDiagram(l, s) {
   const el = $('#svg');
   if (paused) { el.setCurrentTime(0.5); el.pauseAnimations(); }
   syncPause();
+}
+// step index at which each node first appears (focus or flow endpoint); never-referenced nodes appear at the last step
+function firstSeen(l) {
+  const f = {}, last = l.steps.length - 1;
+  l.steps.forEach((st, k) => { for (const id of st.focus || []) f[id] ??= k; for (const x of st.flows || []) { f[x.from] ??= k; f[x.to] ??= k; } });
+  for (const n of l.nodes) f[n.id] ??= last;
+  return f;
 }
 const nodeLabel = (l, id) => (l.nodes.find(n => n.id === id) || {}).label || id;
 function replay() { const el = $('#svg'); if (el) { el.setCurrentTime(0); if (paused) togglePause(); } }
