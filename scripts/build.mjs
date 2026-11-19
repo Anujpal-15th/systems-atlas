@@ -22,6 +22,7 @@ export function validate(l, slug) {
   need(Number.isInteger(l.minutes) && l.minutes >= 3 && l.minutes <= 30, 'minutes int 3-30');
   need(LEVELS.includes(l.level), `level one of ${LEVELS}`);
   need(Array.isArray(l.learn) && l.learn.length >= 3 && l.learn.length <= 6 && l.learn.every(x => str(x, 5, 140)), 'learn: 3-6 strings');
+  need(l.style === undefined || l.style === 'illustrated', 'style must be "illustrated" when present');
   const nodes = Array.isArray(l.nodes) ? l.nodes : [];
   need(nodes.length >= 2 && nodes.length <= 9, 'nodes: 2-9');
   const ids = new Set();
@@ -59,6 +60,7 @@ export function validate(l, slug) {
       need(FLOWS.includes(f.kind), `${p}: flow kind one of ${FLOWS}`);
       need(f.label === undefined || str(f.label, 1, 18), `${p}: flow label <=18 chars`);
     }
+    need(s.chips === undefined || (Array.isArray(s.chips) && s.chips.length <= 4 && s.chips.every(c => ids.has(c.node) && str(c.text, 1, 22) && (c.kind === undefined || c.kind === 'progress') && (c.value === undefined || (c.value >= 0 && c.value <= 100)) && (c.at === undefined || /^(top|right|left|bottom|edge:[a-z0-9-]+-[a-z0-9-]+)$/.test(c.at)))), `${p}: chips: <=4 of {node, text<=22, kind?, value?, at?}`);
     for (const k of Object.keys(s.metrics || {})) need(mids.has(k) && str(String(s.metrics[k]), 1, 12), `${p}: metric ${k} unknown or value >12 chars`);
   });
   need(steps.at(-1)?.tag === 'RECAP', 'last step tag must be RECAP');
