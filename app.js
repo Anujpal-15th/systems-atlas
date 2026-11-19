@@ -44,6 +44,7 @@ const I = {
   list: '<path d="M9 6h11M9 12h11M9 18h11M4.5 6h.01M4.5 12h.01M4.5 18h.01"/>',
   spark: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6.3 6.3l2.5 2.5M15.2 15.2l2.5 2.5M6.3 17.7l2.5-2.5M15.2 8.8l2.5-2.5"/>',
   arrowR: '<path d="M5 12h14M13 6l6 6-6 6"/>',
+  chevL: '<path d="M15 6l-6 6 6 6"/>',
   arrowL: '<path d="M19 12H5M11 6l-6 6 6 6"/>',
   chevron: '<path d="M9 6l6 6-6 6"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
@@ -102,14 +103,17 @@ function renderNav() {
   const active = cur.view === 'home' ? null : cur.view;
   document.querySelectorAll('.views a').forEach(a => { if (a.dataset.view === active) a.setAttribute('aria-current', 'page'); else a.removeAttribute('aria-current'); });
   const openId = cur.slug ? bySlug[cur.slug].moduleId : null;
-  const openState = store.get('open', {});
-  $('#course').innerHTML = C.modules.map(m => {
+  const saved = store.get('open', ''), openId2 = openId || (typeof saved === 'string' ? saved : '');
+  $('#course').innerHTML = `<div class="rail">${C.modules.map(m => `<a href="#/${esc(m.lessons[0].slug)}/1" title="${esc(pad(m.num) + '. ' + m.title)}" data-mc="${(m.num - 1) % 11}"${m.id === openId ? ' aria-current="true"' : ''}>${icon('folder')}<span class="sr">${esc(m.title)}</span></a>`).join('')}</div>` + C.modules.map(m => {
     const d = m.lessons.filter(l => done.has(l.slug)).length;
-    const open = m.id === openId || openState[m.id];
+    const open = m.id === openId2;
     return `<details data-m="${esc(m.id)}" data-mc="${(m.num - 1) % 11}"${open ? ' open' : ''}><summary>${icon('chevron', 'chev')}${icon('folder', 'fold')}<span class="mt">${pad(m.num)}. ${esc(m.title)}</span><small>${d}/${m.lessons.length}</small></summary><ul>${m.lessons.map(l =>
       `<li><a href="#/${esc(l.slug)}/1"${l.slug === cur.slug ? ' aria-current="page"' : ''}>${icon(done.has(l.slug) ? 'check' : 'doc', done.has(l.slug) ? 'ok' : '')}<span>${esc(l.title)}</span>${l.isNew ? '<em class="new">new</em>' : ''}${done.has(l.slug) ? '<span class="sr"> (completed)</span>' : ''}</a></li>`).join('')}</ul></details>`;
   }).join('');
-  $('#course').querySelectorAll('details').forEach(el => el.addEventListener('toggle', () => { const s = store.get('open', {}); s[el.dataset.m] = el.open; store.set('open', s); }));
+  $('#course').querySelectorAll('details').forEach(el => el.addEventListener('toggle', () => {
+    if (el.open) { store.set('open', el.dataset.m); $('#course').querySelectorAll('details[open]').forEach(o => { if (o !== el) o.open = false; }); }
+    else if (store.get('open', '') === el.dataset.m) store.set('open', '');
+  }));
   $('#progress-text').textContent = `${done.size} / ${lessons.length}`;
   $('#progress-bar').style.width = (lessons.length ? done.size / lessons.length * 100 : 0) + '%';
   $('#lesson-count').textContent = `${lessons.length} lessons`;
@@ -270,11 +274,6 @@ function art(kind) {
     return [s + [-8, 4, 14].map(u => seg(iso(u, -16, 12), iso(u, 16, 12))).join(''), 44];
   }
   if (kind === 'user') { const [hx, hy] = iso(0, 0, 40); return [cyl(26, 0, 5) + cyl(10, 5, 28) + `<circle class="s f-top" cx="${hx}" cy="${hy}" r="${9 * K}"/>`, 20]; }
-  if (kind === 'server') {
-    let s = box(-18, 18, -18, 18, 0, 74);
-    for (const z of [16, 32, 48]) s += seg(iso(18, -12, z), iso(18, 4, z)) + led(18, 10, z) + seg(iso(-12, 18, z), iso(4, 18, z)) + led(10, 18, z);
-    return [s, 18];
-  }
   if (kind === 'db' || kind === 'storage') return [cyl(30, 0, 42, kind === 'db' ? [14, 28] : [10, 21, 32]), 21];
   if (kind === 'queue') { let s = ''; for (let i = 0; i < 4; i++) s += box(-36 + i * 18, -26 + i * 18, -22, 22, 0, 26) + seg(iso(-26 + i * 18, -14, 13), iso(-26 + i * 18, 14, 13)); return [s, 29]; }
   if (kind === 'region') return [box(-72, 72, -72, 72, 0, 5, ' stroke-dasharray="7 5"'), 72];
@@ -299,9 +298,9 @@ function drawDiagram(l, s) {
   const real = l.nodes.filter(n => n.kind !== 'region');
   for (let a = 0; a < real.length; a++) for (let b = a + 1; b < real.length; b++) {
     const p = PX(real[a]), q = PX(real[b]);
-    K = Math.min(K, Math.max(Math.abs(p.x - q.x) / 180, Math.abs(p.y - q.y) / 138));
+    K = Math.min(K, Math.max(Math.abs(p.x - q.x) / 180, Math.abs(p.y - q.y) / 178));
   }
-  K = Math.max(0.7, Math.min(1.45, K * 0.98));
+  K = Math.max(0.62, Math.min(1.3, K * 0.98));
   const focus = new Set(s.focus || []), flows = s.flows || [];
   const si = l.steps.indexOf(s), first = firstSeen(l);
   const prevFocus = !reducedMotion && lastDraw.slug === l.slug ? lastDraw.focus : null;
@@ -313,7 +312,7 @@ function drawDiagram(l, s) {
   const route = (ida, idb) => {
     const [i1, i2] = [ida, idb].sort(), a = P(i1), b = P(i2), dx = b.x - a.x, dy = b.y - a.y;
     const du = (dx / .866 + 2 * dy) / 2, dv = (2 * dy - dx / .866) / 2, m = { x: a.x + du * .866, y: a.y + du * .5 };
-    const c = Math.hypot(dx, dy) || 1, off = Math.abs((m.x - a.x) * dy - (m.y - a.y) * dx) / c, s1 = Math.abs(du), s2 = Math.abs(dv), r = Math.min(16, s1 / 2, s2 / 2);
+    const c = Math.hypot(dx, dy) || 1, off = Math.abs((m.x - a.x) * dy - (m.y - a.y) * dx) / c, s1 = Math.abs(du), s2 = Math.abs(dv), r = Math.min(24, s1 / 2, s2 / 2);
     if (off > 60 || r < 2) return { d: `M${a.x},${a.y}L${b.x},${b.y}`, mid: [(a.x + b.x) / 2, (a.y + b.y) / 2], fwd: ida === i1, n: [-dy / c, dx / c] };
     const e1 = [Math.sign(du) * .866, Math.sign(du) * .5], e2 = [-Math.sign(dv) * .866, Math.sign(dv) * .5], h = (s1 + s2) / 2;
     return { d: `M${a.x},${a.y}L${m.x - r * e1[0]},${m.y - r * e1[1]}Q${m.x},${m.y} ${m.x + r * e2[0]},${m.y + r * e2[1]}L${b.x},${b.y}`, mid: h <= s1 ? [a.x + e1[0] * h, a.y + e1[1] * h] : [m.x + e2[0] * (h - s1), m.y + e2[1] * (h - s1)], fwd: ida === i1, n: [-dy / c, dx / c] };
@@ -322,29 +321,36 @@ function drawDiagram(l, s) {
   const clsFor = (n, fs) => (fs.size ? (fs.has(n.id) ? ' focus' : ' dim') : '') + (first[n.id] === si && !reducedMotion ? ' rise' : '');
   const prisms = new Set();
   const nodeSvg = n => {
-    const { x, y } = PX(n), a = art(n.kind), lines = blockLabel(n.label), rg = n.kind === 'region';
+    const { x, y } = PX(n), a = art(n.kind), rg = n.kind === 'region';
     const c1 = clsFor(n, focus), c0 = prevFocus ? clsFor(n, prevFocus) : c1;
-    let g = `<ellipse class="shadow" cy="${K * 6}" rx="${K * (rg ? 90 : 72)}" ry="${K * (rg ? 48 : 40)}"/>`;
-    if (focus.has(n.id) && !rg) g += `<ellipse class="ring" cy="${K * 4}" rx="${K * 78}" ry="${K * 43}"/>`;
+    let g = `<ellipse class="shadow" cy="${K * 8}" rx="${K * (rg ? 90 : 92)}" ry="${K * (rg ? 48 : 52)}"/>`;
+    if (focus.has(n.id) && !rg) g += `<ellipse class="ring" cy="${K * 4}" rx="${K * 98}" ry="${K * 58}"/>`;
     if (a) {
-      const w = Math.max(...lines.map(t => t.length)) * 7.4 + 22, ph = lines.length * 15 + 9, py = K * a[1] + 12;
-      g += a[0] + `<g class="pill"><rect x="${-w / 2}" y="${py}" width="${w}" height="${ph}" rx="${Math.min(ph / 2, 12)}"/>` + lines.map((t, k) => `<text x="0" y="${py + 16 + k * 15}">${esc(t)}</text>`).join('') + '</g>';
+      // name pill: panel fill, ink border, leading icon (user / globe / db ...)
+      const ic = { client: 'cdn', user: 'user', db: 'db', storage: 'storage', queue: 'queue', region: 'region' }[n.kind] || 'cdn', tw = n.label.length * 8.6, w = tw + 54, py = K * a[1] + 14;
+      g += a[0] + `<g class="pill"><rect x="${-w / 2}" y="${py}" width="${w}" height="32" rx="16"/><g class="pico" transform="translate(${-w / 2 + 11},${py + 7}) scale(.75)">${I[ic]}</g><text x="${12}" y="${py + 21.5}">${esc(n.label)}</text></g>`;
     } else {
-      // chamfered prism: straight sides to h-b, chamfer faces up to an inset top face with a gradient
+      // hexagonal prism seen from above: flat-top hexagon (rounded) + side depth under the three lower edges; label inside the top face
       prisms.add(n.kind);
-      const A = 52, h = 42, b = 9, hs = h - b, t = A - b, sc = K * 1.5, fs = 15.5 * Math.max(K, .85);
-      g += poly('left', [iso(-A, A, 0), iso(A, A, 0), iso(A, A, hs), iso(-A, A, hs)]) + poly('right', [iso(A, A, 0), iso(A, -A, 0), iso(A, -A, hs), iso(A, A, hs)])
-        + poly('left', [iso(-A, A, hs), iso(A, A, hs), iso(t, t, h), iso(-t, t, h)]).replace('f-left', 'f-left ch') + poly('right', [iso(A, A, hs), iso(A, -A, hs), iso(t, -t, h), iso(t, t, h)]).replace('f-right', 'f-right ch')
-        + `<polygon class="s" fill="url(#gr-${esc(n.kind)})" points="${pts([iso(-t, -t, h), iso(t, -t, h), iso(t, t, h), iso(-t, t, h)])}"/>`
-        + `<g class="nico" transform="matrix(${.866 * sc},${.5 * sc},${-.866 * sc},${.5 * sc},0,${-K * h}) translate(-12,-12)">${I[KIND_ICON[n.kind]] || I.service}</g>`
-        + lines.map((t, k) => `<text class="lbl${k ? ' l2' : ''}" font-size="${fs}" x="0" y="${K * (A - hs / 2) + 5 + (k - (lines.length - 1) / 2) * fs * 1.1}">${esc(t)}</text>`).join('');
+      const tiers = n.kind === 'server' ? 2 : 1, D = 26 * K, Rr = 85 * K, H = tiers * D, ico = 26 * K, hw = (dy) => Rr - Math.abs(dy) / 1.732;
+      const hex = oy => { const v = [0, 1, 2, 3, 4, 5].map(i => [Rr * Math.cos(i * Math.PI / 3), oy + Rr * Math.sin(i * Math.PI / 3)]), t = 10 * K * .577; let d = '';
+        v.forEach((p, i) => { const pr = v[(i + 5) % 6], nx = v[(i + 1) % 6], u = (q) => { const l = Math.hypot(q[0] - p[0], q[1] - p[1]); return [(q[0] - p[0]) / l * t, (q[1] - p[1]) / l * t]; }, a1 = u(pr), b1 = u(nx);
+          d += `${i ? 'L' : 'M'}${(p[0] + a1[0]).toFixed(1)},${(p[1] + a1[1]).toFixed(1)}Q${p[0].toFixed(1)},${p[1].toFixed(1)} ${(p[0] + b1[0]).toFixed(1)},${(p[1] + b1[1]).toFixed(1)}`; });
+        return d + 'Z'; };
+      for (let t = 0; t < tiers; t++) g += `<path class="s f-left" d="${hex(-t * D)}"/>`;
+      g += `<path class="s" fill="url(#gr-${esc(n.kind)})" d="${hex(-H)}"/>`;
+      const cy = -H, w1 = n.label.split(' ')[0], w2 = n.label.slice(w1.length).trim(), f1 = Math.max(9, Math.min(17 * Math.max(K, .8), K * 120 / (w1.length * .6))), f2 = w2 ? Math.max(8, Math.min(13 * Math.max(K, .8), K * 126 / (w2.length * .56))) : 0;
+      const iy = cy - (w2 ? 30 : 20) * K;
+      g += `<g class="nico" transform="translate(${-ico / 2},${iy - ico / 2}) scale(${ico / 24})">${I[KIND_ICON[n.kind]] || I.service}</g>`
+        + `<text class="lbl" font-size="${f1.toFixed(1)}" x="0" y="${(cy + (w2 ? 12 : 16) * K).toFixed(1)}">${esc(w1)}</text>` + (w2 ? `<text class="lbl l2" font-size="${f2.toFixed(1)}" x="0" y="${(cy + 12 * K + f1 * 1.05).toFixed(1)}">${esc(w2)}</text>` : '');
     }
     return `<g class="node kind-${esc(n.kind)}${c0}"${c0 !== c1 ? ` data-c="${c1}"` : ''} transform="translate(${x.toFixed(1)},${y.toFixed(1)})"><g class="body">${g}</g></g>`;
   };
   // camera: frame only the visible nodes, with a minimum size, keeping the canvas aspect
-  const sp = (shown.length ? shown : l.nodes.slice(0, 1)).map(PX), x0 = Math.min(...sp.map(p => p.x)) - 130, x1 = Math.max(...sp.map(p => p.x)) + 130;
-  const y0 = Math.min(...sp.map(p => p.y)) - 170, y1 = Math.max(...sp.map(p => p.y)) + 100;
-  let vw = Math.max(x1 - x0, 520), vh = y1 - y0; const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  const fids = new Set([...focus, ...flows.flatMap(f => [f.from, f.to])].filter(id => shownIds.has(id))), cn = fids.size ? shown.filter(n => fids.has(n.id)) : (shown.length ? shown : l.nodes.slice(0, 1));
+  const sp = cn.map(PX), x0 = Math.min(...sp.map(p => p.x)) - 150 * K - 40, x1 = Math.max(...sp.map(p => p.x)) + 150 * K + 40;
+  const y0 = Math.min(...sp.map(p => p.y)) - 150 * K - 50, y1 = Math.max(...sp.map(p => p.y)) + 95 * K + 40;
+  let vw = Math.max(x1 - x0, 600), vh = y1 - y0; const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
   if (vw / vh < W / H) vw = vh * W / H; else vh = vw * H / W;
   const target = [cx - vw / 2, cy - vh / 2, vw, vh];
   let body = '';
@@ -359,24 +365,24 @@ function drawDiagram(l, s) {
   const used = {};
   flows.forEach(f => {
     if (!f.label) return;
-    const rt = route(f.from, f.to), k = used[key(f.from, f.to)] = (used[key(f.from, f.to)] || 0) + 1, w = f.label.length * 8 + 22;
+    const rt = route(f.from, f.to), k = used[key(f.from, f.to)] = (used[key(f.from, f.to)] || 0) + 1, w = f.label.length * 8.4 + 26;
     let [nx, ny] = rt.n; if (ny > 0) { nx = -nx; ny = -ny; }
-    const d = Math.abs(nx) * w / 2 + Math.abs(ny) * 13 + 10 + (k - 1) * 30, mx = rt.mid[0] + nx * d, my = rt.mid[1] + ny * d;
-    body += `<g class="flabel k-${esc(f.kind)}"><rect x="${mx - w / 2}" y="${my - 13}" width="${w}" height="26" rx="13"/><text x="${mx}" y="${my + 4.5}">${esc(f.label)}</text></g>`;
+    const d = Math.abs(nx) * w / 2 + Math.abs(ny) * 14 + 14 + (k - 1) * 32, mx = rt.mid[0] + nx * d, my = rt.mid[1] + ny * d;
+    body += `<g class="flabel k-${esc(f.kind)}"><rect x="${mx - w / 2}" y="${my - 14}" width="${w}" height="28" rx="14"/><text x="${mx}" y="${my + 5}">${esc(f.label)}</text></g>`;
   });
   // packets: two dots per flow (staggered), SMIL motion with eased spline timing inside the flow's slot
   flows.forEach((f, i) => {
     const rt = route(f.from, f.to), kp = rt.fwd ? '0;0;1;1' : '1;1;0;0';
     for (const dl of [0, 0.18]) {
       const t1 = ((i * slot + dl) / T).toFixed(3), t2 = ((i * slot + 0.95 + dl) / T).toFixed(3), kt = `0;${t1};${t2};1`;
-      body += `<g class="packet k-${esc(f.kind)}" opacity="0"><animateMotion dur="${T}s" repeatCount="indefinite" path="${rt.d}" keyPoints="${kp}" keyTimes="${kt}" calcMode="spline" keySplines="0 0 1 1;.45 0 .2 1;0 0 1 1"/><animate attributeName="opacity" dur="${T}s" repeatCount="indefinite" keyTimes="0;${t1};${t1};${t2};${t2};1" values="0;0;1;1;0;0" calcMode="discrete"/><circle r="6"/></g>`;
+      body += `<g class="packet k-${esc(f.kind)}" opacity="0"><animateMotion dur="${T}s" repeatCount="indefinite" path="${rt.d}" keyPoints="${kp}" keyTimes="${kt}" calcMode="spline" keySplines="0 0 1 1;.45 0 .2 1;0 0 1 1"/><animate attributeName="opacity" dur="${T}s" repeatCount="indefinite" keyTimes="0;${t1};${t1};${t2};${t2};1" values="0;0;1;1;0;0" calcMode="discrete"/><circle r="7"/></g>`;
     }
   });
   const defs = [...prisms].map(k => `<g class="kind-${esc(k)}"><linearGradient id="gr-${esc(k)}" x1="0" y1="0" x2="1" y2="1"><stop class="gs-a" offset="0"/><stop class="gs-b" offset="1"/></linearGradient></g>`).join('');
   $('#diagram').innerHTML = `<svg id="svg" viewBox="${target.map(v => v.toFixed(1)).join(' ')}" preserveAspectRatio="xMidYMid meet" role="img" aria-labelledby="svg-title svg-desc"><title id="svg-title">${esc(l.title)} diagram</title><desc id="svg-desc">${esc(s.caption)} Components: ${esc(shown.map(n => n.label).join(', '))}.${flows.length ? ' Messages: ' + esc(flows.map(f => `${nodeLabel(l, f.from)} to ${nodeLabel(l, f.to)}${f.label ? ' (' + f.label + ')' : ''}`).join('; ')) + '.' : ''}</desc><defs>${defs}</defs>${body}</svg>`;
   const el = $('#svg');
   // measure edges: draw-in length for new ones; trim hot ones short of the node and add an arrowhead at the destination
-  const R0 = 52 * K;
+  const R0 = 82 * K;
   el.querySelectorAll('.edge').forEach(p => {
     const L = p.getTotalLength(), dir = p.dataset.f;
     if (p.classList.contains('new')) p.style.setProperty('--len', L.toFixed(1));
@@ -386,7 +392,7 @@ function drawDiagram(l, s) {
     const ang = Math.atan2(sg * (b.y - a.y), sg * (b.x - a.x)) * 180 / Math.PI;
     p.style.strokeDasharray = dir === 'f' ? `${L - R} ${L}` : `0 ${R} ${L - R} ${L}`;
     const ar = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    ar.setAttribute('class', 'arrow' + (p.classList.contains('new') ? ' new' : '')); ar.setAttribute('d', 'M-11,-6.5L3,0L-11,6.5Z');
+    ar.setAttribute('class', 'arrow' + (p.classList.contains('new') ? ' new' : '')); ar.setAttribute('d', 'M-14,-8L4,0L-14,8Z');
     ar.setAttribute('transform', `translate(${q.x.toFixed(1)} ${q.y.toFixed(1)}) rotate(${ang.toFixed(1)})`);
     el.insertBefore(ar, el.querySelector('.flabel,.packet'));
   });
@@ -501,12 +507,22 @@ $('#search').addEventListener('keydown', e => {
 function isDark() { return document.documentElement.dataset.theme === 'dark' || (!document.documentElement.dataset.theme && matchMedia('(prefers-color-scheme: dark)').matches); }
 function syncTheme() { const d = isDark(); $('#theme').setAttribute('aria-pressed', String(d)); $('#theme').innerHTML = icon(d ? 'sun' : 'moon'); }
 $('#theme').addEventListener('click', () => { const t = isDark() ? 'light' : 'dark'; document.documentElement.dataset.theme = t; try { localStorage.setItem('sa:theme', t); } catch (e) {} syncTheme(); });
+// desktop sidebar rail (>=981px); the diagram re-fits when the grid transition ends
+function syncSide(min) {
+  document.body.classList.toggle('side-min', min); const b = $('#sidemin');
+  b.setAttribute('aria-expanded', String(!min)); b.setAttribute('aria-label', min ? 'Expand course list' : 'Collapse course list');
+}
+function toggleSide() { const m = !document.body.classList.contains('side-min'); store.set('sideMin', m); syncSide(m); }
+syncSide(!!store.get('sideMin', false));
+$('#sidemin').addEventListener('click', toggleSide);
+document.querySelector('.shell').addEventListener('transitionend', e => { if (e.target === e.currentTarget && e.propertyName === 'grid-template-columns' && cur.view === 'learn') { const l = bySlug[cur.slug]; drawDiagram(l, l.steps[cur.step]); } });
 function closeDrawer() { document.body.classList.remove('drawer'); $('#menu').setAttribute('aria-expanded', 'false'); }
 $('#menu').addEventListener('click', () => { const o = !document.body.classList.contains('drawer'); document.body.classList.toggle('drawer', o); $('#menu').setAttribute('aria-expanded', String(o)); if (o) $('#course a[aria-current], #course summary')?.focus(); });
 addEventListener('keydown', e => {
   if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); openSearch(); return; }
   if (e.key === 'Escape' && document.body.classList.contains('drawer')) { closeDrawer(); $('#menu').focus(); return; }
   if (e.ctrlKey || e.metaKey || e.altKey || $('#search').open || e.target.closest('input, textarea, select, [contenteditable]')) return;
+  if (e.key === '[' && matchMedia('(min-width:981px)').matches) { e.preventDefault(); toggleSide(); return; }
   if (e.key === '/') { e.preventDefault(); openSearch(); return; }
   if (cur.view !== 'learn') return;
   if (e.key === 'ArrowRight') { e.preventDefault(); nextStep(); }
