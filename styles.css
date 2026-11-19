@@ -450,3 +450,12 @@ h1{font-size:32px;font-weight:700;letter-spacing:-.03em}
 }
 @media (prefers-reduced-motion:reduce){.shell{transition:none}}
 .idea[hidden]{display:none}
+
+/* sidebar: match the reference's compact type */
+.tree summary{font-size:13.5px;font-weight:500;padding:5px 8px;gap:8px}
+.tree summary .mt{font-family:var(--sans);letter-spacing:0}
+.tree summary small{font-size:11px}
+.tree .fold{width:16px;height:16px}
+.tree li a{font-size:12.5px;padding:4px 8px}
+.side-head a{font-size:14px;font-weight:600;font-family:var(--sans)}
+.side-head span{font-size:11px}
