@@ -12,47 +12,542 @@
     "Why distance and a slow dependency can dominate page load time"
   ],
   "nodes": [
-    {"id": "browser", "label": "Browser", "kind": "client", "x": 10, "y": 40, "url": "https://shop.example"},
-    {"id": "dns", "label": "DNS resolver", "kind": "dns", "x": 30, "y": 16},
-    {"id": "lb", "label": "Load balancer", "kind": "lb", "x": 40, "y": 72},
-    {"id": "app", "label": "App server", "kind": "server", "x": 64, "y": 50},
-    {"id": "db", "label": "Database", "kind": "db", "x": 88, "y": 24},
-    {"id": "cdn", "label": "CDN edge", "kind": "cdn", "x": 12, "y": 92}
+    {
+      "id": "browser",
+      "label": "Browser",
+      "kind": "client",
+      "x": 10,
+      "y": 40,
+      "url": "https://shop.example"
+    },
+    {
+      "id": "dns",
+      "label": "DNS resolver",
+      "kind": "dns",
+      "x": 30,
+      "y": 16
+    },
+    {
+      "id": "lb",
+      "label": "Load balancer",
+      "kind": "lb",
+      "x": 40,
+      "y": 72
+    },
+    {
+      "id": "app",
+      "label": "App server",
+      "kind": "server",
+      "x": 64,
+      "y": 50
+    },
+    {
+      "id": "db",
+      "label": "Database",
+      "kind": "db",
+      "x": 88,
+      "y": 24
+    },
+    {
+      "id": "cdn",
+      "label": "CDN edge",
+      "kind": "cdn",
+      "x": 12,
+      "y": 92
+    }
   ],
   "edges": [
-    {"from": "browser", "to": "dns"},
-    {"from": "browser", "to": "lb"},
-    {"from": "lb", "to": "app"},
-    {"from": "app", "to": "db"},
-    {"from": "browser", "to": "cdn"}
+    {
+      "from": "browser",
+      "to": "dns"
+    },
+    {
+      "from": "browser",
+      "to": "lb"
+    },
+    {
+      "from": "lb",
+      "to": "app"
+    },
+    {
+      "from": "app",
+      "to": "db"
+    },
+    {
+      "from": "browser",
+      "to": "cdn"
+    }
   ],
   "metrics": [
-    {"id": "dns", "label": "DNS", "unit": "ms"},
-    {"id": "connect", "label": "Connect", "unit": "ms"},
-    {"id": "server", "label": "Server", "unit": "ms"},
-    {"id": "total", "label": "Total", "unit": "ms"}
+    {
+      "id": "dns",
+      "label": "DNS",
+      "unit": "ms"
+    },
+    {
+      "id": "connect",
+      "label": "Connect",
+      "unit": "ms"
+    },
+    {
+      "id": "server",
+      "label": "Server",
+      "unit": "ms"
+    },
+    {
+      "id": "total",
+      "label": "Total",
+      "unit": "ms"
+    }
   ],
   "steps": [
-    {"tag": "QUESTION", "title": "You press Enter", "body": "You type shop.example and press Enter. A fraction of a second later a page appears. That short wait is not one thing: it is a chain of separate conversations between machines, and each one has to finish before the next can start. This lesson walks the chain in order and times each link.", "idea": "A page load is a sequence of dependent waits; the total is their sum.", "caption": "The browser knows a name, not an address.", "focus": ["browser"], "flows": [], "chips": [{"node":"browser","text":"shop.example → ?","at":"right"}], "metrics": {}},
-    {"tag": "DNS", "title": "Find the address", "body": "Computers route by IP address, so the browser first asks a DNS resolver which address belongs to shop.example. If the answer is already cached in the browser, the OS, or the resolver (for a time set by the record's TTL, time to live), this costs almost nothing. A cold lookup can walk root, TLD, and authoritative servers and take tens of milliseconds.", "idea": "DNS answers are cached according to their TTL; a warm cache makes this step nearly free.", "caption": "Resolver returns an IP address.", "focus": ["browser", "dns"], "flows": [{"from": "browser", "to": "dns", "kind": "request", "label": "A shop.example?"}, {"from": "dns", "to": "browser", "kind": "response", "label": "203.0.113.7"}], "chips": [{"node":"dns","text":"→ 203.0.113.7"},{"node":"browser","text":"20 ms","at":"right"}], "metrics": {"dns": "20", "total": "20"}},
-    {"tag": "CONNECT", "title": "Open a secure connection", "body": "Before sending the request the browser opens a TCP connection (one round trip) and negotiates TLS encryption (one more round trip with TLS 1.3). A round trip is a message going there and the reply coming back (RTT). No page data moves yet. Assume the round trip to the server takes 50 ms (about 25 ms each way). Then the two handshakes cost about 100 ms spent just agreeing to talk.", "idea": "Handshakes cost round trips, so physical distance multiplies directly into latency.", "caption": "TCP + TLS handshakes complete.", "focus": ["browser", "lb"], "flows": [{"from": "browser", "to": "lb", "kind": "handshake", "label": "TCP/TLS hello"}, {"from": "lb", "to": "browser", "kind": "handshake", "label": "TCP/TLS keys"}], "chips": [{"node":"dns","text":"cached · 5 min","at":"edge:browser-dns"},{"node":"lb","text":"RTT 50 ms"},{"node":"lb","text":"TCP + TLS ≈ 100 ms","at":"bottom"}], "metrics": {"connect": "100", "total": "120"}},
-    {"tag": "REQUEST", "title": "Send the request", "body": "The browser sends GET / with headers and cookies. A load balancer receives it and forwards it to one healthy app server. The load balancer exists so any single server can fail or be replaced without the user noticing. The request spends about 25 ms travelling one way.", "idea": "The load balancer hides how many servers exist and which one answers.", "caption": "Request forwarded to an app server.", "focus": ["lb", "app"], "flows": [{"from": "browser", "to": "lb", "kind": "request", "label": "GET /"}, {"from": "lb", "to": "app", "kind": "request", "label": "GET /"}], "chips": [{"node":"lb","text":"1 of 3 healthy","at":"bottom"},{"node":"app","text":"+25 ms"}], "metrics": {"total": "145"}},
-    {"tag": "SERVER", "title": "Fetch the data", "body": "The app server runs the handler, which usually needs data: the product list, the user's cart, prices. It queries the database. A well-indexed query (one that uses a lookup structure instead of reading every row) returns in a few milliseconds; the handler then renders HTML or JSON from the rows. Here the server work totals 40 ms.", "idea": "Server time is application logic plus every dependency it waits on.", "caption": "App queries the database.", "focus": ["app", "db"], "flows": [{"from": "app", "to": "db", "kind": "request", "label": "SELECT ..."}, {"from": "db", "to": "app", "kind": "response", "label": "rows"}], "chips": [{"node":"app","kind":"progress","value":30,"text":"30%"},{"node":"db","text":"indexed · 4 ms"},{"node":"app","text":"40 ms","at":"bottom"}], "metrics": {"server": "40", "total": "185"}},
-    {"tag": "RESPONSE", "title": "Bytes come back", "body": "The HTML travels back through the load balancer to the browser. The first byte arriving (time to first byte, TTFB) is a common health metric. The browser starts parsing immediately, before the whole response has downloaded. This adds about 50 ms: 25 ms of travel back plus the HTML download.", "idea": "TTFB captures everything up to here: DNS, connect, and server time.", "caption": "HTML streams back to the browser.", "focus": ["browser", "lb", "app"], "flows": [{"from": "app", "to": "lb", "kind": "response", "label": "200 OK"}, {"from": "lb", "to": "browser", "kind": "response", "label": "HTML"}], "chips": [{"node":"app","text":"200 OK"},{"node":"browser","text":"TTFB 235 ms","at":"right"}], "metrics": {"total": "235"}},
-    {"tag": "ASSETS", "title": "More files", "body": "The HTML references CSS, JavaScript, fonts, and images. The browser fetches these too, usually from a CDN (content delivery network) edge server close to the user. A separate CDN hostname needs its own DNS lookup and handshake, but that edge is near, so they are cheap. The browser downloads several files in parallel, adding about 75 ms here. Static files are cached aggressively so repeat visits skip most of this.", "idea": "Serving static assets from the edge removes distance from most of the bytes.", "caption": "Static assets arrive from a nearby edge.", "focus": ["browser", "cdn"], "flows": [{"from": "browser", "to": "cdn", "kind": "request", "label": "app.css, app.js"}, {"from": "cdn", "to": "browser", "kind": "response", "label": "cached files"}], "chips": [{"node":"cdn","text":"cache hit"},{"node":"cdn","text":"+75 ms","at":"right"}], "metrics": {"total": "310"}},
-    {"tag": "WHAT IF", "title": "A slow query", "body": "Suppose the product query scans the whole table instead of using an index and takes 900 ms. Every other step is unchanged, yet the page now takes over a second. One slow dependency on the chain of steps that must happen one after another (the critical path) dominates the whole request, which is why you measure each hop instead of guessing.", "idea": "The slowest hop on the critical path usually dominates the total, so fix that one first.", "caption": "The database is now the bottleneck.", "focus": ["app", "db"], "flows": [{"from": "app", "to": "db", "kind": "request", "label": "full scan, 900ms"}, {"from": "db", "to": "app", "kind": "response", "label": "rows, late"}], "chips": [{"node":"db","text":"full scan"},{"node":"db","text":"900 ms","at":"right"},{"node":"app","kind":"progress","value":8,"text":"8%"}], "metrics": {"server": "900", "total": "1170"}},
-    {"tag": "WHAT IF", "title": "A faraway user", "body": "Back to the healthy 40 ms query, now put the user on another continent, 150 ms away (round trip). The handshakes alone cost about 300 ms and the request with its reply another 150 ms, so 20 + 300 + 150 + 40 = 510 ms for the HTML, with assets still coming from a nearby edge. Code cannot fix the speed of light; moving servers or caches closer to users can.", "idea": "Latency from distance is paid per round trip, so fewer round trips and closer servers both help.", "caption": "Each round trip now costs 150 ms.", "focus": ["browser", "lb"], "flows": [{"from": "browser", "to": "lb", "kind": "handshake", "label": "150 ms RTT"}], "chips": [{"node":"lb","text":"RTT 150 ms"},{"node":"browser","text":"+300 ms","at":"right"}], "metrics": {"dns": "20", "connect": "300", "server": "40", "total": "510"}},
-    {"tag": "RECAP", "title": "Where the time went", "body": "A request is DNS, connect, request, server work, response, and assets, in that order. Caching cuts DNS and asset time, connection reuse cuts handshakes, indexes cut server time, and CDNs or regional servers cut distance. To make a page faster, first find which hop is slow. Parsing, rendering and running JavaScript add more time after the last byte arrives; this lesson times only the network and server hops.", "idea": "Measure each hop, then fix the biggest one.", "caption": "Every hop added to the total.", "focus": ["browser", "dns", "lb", "app", "db", "cdn"], "flows": [], "chips": [{"node":"browser","text":"310 ms total","at":"right"},{"node":"dns","text":"20 ms"},{"node":"lb","text":"100 ms"},{"node":"app","text":"40 ms","at":"bottom"}], "metrics": {"dns": "20", "connect": "100", "server": "40", "total": "310"}}
+    {
+      "tag": "QUESTION",
+      "title": "You press Enter",
+      "body": "You type shop.example and press Enter. A fraction of a second later a page appears. That short wait is not one thing: it is a chain of separate conversations between machines, and each one has to finish before the next can start. This lesson walks the chain in order and times each link.",
+      "idea": "A page load is a sequence of dependent waits; the total is their sum.",
+      "caption": "The browser knows a name, not an address.",
+      "focus": [
+        "browser"
+      ],
+      "flows": [],
+      "chips": [
+        {
+          "node": "browser",
+          "text": "shop.example → ?",
+          "at": "right"
+        }
+      ],
+      "metrics": {}
+    },
+    {
+      "tag": "DNS",
+      "title": "Find the address",
+      "body": "Computers route by IP address, so the browser first asks a DNS resolver which address belongs to shop.example. If the answer is already cached in the browser, the OS, or the resolver (for a time set by the record's TTL, time to live), this costs almost nothing. A cold lookup can walk root, TLD, and authoritative servers and take tens of milliseconds.",
+      "idea": "DNS answers are cached according to their TTL; a warm cache makes this step nearly free.",
+      "caption": "Resolver returns an IP address.",
+      "focus": [
+        "browser",
+        "dns"
+      ],
+      "flows": [
+        {
+          "from": "browser",
+          "to": "dns",
+          "kind": "request",
+          "label": "A shop.example?",
+          "token": "shop.example?"
+        },
+        {
+          "from": "dns",
+          "to": "browser",
+          "kind": "response",
+          "label": "203.0.113.7"
+        }
+      ],
+      "chips": [
+        {
+          "node": "browser",
+          "text": "→ 203.0.113.7",
+          "at": "right"
+        },
+        {
+          "node": "browser",
+          "text": "20 ms",
+          "at": "right"
+        }
+      ],
+      "metrics": {
+        "dns": "20",
+        "total": "20"
+      }
+    },
+    {
+      "tag": "CONNECT",
+      "title": "Open a secure connection",
+      "body": "Before sending the request the browser opens a TCP connection (one round trip) and negotiates TLS encryption (one more round trip with TLS 1.3). A round trip is a message going there and the reply coming back (RTT). No page data moves yet. Assume the round trip to the server takes 50 ms (about 25 ms each way). Then the two handshakes cost about 100 ms spent just agreeing to talk.",
+      "idea": "Handshakes cost round trips, so physical distance multiplies directly into latency.",
+      "caption": "TCP + TLS handshakes complete.",
+      "focus": [
+        "browser",
+        "lb"
+      ],
+      "flows": [
+        {
+          "from": "browser",
+          "to": "lb",
+          "kind": "handshake",
+          "label": "TCP/TLS hello"
+        },
+        {
+          "from": "lb",
+          "to": "browser",
+          "kind": "handshake",
+          "label": "TCP/TLS keys"
+        }
+      ],
+      "chips": [
+        {
+          "node": "dns",
+          "text": "cached · 5 min",
+          "at": "edge:browser-dns"
+        },
+        {
+          "node": "lb",
+          "text": "RTT 50 ms"
+        },
+        {
+          "node": "lb",
+          "text": "TCP + TLS ≈ 100 ms",
+          "at": "bottom"
+        }
+      ],
+      "metrics": {
+        "connect": "100",
+        "total": "120"
+      }
+    },
+    {
+      "tag": "REQUEST",
+      "title": "Send the request",
+      "body": "The browser sends GET / with headers and cookies. A load balancer receives it and forwards it to one healthy app server. The load balancer exists so any single server can fail or be replaced without the user noticing. The request spends about 25 ms travelling one way.",
+      "idea": "The load balancer hides how many servers exist and which one answers.",
+      "caption": "Request forwarded to an app server.",
+      "focus": [
+        "lb",
+        "app"
+      ],
+      "flows": [
+        {
+          "from": "browser",
+          "to": "lb",
+          "kind": "request",
+          "label": "GET /"
+        },
+        {
+          "from": "lb",
+          "to": "app",
+          "kind": "request",
+          "label": "GET /"
+        }
+      ],
+      "chips": [
+        {
+          "node": "lb",
+          "text": "1 of 3 healthy",
+          "at": "bottom"
+        },
+        {
+          "node": "app",
+          "text": "+25 ms"
+        }
+      ],
+      "metrics": {
+        "total": "145"
+      }
+    },
+    {
+      "tag": "SERVER",
+      "title": "Fetch the data",
+      "body": "The app server runs the handler, which usually needs data: the product list, the user's cart, prices. It queries the database. A well-indexed query (one that uses a lookup structure instead of reading every row) returns in a few milliseconds; the handler then renders HTML or JSON from the rows. Here the server work totals 40 ms.",
+      "idea": "Server time is application logic plus every dependency it waits on.",
+      "caption": "App queries the database.",
+      "focus": [
+        "app",
+        "db"
+      ],
+      "flows": [
+        {
+          "from": "app",
+          "to": "db",
+          "kind": "request",
+          "label": "SELECT ..."
+        },
+        {
+          "from": "db",
+          "to": "app",
+          "kind": "response",
+          "label": "rows"
+        }
+      ],
+      "chips": [
+        {
+          "node": "app",
+          "kind": "progress",
+          "value": 30,
+          "text": "30%"
+        },
+        {
+          "node": "db",
+          "text": "indexed · 4 ms"
+        },
+        {
+          "node": "app",
+          "text": "40 ms",
+          "at": "bottom"
+        }
+      ],
+      "metrics": {
+        "server": "40",
+        "total": "185"
+      }
+    },
+    {
+      "tag": "RESPONSE",
+      "title": "Bytes come back",
+      "body": "The HTML travels back through the load balancer to the browser. The first byte arriving (time to first byte, TTFB) is a common health metric. The browser starts parsing immediately, before the whole response has downloaded. This adds about 50 ms: 25 ms of travel back plus the HTML download.",
+      "idea": "TTFB captures everything up to here: DNS, connect, and server time.",
+      "caption": "HTML streams back to the browser.",
+      "focus": [
+        "browser",
+        "lb",
+        "app"
+      ],
+      "flows": [
+        {
+          "from": "app",
+          "to": "lb",
+          "kind": "response",
+          "label": "200 OK"
+        },
+        {
+          "from": "lb",
+          "to": "browser",
+          "kind": "response",
+          "label": "HTML"
+        }
+      ],
+      "chips": [
+        {
+          "node": "app",
+          "text": "200 OK"
+        },
+        {
+          "node": "browser",
+          "text": "TTFB 235 ms",
+          "at": "right"
+        }
+      ],
+      "metrics": {
+        "total": "235"
+      }
+    },
+    {
+      "tag": "ASSETS",
+      "title": "More files",
+      "body": "The HTML references CSS, JavaScript, fonts, and images. The browser fetches these too, usually from a CDN (content delivery network) edge server close to the user. A separate CDN hostname needs its own DNS lookup and handshake, but that edge is near, so they are cheap. The browser downloads several files in parallel, adding about 75 ms here. Static files are cached aggressively so repeat visits skip most of this.",
+      "idea": "Serving static assets from the edge removes distance from most of the bytes.",
+      "caption": "Static assets arrive from a nearby edge.",
+      "focus": [
+        "browser",
+        "cdn"
+      ],
+      "flows": [
+        {
+          "from": "browser",
+          "to": "cdn",
+          "kind": "request",
+          "label": "app.css, app.js"
+        },
+        {
+          "from": "cdn",
+          "to": "browser",
+          "kind": "response",
+          "label": "cached files"
+        }
+      ],
+      "chips": [
+        {
+          "node": "cdn",
+          "text": "cache hit"
+        },
+        {
+          "node": "cdn",
+          "text": "+75 ms",
+          "at": "right"
+        }
+      ],
+      "metrics": {
+        "total": "310"
+      }
+    },
+    {
+      "tag": "WHAT IF",
+      "title": "A slow query",
+      "body": "Suppose the product query scans the whole table instead of using an index and takes 900 ms. Every other step is unchanged, yet the page now takes over a second. One slow dependency on the chain of steps that must happen one after another (the critical path) dominates the whole request, which is why you measure each hop instead of guessing.",
+      "idea": "The slowest hop on the critical path usually dominates the total, so fix that one first.",
+      "caption": "The database is now the bottleneck.",
+      "focus": [
+        "app",
+        "db"
+      ],
+      "flows": [
+        {
+          "from": "app",
+          "to": "db",
+          "kind": "request",
+          "label": "full scan, 900ms",
+          "token": "full scan"
+        },
+        {
+          "from": "db",
+          "to": "app",
+          "kind": "response",
+          "label": "rows, late"
+        }
+      ],
+      "chips": [
+        {
+          "node": "db",
+          "text": "full scan"
+        },
+        {
+          "node": "db",
+          "text": "900 ms",
+          "at": "right"
+        },
+        {
+          "node": "app",
+          "kind": "progress",
+          "value": 8,
+          "text": "8%"
+        }
+      ],
+      "metrics": {
+        "server": "900",
+        "total": "1170"
+      }
+    },
+    {
+      "tag": "WHAT IF",
+      "title": "A faraway user",
+      "body": "Back to the healthy 40 ms query, now put the user on another continent, 150 ms away (round trip). The handshakes alone cost about 300 ms and the request with its reply another 150 ms, so 20 + 300 + 150 + 40 = 510 ms for the HTML, with assets still coming from a nearby edge. Code cannot fix the speed of light; moving servers or caches closer to users can.",
+      "idea": "Latency from distance is paid per round trip, so fewer round trips and closer servers both help.",
+      "caption": "Each round trip now costs 150 ms.",
+      "focus": [
+        "browser",
+        "lb"
+      ],
+      "flows": [
+        {
+          "from": "browser",
+          "to": "lb",
+          "kind": "handshake",
+          "label": "150 ms RTT"
+        }
+      ],
+      "chips": [
+        {
+          "node": "lb",
+          "text": "RTT 150 ms"
+        },
+        {
+          "node": "browser",
+          "text": "+300 ms",
+          "at": "right"
+        }
+      ],
+      "metrics": {
+        "dns": "20",
+        "connect": "300",
+        "server": "40",
+        "total": "510"
+      }
+    },
+    {
+      "tag": "RECAP",
+      "title": "Where the time went",
+      "body": "A request is DNS, connect, request, server work, response, and assets, in that order. Caching cuts DNS and asset time, connection reuse cuts handshakes, indexes cut server time, and CDNs or regional servers cut distance. To make a page faster, first find which hop is slow. Parsing, rendering and running JavaScript add more time after the last byte arrives; this lesson times only the network and server hops.",
+      "idea": "Measure each hop, then fix the biggest one.",
+      "caption": "Every hop added to the total.",
+      "focus": [
+        "browser",
+        "dns",
+        "lb",
+        "app",
+        "db",
+        "cdn"
+      ],
+      "flows": [],
+      "chips": [
+        {
+          "node": "browser",
+          "text": "310 ms total",
+          "at": "right"
+        },
+        {
+          "node": "dns",
+          "text": "20 ms"
+        },
+        {
+          "node": "lb",
+          "text": "100 ms"
+        },
+        {
+          "node": "app",
+          "text": "40 ms",
+          "at": "bottom"
+        }
+      ],
+      "metrics": {
+        "dns": "20",
+        "connect": "100",
+        "server": "40",
+        "total": "310"
+      }
+    }
   ],
   "quiz": [
-    {"q": "A page's DNS lookup takes 0 ms on a repeat visit. What is the most likely reason?", "options": ["DNS is skipped for HTTPS sites", "The answer was cached and its TTL had not expired", "The CDN resolved it", "The load balancer stores IP addresses"], "answer": 1, "why": "Resolvers, the OS, and browsers cache DNS answers until their TTL expires, so repeat lookups are near-instant."},
-    {"q": "The server is 80 ms away (round trip). Roughly how long do a fresh TCP + TLS 1.3 handshake take before the request can be sent?", "options": ["About 40 ms", "About 80 ms", "About 160 ms", "About 320 ms"], "answer": 2, "why": "TCP needs one round trip and TLS 1.3 needs one more, so about two round trips: 2 × 80 ms."},
-    {"q": "TTFB jumps from 200 ms to 1.2 s after a deploy, but DNS and connect times are unchanged. Where should you look first?", "options": ["Server-side work such as a slow database query", "DNS TTLs", "Image sizes on the page", "The user's Wi-Fi"], "answer": 0, "why": "If DNS and connection setup are unchanged, the added time is inside the server's handling, typically a slow dependency like a query."}
+    {
+      "q": "A page's DNS lookup takes 0 ms on a repeat visit. What is the most likely reason?",
+      "options": [
+        "DNS is skipped for HTTPS sites",
+        "The answer was cached and its TTL had not expired",
+        "The CDN resolved it",
+        "The load balancer stores IP addresses"
+      ],
+      "answer": 1,
+      "why": "Resolvers, the OS, and browsers cache DNS answers until their TTL expires, so repeat lookups are near-instant."
+    },
+    {
+      "q": "The server is 80 ms away (round trip). Roughly how long do a fresh TCP + TLS 1.3 handshake take before the request can be sent?",
+      "options": [
+        "About 40 ms",
+        "About 80 ms",
+        "About 160 ms",
+        "About 320 ms"
+      ],
+      "answer": 2,
+      "why": "TCP needs one round trip and TLS 1.3 needs one more, so about two round trips: 2 × 80 ms."
+    },
+    {
+      "q": "TTFB jumps from 200 ms to 1.2 s after a deploy, but DNS and connect times are unchanged. Where should you look first?",
+      "options": [
+        "Server-side work such as a slow database query",
+        "DNS TTLs",
+        "Image sizes on the page",
+        "The user's Wi-Fi"
+      ],
+      "answer": 0,
+      "why": "If DNS and connection setup are unchanged, the added time is inside the server's handling, typically a slow dependency like a query."
+    }
   ],
   "cheatsheet": [
-    {"term": "RTT", "def": "Round-trip time: how long a message takes to reach a server and come back. Handshakes cost whole RTTs."},
-    {"term": "TTFB", "def": "Time to first byte: from the start of the navigation until the first response byte arrives, so it includes redirects, DNS, TCP/TLS setup, request travel and server time. Some tools (e.g. the DevTools 'waiting' bar) count only from request-sent."},
-    {"term": "TLS 1.3 handshake", "def": "One round trip to agree on keys before encrypted data can flow (TLS 1.2 needed two). Optional 0-RTT resumption can send data in the first flight, but has replay risks and is used sparingly."},
-    {"term": "Critical path", "def": "The longest chain of dependent steps. Its total length is the fastest the request can finish, so speeding up anything off this chain does not help."}
+    {
+      "term": "RTT",
+      "def": "Round-trip time: how long a message takes to reach a server and come back. Handshakes cost whole RTTs."
+    },
+    {
+      "term": "TTFB",
+      "def": "Time to first byte: from the start of the navigation until the first response byte arrives, so it includes redirects, DNS, TCP/TLS setup, request travel and server time. Some tools (e.g. the DevTools 'waiting' bar) count only from request-sent."
+    },
+    {
+      "term": "TLS 1.3 handshake",
+      "def": "One round trip to agree on keys before encrypted data can flow (TLS 1.2 needed two). Optional 0-RTT resumption can send data in the first flight, but has replay risks and is used sparingly."
+    },
+    {
+      "term": "Critical path",
+      "def": "The longest chain of dependent steps. Its total length is the fastest the request can finish, so speeding up anything off this chain does not help."
+    }
   ]
 }

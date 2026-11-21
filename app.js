@@ -324,7 +324,7 @@ function drawDiagram(l, s) {
     if (off > 90 || r < 2) return routes[ck] = straight;
     const mk = (first, s1, s2, e1, e2) => { const m = { x: a.x + first[0] * s1, y: a.y + first[1] * s1 }, rr = Math.min(R, Math.abs(s1) / 2, Math.abs(s2) / 2), q1 = [Math.sign(s1) * e1[0], Math.sign(s1) * e1[1]], q2 = [Math.sign(s2) * e2[0], Math.sign(s2) * e2[1]]; return { i1, i2, m, n: nrm, mid: [m.x, m.y], d: `M${a.x},${a.y}L${m.x - rr * q1[0]},${m.y - rr * q1[1]}Q${m.x},${m.y} ${m.x + rr * q2[0]},${m.y + rr * q2[1]}L${b.x},${b.y}`, a, b }; };
     const A = mk(U, du, dv, U, V), B = mk(V, dv, du, V, U);
-    const bad = o => { let k = 0; const p = document.createElementNS(NS, 'path'); p.setAttribute('d', o.d); const L = p.getTotalLength(); for (let t = 0; t <= L; t += 4) { const q = p.getPointAtLength(t); for (const id in nodeRect) { if (id === i1 || id === i2) continue; const r4 = nodeRect[id]; if (q.x > r4[0] - 10 && q.x < r4[2] + 10 && q.y > r4[1] - 10 && q.y < r4[3] + 10) k++; } } return k; };
+    const bad = o => { let k = 0; const p = document.createElementNS(NS, 'path'); p.setAttribute('d', o.d); const L = p.getTotalLength(); for (let t = 0; t <= L; t += 4) { const q = p.getPointAtLength(t); const NR = typeof nodeRect === "undefined" ? {} : nodeRect; for (const id in NR) { if (id === i1 || id === i2) continue; const r4 = NR[id]; if (q.x > r4[0] - 10 && q.x < r4[2] + 10 && q.y > r4[1] - 10 && q.y < r4[3] + 10) k++; } } return k; };
     return routes[ck] = bad(B) < bad(A) ? B : A;
   };
   const hot = new Map(); flows.forEach(f => { if (!hot.has(key(f.from, f.to))) hot.set(key(f.from, f.to), { kind: f.kind, fwd: route(f.from, f.to).fwd }); });
@@ -380,7 +380,7 @@ function drawDiagram(l, s) {
   for (const n of order) if (n.kind !== 'region') body += nodeSvg(n);
   // flow labels beside the path midpoint (offset along the normal, clear of the line), stacked when several share an edge
   const used = {};
-  flows.forEach(f => {
+  flows.forEach((f, fi) => {
     if (!f.label) return;
     const rt = route(f.from, f.to), k = used[key(f.from, f.to)] = (used[key(f.from, f.to)] || 0) + 1, w = f.label.length * 9.2 + 30;
     let [nx, ny] = rt.n; if (ny > 0) { nx = -nx; ny = -ny; }
@@ -500,6 +500,9 @@ function trimPath(d, in1, in2) {
   const ang = (p0, p1) => Math.atan2(p1.y - p0.y, p1.x - p0.x) * 180 / Math.PI;
   return { d: 'M' + q.map(o => o.x.toFixed(1) + ',' + o.y.toFixed(1)).join('L'), s: q[0], e: q[n], as: ang(q[0], q[1]), ae: ang(q[n - 1], q[n]), len: b - a, at: t => p.getPointAtLength(a + t), pts: q.map(o => [o.x, o.y]) };
 }
+// short text a message token carries: explicit f.token, else the flow label (max 17 chars)
+const tokText = f => { const t = String(f.token || f.label || ''); return t.length > 17 ? t.slice(0, 16) + '…' : t; };
+const chipTag = (svg, c) => svg.replace(/^<g /, `<g data-n="${esc(c.node)}" data-t="${esc(c.text || '')}" `);
 function drawIllustrated(l, s) {
   K = 1;
   const PX = n => ({ x: 110 + n.x / 100 * 1120, y: 110 + n.y / 100 * 450 });
@@ -536,7 +539,7 @@ function drawIllustrated(l, s) {
       g += q.svg; nr = [x - CRX - 4, y + CTY - CRY - 4, x + px + pl.w / 2 + 4, y + CBY + CRY + 6]; rects.push(nr);
     } else rects.push(nr = [x - IA - 4, y - IB - 4, x + IA + 4, y + IB + ID + 6]);
     nodeRect[n.id] = nr;
-    nodes += `<g class="inode kind-${esc(n.kind)}${c0}"${c0 !== c1 ? ` data-c="${c1}"` : ''} transform="translate(${x.toFixed(1)},${y.toFixed(1)})"><g class="body">${g}</g></g>`;
+    nodes += `<g class="inode kind-${esc(n.kind)}${c0}" data-id="${esc(n.id)}" data-x="${x.toFixed(1)}" data-y="${y.toFixed(1)}"${c0 !== c1 ? ` data-c="${c1}"` : ''} transform="translate(${x.toFixed(1)},${y.toFixed(1)})"><g class="body">${g}</g></g>`;
   }
   // edges: clipped to the block silhouettes (start/end just outside them) and drawn before the nodes, so they stay behind blocks
   const head = (pt, ang, cls) => { arrows.push([pt.x - 14, pt.y - 14, pt.x + 14, pt.y + 14]); return `<path class="iarrow${cls}" d="M-16,-8.5Q-15,-8 1,0Q-15,8 -16,8.5Z" transform="translate(${pt.x.toFixed(1)} ${pt.y.toFixed(1)}) rotate(${ang.toFixed(1)})${cls.includes('idle') ? ' scale(.72)' : ''}"/>`; };
@@ -554,7 +557,7 @@ function drawIllustrated(l, s) {
     const rev = f.from === rt.i1 ? 0 : 1, kp = rev ? '1;1;0;0' : '0;0;1;1';
     for (const dl of [0, 0.18]) {
       const t1 = ((i * slot + dl) / T).toFixed(3), t2 = ((i * slot + 0.95 + dl) / T).toFixed(3), kt = `0;${t1};${t2};1`;
-      over += `<g class="ipacket k-${esc(f.kind)}${dl ? ' tail' : ''}" data-e="${eIdx.get(k)}" data-r="${rev}" data-i="${i}" data-d="${dl}" opacity="0"><animateMotion dur="${T}s" repeatCount="indefinite" path="${tm.d}" keyPoints="${kp}" keyTimes="${kt}" calcMode="spline" keySplines="0 0 1 1;.45 0 .2 1;0 0 1 1"/><animate attributeName="opacity" dur="${T}s" repeatCount="indefinite" keyTimes="0;${t1};${t1};${t2};${t2};1" values="0;0;1;1;0;0" calcMode="discrete"/><circle r="6"/></g>`;
+      over += `<g class="ipacket k-${esc(f.kind)}${dl ? ' tail' : ''}" data-e="${eIdx.get(k)}" data-r="${rev}" data-i="${i}" data-d="${dl}" data-t="${esc(tokText(f))}" data-from="${esc(f.from)}" data-to="${esc(f.to)}" opacity="0"><animateMotion dur="${T}s" repeatCount="indefinite" path="${tm.d}" keyPoints="${kp}" keyTimes="${kt}" calcMode="spline" keySplines="0 0 1 1;.45 0 .2 1;0 0 1 1"/><animate attributeName="opacity" dur="${T}s" repeatCount="indefinite" keyTimes="0;${t1};${t1};${t2};${t2};1" values="0;0;1;1;0;0" calcMode="discrete"/><circle r="6"/></g>`;
     }
   });
   // collision avoidance: every pill/chip/label gets a box; candidates are tried until the box keeps >= GAP from blocks, pills, chips, arrowheads and edge lines
@@ -577,11 +580,11 @@ function drawIllustrated(l, s) {
     const m = tm.at(tm.len / 2); return [m.x, m.y + 44];
   };
   const slots = {}; let chipOut = '', lblOut = '';
-  flows.forEach(f => {
+  flows.forEach((f, fi) => {
     if (!f.label) return;
     const tm = trims[key(f.from, f.to)]; if (!tm) return;
     const pr = pillSvg(0, 0, f.label, null, 'iflabel', 36, 15), [mx, my] = along(tm, pr.w, 36, [1, -1]), q = pillSvg(mx, my, f.label, null, 'iflabel', 36, 15);
-    lblOut += q.svg; rects.push(bx(mx, my, q.w, 36));
+    lblOut += q.svg.replace(/^<g /, `<g data-f="${fi}" `); rects.push(bx(mx, my, q.w, 36));
   });
   for (const c of chips) {
     const n = shownIds.has(c.node) && nodeById(c.node); if (!n || (c.at || '').startsWith('edge:')) continue;
@@ -591,12 +594,12 @@ function drawIllustrated(l, s) {
     else if (at === 'left') { cx = x - (lap ? 135 : 96) - probe.w / 2; cy = y + (lap ? -30 : 0) + dk; }
     else if (at === 'bottom') { cx = x; cy = y + (lap ? 168 : 118) + dk; }
     else { cx = x + probe.w / 2 - 8; cy = y - (lap ? 176 : 80) - dk; }
-    [cx, cy] = spot(cx, cy, probe.w, 32); const q = chipSvg(cx, cy, c); chipOut += q.svg; rects.push(bx(cx, cy, q.w, 32));
+    [cx, cy] = spot(cx, cy, probe.w, 32); const q = chipSvg(cx, cy, c); chipOut += chipTag(q.svg, c); rects.push(bx(cx, cy, q.w, 32));
   }
   for (const c of chips) {
     const at = c.at || ''; if (!at.startsWith('edge:') || !shownIds.has(c.node)) continue;
     const [a, b] = at.slice(5).split('-'), tm = trims[key(a, b)]; if (!tm) continue;
-    const probe = chipSvg(0, 0, c), [cx, cy] = along(tm, probe.w, 32, [-1, 1]), q = chipSvg(cx, cy, c); chipOut += q.svg; rects.push(bx(cx, cy, q.w, 32));
+    const probe = chipSvg(0, 0, c), [cx, cy] = along(tm, probe.w, 32, [-1, 1]), q = chipSvg(cx, cy, c); chipOut += chipTag(q.svg, c); rects.push(bx(cx, cy, q.w, 32));
   }
   over += lblOut;
   const defs = [...used].map(k => `<g class="kind-${esc(k)}"><radialGradient id="ig-t-${esc(k)}" cx=".5" cy=".38" r=".75"><stop class="ga" offset="0"/><stop class="gb" offset="1"/></radialGradient><linearGradient id="ig-l-${esc(k)}" x1="0" y1="0" x2="0" y2="1"><stop class="gc" offset="0"/><stop class="gd" offset="1"/></linearGradient><linearGradient id="ig-r-${esc(k)}" x1="0" y1="0" x2="0" y2="1"><stop class="ge" offset="0"/><stop class="gf" offset="1"/></linearGradient></g>`).join('')
@@ -625,27 +628,74 @@ function loadGsap() {
     ld('gsap.min.js', () => ld('MotionPathPlugin.min.js', () => { try { gsap.registerPlugin(MotionPathPlugin); res(true); } catch { res(false); } }));
   });
 }
-// one gsap timeline per step: blocks pop in, edges draw, packets travel, labels/chips rise in
+// one master gsap timeline per step: blocks pop in -> edges draw -> message tokens fly (request -> arrive pulse -> think -> response) -> chips land; then the token pass loops
 function enhance(el) {
   const g = window.gsap; if (!g || $('#svg') !== el) return;
-  el.querySelectorAll('.ipacket animateMotion,.ipacket animate').forEach(a => a.remove());
+  const q = s => [...el.querySelectorAll(s)], edgeEls = q('.iedge'), NS = 'http://www.w3.org/2000/svg';
+  const mk = (n, a, p) => { const e = document.createElementNS(NS, n); for (const k in a) e.setAttribute(k, a[k]); if (p) p.append(e); return e; };
+  const pk = q('.ipacket:not(.tail)').map(p => ({ i: +p.dataset.i, e: edgeEls[+p.dataset.e], rev: p.dataset.r === '1', text: p.dataset.t, from: p.dataset.from, to: p.dataset.to, kind: (p.getAttribute('class').match(/k-(\S+)/) || [])[1] || 'request' })).filter(f => f.e);
+  q('.ipacket').forEach(p => p.remove());
   el.classList.add('gs');
   if (reducedMotion) return; // end state only
-  const q = s => [...el.querySelectorAll(s)], edgeEls = q('.iedge');
   tl = g.timeline();
+  const nodeEl = id => el.querySelector(`.inode[data-id="${id}"]`), nodeXY = id => { const n = nodeEl(id); return n ? [+n.dataset.x, +n.dataset.y] : [0, 0]; };
   const bodies = q('.inode.rise .body');
-  if (bodies.length) tl.fromTo(bodies, { scale: .4, opacity: 0, transformOrigin: '50% 50%' }, { scale: 1, opacity: 1, duration: .5, ease: 'back.out(1.7)', stagger: .12, clearProps: 'transform,opacity' });
+  if (bodies.length) tl.fromTo(bodies, { scale: .4, opacity: 0, transformOrigin: '50% 50%' }, { scale: 1, opacity: 1, duration: .55, ease: 'back.out(1.6)', stagger: .12, clearProps: 'transform,opacity' });
   tl.addLabel('edges', bodies.length ? '>-0.1' : 0);
-  q('.iedge.fresh').forEach(p => { const L = p.getTotalLength(); tl.fromTo(p, { strokeDasharray: `${L} ${L}`, strokeDashoffset: L }, { strokeDashoffset: 0, duration: .6, ease: 'power1.inOut', clearProps: 'strokeDasharray,strokeDashoffset' }, 'edges'); });
+  q('.iedge.fresh').forEach(p => { const L = p.getTotalLength(); tl.fromTo(p, { strokeDasharray: `${L} ${L}`, strokeDashoffset: L }, { strokeDashoffset: 0, duration: .6, ease: 'power1.out', clearProps: 'strokeDasharray,strokeDashoffset' }, 'edges'); });
   const heads = q('.iarrow.fresh'); if (heads.length) tl.fromTo(heads, { opacity: 0 }, { opacity: 1, duration: .25, clearProps: 'opacity' }, 'edges+=.45');
-  tl.addLabel('packets', '>');
-  q('.ipacket').forEach(p => {
-    const at = `packets+=${(+p.dataset.i * .9 + +p.dataset.d).toFixed(2)}`, path = edgeEls[+p.dataset.e], rev = p.dataset.r === '1';
-    if (!path) return;
-    tl.set(p, { opacity: 1 }, at).to(p, { motionPath: { path, align: path, alignOrigin: [.5, .5], start: rev ? 1 : 0, end: rev ? 0 : 1 }, duration: .95, ease: 'power2.inOut' }, at).set(p, { opacity: 0 }, at + '+=.95');
+  tl.addLabel('flows', '>+0.1');
+  // overlay layer: tokens, trailing ghosts, receive ripples, "thinking" dots
+  const layer = mk('g', { class: 'itoks' }, el), chipEls = q('.ichip'), lblEls = q('.iflabel'), norm = t => (t || '').toLowerCase().replace(/[?\s]+$/, '');
+  const chipOf = chipEls.map(c => ({ el: c, n: c.dataset.n, t: (c.dataset.t || '').toLowerCase(), land: false }));
+  const toks = pk.map(f => {
+    const w = f.text ? Math.max(54, f.text.length * 7.6 + 36) : 18, gh = [.3, .2, .11].map(o => mk('circle', { class: `igh k-${f.kind}`, r: 5, opacity: 0, 'data-o': o }, layer)), t = mk('g', { class: `itok k-${f.kind}`, opacity: 0 }, layer);
+    if (f.text) { mk('rect', { x: -w / 2, y: -13, width: w, height: 26, rx: 13 }, t); mk('circle', { cx: -w / 2 + 13, cy: 0, r: 4.5 }, t); mk('text', { x: -w / 2 + 24, y: 4.3, 'font-size': 12.5 }, t).textContent = f.text; }
+    else mk('circle', { class: 'solo', r: 6 }, t);
+    // a chip on the destination that repeats the token text is where this token settles (FLIP-style morph)
+    const tx = norm(f.text), lc = tx ? chipOf.find(c => !c.land && c.n === f.to && c.t.includes(tx)) : null; if (lc) lc.land = true;
+    const bb = lc && lc.el.getBBox();
+    return { f, t, gh, len: f.e.getTotalLength(), lc, lcxy: bb ? [bb.x + bb.width / 2, bb.y + bb.height / 2] : null };
   });
-  const tags = q('.iflabel,.ichip'); if (tags.length) tl.fromTo(tags, { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: .4, ease: 'power2.out', stagger: .08, clearProps: 'transform,opacity' }, '>-0.05');
-  if (paused) tl.progress(1).pause();
+  const rings = {}, dots = {};
+  for (const id of new Set(pk.map(f => f.to))) {
+    const [x, y] = nodeXY(id), kc = (nodeEl(id).getAttribute('class').match(/kind-(\S+)/) || [])[1];
+    rings[id] = mk('ellipse', { class: `iring kind-${kc}`, cx: x, cy: y + 6, rx: 74, ry: 44, opacity: 0 }, layer);
+    dots[id] = [-14, 0, 14].map(o => mk('circle', { class: 'ithink', cx: x + o, cy: y - 2, r: 4, opacity: 0 }, layer));
+  }
+  const landing = new Set(chipOf.filter(c => c.land).map(c => c.el));
+  g.set([...landing], { opacity: 0 });
+  const pulse = (t, at, id) => {
+    const b = nodeEl(id).querySelector('.body');
+    t.fromTo(rings[id], { opacity: .7, scale: .55, transformOrigin: '50% 50%' }, { opacity: 0, scale: 1.35, duration: .7, ease: 'power1.out' }, at)
+      .to(b, { scale: 1.06, transformOrigin: '50% 50%', duration: .16, ease: 'power2.out' }, at).to(b, { scale: 1, duration: .34, ease: 'power2.inOut' }, '>');
+  };
+  const think = (t, at, id) => t.fromTo(dots[id], { opacity: 0, y: 4 }, { opacity: 1, y: 0, duration: .1, stagger: .06, ease: 'sine.out' }, at).to(dots[id], { opacity: 0, duration: .12, stagger: .06, ease: 'sine.in' }, '>+0.02');
+  // one pass over every flow, in order: token flies -> receiver pulses -> (thinks) -> next token leaves. `first` also reveals labels/chips as the story reaches them.
+  const pass = first => {
+    const t = g.timeline(), shown = new Set(landing); let c = 0;
+    const reveal = (at, list) => { list = list.filter(x => !shown.has(x)); list.forEach(x => shown.add(x)); if (list.length) t.fromTo(list, { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: .4, ease: 'power2.out', stagger: .08, clearProps: 'transform,opacity' }, at); };
+    toks.forEach((k, i) => {
+      const { f, t: tk, gh, len } = k, dur = Math.max(.7, len / 400), path = { path: f.e, align: f.e, alignOrigin: [.5, .5], start: f.rev ? 1 : 0, end: f.rev ? 0 : 1 }, end = c + dur;
+      const lbl = first && lblEls.find(l => +l.dataset.f === f.i); if (lbl) t.fromTo(lbl, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .4, ease: 'power2.out', clearProps: 'transform,opacity' }, c);
+      t.fromTo(tk, { opacity: 0 }, { opacity: 1, duration: .2, ease: 'power1.out' }, c).fromTo(tk, { scale: .5, transformOrigin: '50% 50%' }, { scale: 1, duration: .3, ease: 'back.out(1.6)' }, c).to(tk, { motionPath: path, duration: dur, ease: 'sine.inOut' }, c);
+      gh.forEach((h, j) => { const at = c + .07 * (j + 1); t.fromTo(h, { opacity: 0 }, { opacity: +h.getAttribute('data-o'), duration: .2 }, at).to(h, { motionPath: path, duration: dur, ease: 'sine.inOut' }, at).to(h, { opacity: 0, duration: .2 }, at + dur - .2); });
+      if (k.lc) { // token hops onto its chip and becomes it
+        t.to(tk, { x: k.lcxy[0], y: k.lcxy[1], duration: .42, ease: 'power2.out' }, end).to(tk, { opacity: 0, duration: .22, ease: 'power1.in' }, end + .2)
+          .fromTo(k.lc.el, { opacity: 0, scale: .8, transformOrigin: '50% 50%' }, { opacity: 1, scale: 1, duration: .45, ease: 'back.out(1.5)' }, end + .12);
+      } else t.to(tk, { scale: .6, opacity: 0, duration: .22, ease: 'power1.in' }, end);
+      pulse(t, end - .05, f.to);
+      if (first) reveal(end, chipEls.filter(x => x.dataset.n === f.to));
+      const nx = toks[i + 1]; c = end + .1;
+      if (nx && nx.f.from === f.to) { think(t, c, f.to); c += .5; } else c += .15;
+      if (k.lc) c += .3;
+    });
+    if (first) reveal(c, chipEls);
+    return t;
+  };
+  tl.add(pass(true), 'flows');
+  if (toks.length) { const lp = g.timeline({ repeat: -1, repeatDelay: 1.2 }).add(pass(false)); tl.addLabel('loop', '>+1.2').add(lp, 'loop'); }
+  if (paused) tl.time(tl.labels.loop ?? tl.duration()).pause();
 }
 // step index at which each node first appears (focus or flow endpoint); never-referenced nodes appear at the last step
 function firstSeen(l) {

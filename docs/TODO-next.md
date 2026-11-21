@@ -22,3 +22,10 @@ Iterate on lesson 1 (request-lifecycle) only until the user approves the final l
 - Edges: one elbow, quadratic rounded corner (R=22); route() tries both iso elbows and keeps the one that crosses fewer other blocks. Arrowheads are smaller rounded triangles (idle ones scaled .72), both ends for two-way edges. Polyline sampled every 3px.
 - Packets r=6; trailing packet is hollow (panel fill, kind-coloured stroke).
 - Ideas left: compare again at 1920px / mobile; hollow packet currently on every flow kind, restrict to responses if preferred.
+
+## Update: story-driven message tokens (lesson 1 only, uncommitted)
+- Each flow now carries a pill token (dot + short text: `flow.token` or the label, max 17 chars) built in `enhance()`; SMIL packets are only the no-gsap fallback. Timeline per step: blocks pop (back.out 1.6) -> edges draw (power1.out) -> per flow: token scale-in, MotionPath along the exact trimmed edge (sine.inOut, 400 units/s, min 0.7s) with 3 fading ghost dots -> receiver pulse (scale 1.06 + ripple ring) -> 3 "thinking" dots (~0.45s) when the next flow leaves that node -> next token. Labels/chips fade in when the story reaches them.
+- FLIP-style landing: a chip on the destination whose text contains the token text (e.g. browser "-> 203.0.113.7", db "full scan") is where the token settles; the token hops onto the chip and crossfades into it. Step 2: the IP chip moved from dns to browser in the lesson JSON for this.
+- Loop: master timeline = intro + first pass + nested repeating pass (repeatDelay 1.2s). Pause/Play/Replay drive the master; reduced motion = end state, no tokens.
+- Note: the Browser pane throttles rAF when idle, so animations only advance while screenshots are taken.
+- Ideas: token text duplicates the static flow label (could hide labels on replays); tune pulse/ring size per node kind.

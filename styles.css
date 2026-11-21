@@ -506,3 +506,12 @@ h1{font-size:32px;font-weight:700;letter-spacing:-.03em}
 .ill .inode.rise .body{transform-box:view-box;transform-origin:0 0;animation:rise .5s cubic-bezier(.34,1.56,.64,1) both}
 .ill.gs .ichip,.ill.gs .inode.rise .body,.ill.gs .iedge.fresh,.ill.gs .iarrow.fresh{animation:none}
 @media (prefers-reduced-motion:reduce){.ill .ichip,.ill .inode.rise .body,.ill .iedge.fresh,.ill .iarrow.fresh{animation:none}}
+/* lesson-1 message tokens (gsap): pill token with dot + text, soft ghost trail, receive ripple, thinking dots */
+.ill .itoks{pointer-events:none}
+.ill .itok,.ill .igh,.ill .iring,.ill .ithink,.ill .ichip,.ill .inode .body{will-change:transform,opacity}
+.ill .itok rect{fill:var(--panel);stroke:var(--ink);stroke-width:2}
+.ill .itok circle{fill:var(--fc);stroke:var(--ink);stroke-width:1.6}
+.ill .itok text{fill:var(--ink);font-family:var(--mono);font-weight:700}
+.ill .igh{fill:var(--fc);stroke:none}
+.ill .iring{fill:none;stroke:var(--nc);stroke-width:3}
+.ill .ithink{fill:#fff;stroke:var(--ink);stroke-width:1.6}
