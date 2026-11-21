@@ -232,22 +232,23 @@ function updateStep(l, i) {
   $('#changes').innerHTML = ch.length ? `<b>What changed</b><ul>${ch.slice(0, 5).map(([k, t]) => `<li class="c-${k}">${icon(k)}<span>${esc(t)}</span></li>`).join('')}</ul>` : '';
   // "You'll learn" ticks fill in as the lesson progresses.
   document.querySelectorAll('#learn li').forEach((li, k, all) => li.classList.toggle('got', done.has(l.slug) || (i + 1) / n >= (k + 1) / all.length));
-  for (const m of l.metrics) setMetric(m, metricAt(l, m.id, i));
+  for (const m of l.metrics) setMetric(m, metricAt(l, m.id, i), l.style === 'illustrated');
   drawDiagram(l, s);
   $('#live').textContent = `Step ${i + 1} of ${n}: ${s.title}`;
   fitGuide();
 }
 
-function setMetric(m, v) {
+function setMetric(m, v, ill) {
   const el = document.getElementById('m-' + m.id);
   if (!el) return;
   const unit = m.unit ? ` ${m.unit}` : '';
   if (v == null) { el.textContent = '—'; shownMetrics[m.id] = null; return; }
-  const from = parseFloat(shownMetrics[m.id]), to = Number(v);
+  const prev = shownMetrics[m.id], from = parseFloat(prev), to = Number(v);
   shownMetrics[m.id] = v;
+  if (ill && prev !== v && !reducedMotion) { const box = el.parentElement; box.classList.remove('is-changed'); void box.offsetWidth; box.classList.add('is-changed'); }
   if (reducedMotion || !Number.isFinite(to) || !Number.isFinite(from) || from === to) { el.textContent = v + unit; return; }
-  const t0 = performance.now(), dec = (v.split('.')[1] || '').length;
-  const tick = t => { const p = Math.min((t - t0) / 500, 1), e = 1 - (1 - p) ** 3; if (shownMetrics[m.id] !== v) return; el.textContent = (p < 1 ? (from + (to - from) * e).toFixed(dec) : v) + unit; if (p < 1) requestAnimationFrame(tick); };
+  const t0 = performance.now(), dec = (v.split('.')[1] || '').length, dur = ill ? 900 : 500;
+  const tick = t => { const p = Math.min((t - t0) / dur, 1), e = 1 - (1 - p) ** 3; if (shownMetrics[m.id] !== v) return; el.textContent = (p < 1 ? (from + (to - from) * e).toFixed(dec) : v) + unit; if (p < 1) requestAnimationFrame(tick); };
   requestAnimationFrame(tick);
 }
 
@@ -292,7 +293,6 @@ function flyTo(svg, to, slug) {
   cam.raf = requestAnimationFrame(tick);
 }
 function drawDiagram(l, s) {
-  if (tl) { tl.kill(); tl = null; }
   if (l.style === 'illustrated') return drawIllustrated(l, s);
   let PX = n => ({ x: 90 + n.x / 100 * (W - 180), y: 100 + n.y / 100 * (H - 190) });
   const P = id => PX(l.nodes.find(x => x.id === id));
@@ -418,8 +418,9 @@ function drawDiagram(l, s) {
   if (paused) { el.setCurrentTime(0.5); el.pauseAnimations(); }
   syncPause();
 }
-// ---------- illustrated style (opt-in per lesson: "style": "illustrated"): soft isometric cubes, detailed laptop, pills, status chips ----------
-const IA = 84, IB = 50, ID = 44, NS = 'http://www.w3.org/2000/svg';
+// ---------- illustrated style (opt-in per lesson: "style": "illustrated"): scene-graph renderer, numbers from evidence/animation-spec.md ----------
+// A step is a full scene {ents, links, routes}; goTo(scene) diffs by id (exit / move / enter), the camera tweens its viewBox, packets spawn forever until the next step.
+const NS = 'http://www.w3.org/2000/svg';
 const ILL_ICON = { dns: 'cdn', cdn: 'external' };
 function roundPoly(p, r) {
   return p.map((q, i) => {
@@ -429,274 +430,300 @@ function roundPoly(p, r) {
     return `${i ? 'L' : 'M'}${A[0].toFixed(1)},${A[1].toFixed(1)}Q${q[0].toFixed(1)},${q[1].toFixed(1)} ${B[0].toFixed(1)},${B[1].toFixed(1)}`;
   }).join('') + 'Z';
 }
-const CUBE = [[0, -IB], [IA, 0], [IA, ID], [0, IB + ID], [-IA, ID], [-IA, 0]];
-function laptopSvg() {
-  K = 1;
-  const P_ = 72, PT = 16, PLAT = [iso(-P_, -P_, 0), iso(P_, -P_, 0), iso(P_, -P_, -PT), iso(P_, P_, -PT), iso(-P_, P_, -PT), iso(-P_, P_, 0)];
-  let g = `<ellipse class="ishadow" cx="8" cy="${(iso(0, 0, -PT)[1] + 40).toFixed(1)}" rx="150" ry="38"/>`;
-  g += `<g clip-path="url(#ipl)"><polygon class="pf-l" points="${pts([iso(-P_, P_, 0), iso(P_, P_, 0), iso(P_, P_, -PT), iso(-P_, P_, -PT)])}"/><polygon class="pf-r" points="${pts([iso(P_, P_, 0), iso(P_, -P_, 0), iso(P_, -P_, -PT), iso(P_, P_, -PT)])}"/><polygon class="pf-t" points="${pts([iso(-P_, -P_, 0), iso(P_, -P_, 0), iso(P_, P_, 0), iso(-P_, P_, 0)])}"/></g>`;
-  g += `<path class="iout" d="${roundPoly(PLAT, 24)}"/>`;
-  const dz = 6, u0 = -30, u1 = 46, v0 = -46, v1 = 46;
-  g += `<g class="lap">` + poly('left', [iso(u0, v1, 0), iso(u1, v1, 0), iso(u1, v1, dz), iso(u0, v1, dz)]) + poly('right', [iso(u1, v1, 0), iso(u1, v0, 0), iso(u1, v0, dz), iso(u1, v1, dz)]) + poly('top', [iso(u0, v0, dz), iso(u1, v0, dz), iso(u1, v1, dz), iso(u0, v1, dz)]);
-  let kb = '';
-  for (let r = 0; r <= 5; r++) { const u = -22 + r * 8; kb += `M${iso(u, -38, dz)}L${iso(u, 38, dz)}`; }
-  for (let c = 0; c <= 12; c++) { const v = -38 + c * 6.34; kb += `M${iso(-22, v, dz)}L${iso(18, v, dz)}`; }
-  g += `<path class="kb" d="${kb}"/><path class="tp" d="${roundPoly([iso(25, -14, dz), iso(40, -14, dz), iso(40, 14, dz), iso(25, 14, dz)], 4)}"/>`;
-  const S = (v, z, off = 0) => iso(-30 - 9 * (z - dz) / 50 + off, v, z), zt = 56;
-  g += `<polygon class="s scr-d" points="${pts([S(v1, dz), S(v1, dz, -5), S(v1, zt, -5), S(v1, zt)])}"/>`
-    + `<polygon class="s scr-d" points="${pts([S(v0, zt), S(v1, zt), S(v1, zt, -5), S(v0, zt, -5)])}"/>`
-    + `<polygon class="s scr-f" points="${pts([S(v1, dz), S(v0, dz), S(v0, zt), S(v1, zt)])}"/>`;
-  const sc = (a, b) => S(40 - 80 * a, 12 + 38 * b), Q = (a0, a1, b0, b1, c, r = 2) => `<path class="${c}" d="${roundPoly([sc(a0, b0), sc(a1, b0), sc(a1, b1), sc(a0, b1)], r)}"/>`;
-  g += Q(0.05, 0.95, 0.04, 0.96, 'glass', 3) + Q(0.05, 0.95, 0.86, 0.96, 'ui-bar', 2);
-  [0.09, 0.14, 0.19].forEach((a, i) => { const [x, y] = sc(a, 0.91); g += `<circle class="ui-dot d${i}" cx="${x.toFixed(1)}" cy="${y.toFixed(1)}" r="1.7"/>`; });
-  g += Q(0.1, 0.9, 0.45, 0.78, 'ui-hero', 3) + Q(0.1, 0.72, 0.3, 0.37, 'ui-line', 2) + Q(0.1, 0.5, 0.18, 0.25, 'ui-line', 2) + Q(0.1, 0.62, 0.08, 0.14, 'ui-line', 2);
+const RT = { exit: 420, move: 820, enter: 680, draw: 560, stagger: 130 };
+const EZ = { io: t => t < .5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2, out: t => 1 - (1 - t) ** 3, back: t => 1 + 2.35 * (t - 1) ** 3 + 1.35 * (t - 1) ** 2 };
+const c01 = t => t < 0 ? 0 : t > 1 ? 1 : t, lerp = (a, b, t) => a + (b - a) * t;
+const jx = (x, y, z = 0) => [14 * (x + y), 7 * (x - y) - z]; // iso projection, 2:1
+const RC = { // [top a, top b, side a, side b]
+  orange: ['#fee6cc', '#fcd4ad', '#f9c697', '#f3b47f'], yellow: ['#fff3d6', '#fee7b8', '#fcdb9c', '#f6cd82'], blue: ['#e6f0fc', '#d0e2f8', '#bcd5f2', '#9fc2e8'],
+  purple: ['#f1e8fc', '#e1d2f6', '#d3c1f0', '#bba2e6'], green: ['#e8f6df', '#d3edc5', '#c3e4b1', '#a5d28e'], slab: ['#fbf8f2', '#ece6da', '#ddd5c6', '#c9bfac']
+};
+const KCOL = { server: 'orange', dns: 'yellow', lb: 'blue', db: 'purple', storage: 'purple', cdn: 'green', client: 'slab' };
+const PK = { req: { r: 4.3, f: '#f3b47f', s: '#211e1b', w: 1.5 }, slow: { r: 4.3, f: '#efb041', s: '#211e1b', w: 1.5 }, push: { r: 4.3, f: '#9fd28f', s: '#211e1b', w: 1.5 }, ping: { r: 3.6, f: '#f4fbef', s: '#2f8a43', w: 2.1 } };
+const PKSPEED = { slow: .32, ping: .85 };
+const REXT = { block: { top: -74, bot: 28, hw: 56 }, db: { top: -55, bot: 17, hw: 34 }, device: { top: -100, bot: 42, hw: 84 } };
+const ZL = { block: 120, db: 120, device: 40 };
+const pinPoly = (x, y, pl) => { let c = false; for (let i = 0, j = pl.length - 1; i < pl.length; j = i++) if ((pl[i][1] > y) !== (pl[j][1] > y) && x < (pl[j][0] - pl[i][0]) * (y - pl[i][1]) / (pl[j][1] - pl[i][1]) + pl[i][0]) c = !c; return c; };
+const RX = { svg: null, slug: '', key: '', si: 0, sc: [], cams: [], cur: { ents: {}, links: {}, routes: [] }, ents: new Map(), links: new Map(), pks: [], fxs: [], flows: [], vb: [0, 0, 900, 520], camTw: null, end: 0, settled: true, spotIds: [], raf: 0, last: 0, W: 900, H: 520, L: {} };
+
+// scenes: one per step, built from the lesson JSON (nodes gx/gy are grid cells; chips become pills; flows become routes)
+function rxScenes(l) {
+  const first = firstSeen(l), seen = new Map(), key = (a, b) => [a, b].sort().join('|'), nd = id => l.nodes.find(n => n.id === id);
+  return l.steps.map((s, i) => {
+    const ents = {}, links = {}, flows = s.flows || [];
+    for (const n of l.nodes) if (first[n.id] <= i) {
+      const tags = [], cl = n.kind === 'client';
+      if (n.url) tags.push({ text: n.url });
+      if (cl) tags.push({ text: n.label, tone: 'gray', below: true });
+      for (const c of s.chips || []) if (c.node === n.id && typeof c.text === 'string') tags.push({ text: c.text, tone: c.tone || 'paper', cpu: c.kind === 'progress' ? +c.value || 0 : undefined, below: c.at === 'bottom' });
+      ents[n.id] = { id: n.id, type: cl ? 'device' : (n.kind === 'db' || n.kind === 'storage') ? 'db' : 'block', color: KCOL[n.kind] || 'orange', kind: n.kind, label: n.label, x: n.gx || 0, y: n.gy || 0, tags };
+    }
+    const now = new Map();
+    for (const f of flows) {
+      const k = key(f.from, f.to); (now.get(k) || now.set(k, []).get(k)).push(f);
+      if (!seen.has(k)) { const a = nd(f.from), b = nd(f.to); seen.set(k, { a: f.from, b: f.to, via: a.gx !== b.gx && a.gy !== b.gy ? [b.gx, a.gy] : null }); }
+    }
+    for (const [k, v] of seen) { const fs = now.get(k); links[k] = { id: k, a: v.a, b: v.b, via: v.via, style: fs || !flows.length ? 'solid' : 'off', heads: fs && fs.some(f => f.kind === 'handshake') ? 'both' : 'end', label: fs && fs[0].label || '' }; }
+    // routes: a request/response pair over the same links is one packet that bounces; a chain is walked link by link
+    const fl = flows.map(f => ({ link: key(f.from, f.to), rev: seen.get(key(f.from, f.to)).a !== f.from, kind: f.kind, pkt: f.pkt, from: f.from, to: f.to })), n = fl.length;
+    const chain = a => a.every((x, k) => !k || a[k - 1].to === x.from), pal = n >= 2 && n % 2 === 0 && fl.every((x, k) => x.link === fl[n - 1 - k].link && x.rev !== fl[n - 1 - k].rev);
+    const mk = (legs, bounce) => { const f0 = legs[0], kind = f0.pkt || (f0.kind === 'handshake' ? 'ping' : f0.kind === 'response' ? 'push' : 'req'); return { legs: legs.map(x => ({ link: x.link, rev: x.rev })), bounce, kind, rate: kind === 'ping' ? 1.3 : .8, speed: 1, hold: kind === 'slow' && bounce ? .8 : 0 }; };
+    const routes = !n ? [] : pal ? [mk(fl.slice(0, n / 2), true)] : chain(fl) ? [mk(fl, false)] : fl.map(x => mk([x], false));
+    return { ents, links, routes, title: s.caption };
+  });
+}
+const rxExt = e => REXT[e.type];
+const rxBox = e => { const [cx, cy] = jx(e.x, e.y), x = rxExt(e), up = e.tags.filter(t => !t.below).length, dn = e.tags.filter(t => t.below).length; return [cx - Math.max(x.hw, 60), cy + x.top - (up ? 8 + up * 26 : 0), cx + Math.max(x.hw, 60), cy + x.bot + (dn ? 8 + dn * 26 : 0)]; };
+function rxSil(e) {
+  const [cx, cy] = jx(e.x, e.y), sh = pl => pl.map(p => [cx + p[0], cy + p[1]]);
+  if (e.type === 'block') return [sh([[-56, -46], [0, -74], [56, -46], [56, 0], [0, 28], [-56, 0]])];
+  if (e.type === 'db') { const q = []; for (let i = 0; i <= 16; i++) { const t = Math.PI + Math.PI * i / 16; q.push([33.66 * Math.cos(t), -38 + 16.83 * Math.sin(t)]); } for (let i = 0; i <= 16; i++) { const t = Math.PI * i / 16; q.push([33.66 * Math.cos(t), 16.83 * Math.sin(t)]); } return [sh(q)]; }
+  return [sh([[-84, -16], [0, -58], [84, -16], [84, 0], [0, 42], [-84, 0]]), sh([[-2.4, -2.4, 19], [-2.4, 2.4, 19], [-2.4, 2.4, 66], [-2.4, -2.4, 66]].map(([x, y, z]) => jx(x, y, z)))];
+}
+const pw = t => t.cpu != null ? 86 : t.text.length * 6.3 + 18, PH = 21;
+function rxPillSvg(t, cx, cy, size = 10.5, cpu = t.cpu) {
+  const w = pw(t), x = cx - w / 2, y = cy - PH / 2, tone = t.tone || 'paper';
+  let g = `<g class="pl t-${tone}"><rect class="sh" x="${x.toFixed(1)}" y="${(y + 2).toFixed(1)}" width="${w.toFixed(1)}" height="${PH}" rx="10.5"/><rect class="bg" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${PH}" rx="10.5"/>`;
+  if (cpu != null) {
+    const v = Math.max(0, Math.min(100, cpu)), col = v < 60 ? '#7fc278' : v < 85 ? '#efb041' : '#e5534b';
+    g += `<text x="${(x + 9).toFixed(1)}" y="${(cy + 3.7).toFixed(1)}" font-size="${size}">cpu</text><rect class="bar" x="${(x + 33).toFixed(1)}" y="${(cy - 3.5).toFixed(1)}" width="28" height="7" rx="3.5"/><rect x="${(x + 33).toFixed(1)}" y="${(cy - 3.5).toFixed(1)}" width="${Math.max(2, 28 * v / 100).toFixed(1)}" height="7" rx="3.5" fill="${col}"/><text x="${(x + 66).toFixed(1)}" y="${(cy + 3.7).toFixed(1)}" font-size="${size}">${Math.round(v)}%</text>`;
+  } else g += `<text x="${cx.toFixed(1)}" y="${(cy + size * .35).toFixed(1)}" font-size="${size}" text-anchor="middle">${esc(t.text)}</text>`;
   return g + '</g>';
 }
-function cubeSvg(n) {
-  const k = n.kind, T = [[0, -IB], [IA, 0], [0, IB], [-IA, 0]], Lf = [[-IA, 0], [0, IB], [0, IB + ID], [-IA, ID]], Rf = [[0, IB], [IA, 0], [IA, ID], [0, IB + ID]];
-  const w1 = n.label.split(' ')[0], w2 = n.label.slice(w1.length).trim(), ico = 26;
-  return `<ellipse class="ishadow" cx="6" cy="${IB + ID + 16}" rx="${IA + 18}" ry="26"/><g clip-path="url(#icl)"><polygon fill="url(#ig-l-${esc(k)})" points="${pts(Lf)}"/><polygon fill="url(#ig-r-${esc(k)})" points="${pts(Rf)}"/><polygon fill="url(#ig-t-${esc(k)})" points="${pts(T)}"/></g>`
-    + `<path class="ihi" d="${roundPoly([[0, -IB + 14], [IA - 22, -2], [0, IB - 18], [-IA + 22, -2]], 12)}"/><path class="iout" d="${roundPoly(CUBE, 18)}"/>`
-    + `<g class="nico" transform="translate(${-ico / 2},${w2 ? -37 : -32}) scale(${ico / 24})">${I[ILL_ICON[k] || KIND_ICON[k]] || I.service}</g>`
-    + `<text class="ilbl" font-size="18" x="0" y="${w2 ? 11 : 16}">${esc(w1)}</text>` + (w2 ? `<text class="ilbl l2" font-size="13" x="0" y="29">${esc(w2)}</text>` : '');
+// pills for an entity: stacked 26 px apart above (or below) the block; positions are local to the entity's ground centre
+function rxPills(e, tags, cpu) {
+  const x = rxExt(e); let u = 0, d = 0, s = '';
+  for (const t of tags) { const cy = t.below ? x.bot + 8 + 10.5 + 26 * d++ : x.top - 8 - 10.5 - 26 * u++; s += rxPillSvg(t, 0, cy, 10.5, t.cpu != null ? cpu : undefined); }
+  return s;
 }
-// database / storage: soft cylinder (elliptical top with highlight, vertical-gradient body); name pill sits beside it
-const CRX = 72, CRY = 30, CTY = -22, CBY = 52, isCyl = n => n.kind === 'db' || n.kind === 'storage';
-const CYL = (() => { const q = []; for (let i = 0; i <= 24; i++) { const t = Math.PI + Math.PI * i / 24; q.push([CRX * Math.cos(t), CTY + CRY * Math.sin(t)]); } for (let i = 0; i <= 24; i++) { const t = Math.PI * i / 24; q.push([CRX * Math.cos(t), CBY + CRY * Math.sin(t)]); } return q; })();
-function cylSvg(n) {
-  const k = esc(n.kind), body = `M${-CRX},${CTY}L${-CRX},${CBY}A${CRX},${CRY} 0 0 0 ${CRX},${CBY}L${CRX},${CTY}`;
-  return `<ellipse class="ishadow" cx="6" cy="${CBY + CRY - 2}" rx="${CRX + 22}" ry="22"/><path fill="url(#ig-l-${k})" d="${body}Z"/><ellipse fill="url(#ig-t-${k})" cx="0" cy="${CTY}" rx="${CRX}" ry="${CRY}"/>`
-    + `<ellipse class="ihi" cx="-6" cy="${CTY - 3}" rx="${CRX - 22}" ry="${CRY - 11}"/><path class="iout" d="${body}"/><ellipse class="iout" cx="0" cy="${CTY}" rx="${CRX}" ry="${CRY}"/>`
-    + `<g class="nico" transform="translate(-14,${CTY + CRY + 3}) scale(${28 / 24})">${I[KIND_ICON[n.kind]] || I.db}</g>`;
-}
-// pill / chip builders: return {svg, w} centred on (cx, cy)
-function pillSvg(cx, cy, text, ic, cls = 'ipill', h = 36, fs = 15) {
-  const w = text.length * fs * 0.61 + (ic ? 50 : 30), x = cx - w / 2, y = cy - h / 2;
-  return { w, h, svg: `<g class="${cls}"><rect x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${h}" rx="${h / 2}"/>${ic ? `<g class="pico" transform="translate(${(x + 12).toFixed(1)},${(cy - 9).toFixed(1)}) scale(.75)">${I[ic]}</g>` : ''}<text font-size="${fs}" x="${(x + (ic ? 38 : 15)).toFixed(1)}" y="${(cy + fs * 0.34).toFixed(1)}">${esc(text)}</text></g>` };
-}
-function chipSvg(cx, cy, c) {
-  if (c.kind !== 'progress') return pillSvg(cx, cy, c.text, null, 'ichip', 32, 14);
-  const v = Math.max(0, Math.min(100, +c.value || 0)), tw = (c.text || '').length * 8.6, w = 14 + 20 + 8 + 56 + 8 + tw + 12, x = cx - w / 2, y = cy - 16, bx = x + 42;
-  return { w, h: 32, svg: `<g class="ichip"><rect x="${x.toFixed(1)}" y="${y}" width="${w.toFixed(1)}" height="32" rx="16"/><g class="pico gear" transform="translate(${(x + 12).toFixed(1)},${cy - 8}) scale(.67)">${I.worker}</g><rect class="ibar" x="${bx.toFixed(1)}" y="${cy - 4}" width="56" height="8" rx="4"/><rect class="ifill" x="${bx.toFixed(1)}" y="${cy - 4}" width="${Math.max(8, 56 * v / 100).toFixed(1)}" height="8" rx="4"/><text font-size="14" x="${(bx + 64).toFixed(1)}" y="${cy + 5}">${esc(c.text || '')}</text></g>` };
-}
-// silhouettes (node-local coords): the rounded cube hexagon; laptop = platform + screen
-const inPoly = (x, y, pl) => { let c = false; for (let i = 0, j = pl.length - 1; i < pl.length; j = i++) if ((pl[i][1] > y) !== (pl[j][1] > y) && x < (pl[j][0] - pl[i][0]) * (y - pl[i][1]) / (pl[j][1] - pl[i][1]) + pl[i][0]) c = !c; return c; };
-let lapPolys = null;
-const inSil = (n, x, y) => {
-  if (isCyl(n)) return inPoly(x, y, CYL);
-  if (n.kind !== 'client') return inPoly(x, y, CUBE);
-  if (!lapPolys) { K = 1; lapPolys = [[iso(-72, -72, 0), iso(72, -72, 0), iso(72, -72, -16), iso(72, 72, -16), iso(-72, 72, -16), iso(-72, 72, 0)], [iso(-39, -46, 62), iso(-39, 46, 62), iso(-30, 46, 6), iso(-30, -46, 6)]]; }
-  return lapPolys.some(pl => inPoly(x, y, pl));
-};
-// walk the centre-to-centre path out of both silhouettes (+6 gap); returns a polyline plus sample points for collision tests
-function trimPath(d, in1, in2) {
-  const p = document.createElementNS(NS, 'path'); p.setAttribute('d', d);
-  const L = p.getTotalLength(); let a = 0, b = L;
-  while (a < L * .45 && in1(p.getPointAtLength(a))) a += 2;
-  while (b > L * .55 && in2(p.getPointAtLength(b))) b -= 2;
-  a = Math.min(a + 6, L * .45); b = Math.max(b - 6, L * .55);
-  const n = Math.max(2, Math.ceil((b - a) / 3)), q = [];
-  for (let i = 0; i <= n; i++) q.push(p.getPointAtLength(a + (b - a) * i / n));
-  const ang = (p0, p1) => Math.atan2(p1.y - p0.y, p1.x - p0.x) * 180 / Math.PI;
-  return { d: 'M' + q.map(o => o.x.toFixed(1) + ',' + o.y.toFixed(1)).join('L'), s: q[0], e: q[n], as: ang(q[0], q[1]), ae: ang(q[n - 1], q[n]), len: b - a, at: t => p.getPointAtLength(a + t), pts: q.map(o => [o.x, o.y]) };
-}
-// short text a message token carries: explicit f.token, else the flow label (max 17 chars)
-const tokText = f => { const t = String(f.token || f.label || ''); return t.length > 17 ? t.slice(0, 16) + '…' : t; };
-const chipTag = (svg, c) => svg.replace(/^<g /, `<g data-n="${esc(c.node)}" data-t="${esc(c.text || '')}" `);
-function drawIllustrated(l, s) {
-  K = 1;
-  const PX = n => ({ x: 110 + n.x / 100 * 1120, y: 110 + n.y / 100 * 450 });
-  const nodeById = id => l.nodes.find(x => x.id === id), P = id => PX(nodeById(id));
-  const focus = new Set(s.focus || []), flows = s.flows || [], chips = (s.chips || []).filter(c => c && typeof c.text === 'string');
-  const si = l.steps.indexOf(s), first = firstSeen(l);
-  const prevFocus = !reducedMotion && lastDraw.slug === l.slug ? lastDraw.focus : null;
-  lastDraw.slug = l.slug; lastDraw.focus = focus;
-  const shown = l.nodes.filter(n => first[n.id] <= si), shownIds = new Set(shown.map(n => n.id));
-  const slot = 1.15, T = Math.max(flows.length, 1) * slot + 0.9, key = (a, b) => [a, b].sort().join('|');
-  const route = (ida, idb) => {
-    const [i1, i2] = [ida, idb].sort(), a = P(i1), b = P(i2), dx = b.x - a.x, dy = b.y - a.y;
-    const du = (dx / .866 + 2 * dy) / 2, dv = (2 * dy - dx / .866) / 2, m = { x: a.x + du * .866, y: a.y + du * .5 };
-    const c = Math.hypot(dx, dy) || 1, off = Math.abs((m.x - a.x) * dy - (m.y - a.y) * dx) / c, s1 = Math.abs(du), s2 = Math.abs(dv), r = Math.min(26, s1 / 2, s2 / 2), nrm = [-dy / c, dx / c];
-    if (off > 90 || r < 2) return { i1, i2, d: `M${a.x},${a.y}L${b.x},${b.y}`, mid: [(a.x + b.x) / 2, (a.y + b.y) / 2], n: nrm };
-    const e1 = [Math.sign(du) * .866, Math.sign(du) * .5], e2 = [-Math.sign(dv) * .866, Math.sign(dv) * .5], h = (s1 + s2) / 2;
-    return { i1, i2, d: `M${a.x},${a.y}L${m.x - r * e1[0]},${m.y - r * e1[1]}Q${m.x},${m.y} ${m.x + r * e2[0]},${m.y + r * e2[1]}L${b.x},${b.y}`, mid: h <= s1 ? [a.x + e1[0] * h, a.y + e1[1] * h] : [m.x + e2[0] * (h - s1), m.y + e2[1] * (h - s1)], n: nrm };
+function rxBody(e) {
+  const c = e.color, cid = 'cp-' + e.id, ico = I[ILL_ICON[e.kind] || KIND_ICON[e.kind]] || I.service;
+  const prism = (hw, h, col, id, ol = 'ol') => {
+    const hh = hw / 2, sil = roundPoly([[-hw, -h], [0, -hh - h], [hw, -h], [hw, 0], [0, hh], [-hw, 0]], 9), top = roundPoly([[-hw, -h], [0, -hh - h], [hw, -h], [0, hh - h]], 10);
+    const sheen = roundPoly([[-hw * .74, -h - 1], [0, -h - hh * .74 - 1], [hw * .74, -h - 1], [0, -h + hh * .74 - 1]], 8);
+    return `<clipPath id="${id}"><path d="${sil}"/></clipPath><path d="${sil}" fill="url(#rx-s-${col})"/><path d="M${hw},${-h}L0,${hh - h}L0,${hh}L${hw},0Z" clip-path="url(#${id})" fill="#3a2a14" fill-opacity=".05"/><path d="${top}" fill="url(#rx-t-${col})"/>`
+      + `<path d="${sheen}" fill="#fff" fill-opacity=".22" filter="url(#rx-b2)"/><path d="M${-hw},${1.4 - h}L0,${hh - h + 1.4}L${hw},${1.4 - h}" fill="none" stroke="#fff" stroke-opacity=".75" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/>`
+      + `<path d="M${-hw},${3.4 - h}L0,${hh - h + 3.4}L${hw},${3.4 - h}" fill="none" stroke="#5a4123" stroke-opacity=".07" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"/><path class="${ol}" d="${sil}"/>`;
   };
-  const hot = new Map(); flows.forEach(f => { const k = key(f.from, f.to), o = hot.get(k) || { kind: f.kind, to: new Set() }; o.to.add(f.to); hot.set(k, o); });
-  const clsFor = (n, fs) => (fs.size ? (fs.has(n.id) ? ' focus' : ' dim') : '') + (first[n.id] === si && !reducedMotion ? ' rise' : '');
-  const used = new Set(), rects = [], arrows = [], epts = [], nodeRect = {};
-  let nodes = '', edges = '', over = '';
-  const order = [...shown].sort((a, b) => a.y - b.y || a.x - b.x);
-  for (const n of order) {
-    const { x, y } = PX(n), lap = n.kind === 'client', c1 = clsFor(n, focus), c0 = prevFocus ? clsFor(n, prevFocus) : c1;
-    used.add(n.kind);
-    let g = lap ? laptopSvg() : isCyl(n) ? cylSvg(n) : cubeSvg(n), nr;
-    if (lap) {
-      const p1 = pillSvg(0, -128, n.url || n.label, 'cdn'), p2 = pillSvg(-52, 124, n.you || 'you', 'user');
-      g += p1.svg + p2.svg; rects.push([x - 126, y - 106, x + 126, y + 92], [x - p1.w / 2, y - 146, x + p1.w / 2, y - 110], [x - 52 - p2.w / 2, y + 106, x - 52 + p2.w / 2, y + 142]);
-    nr = [x - 126, y - 146, x + 126, y + 142];
-    } else if (isCyl(n)) {
-      const pl = pillSvg(0, 0, n.label, KIND_ICON[n.kind], 'ipill', 36, 15), px = CRX + 14 + pl.w / 2, q = pillSvg(px, CTY + 4, n.label, KIND_ICON[n.kind]);
-      g += q.svg; nr = [x - CRX - 4, y + CTY - CRY - 4, x + px + pl.w / 2 + 4, y + CBY + CRY + 6]; rects.push(nr);
-    } else rects.push(nr = [x - IA - 4, y - IB - 4, x + IA + 4, y + IB + ID + 6]);
-    nodeRect[n.id] = nr;
-    nodes += `<g class="inode kind-${esc(n.kind)}${c0}" data-id="${esc(n.id)}" data-x="${x.toFixed(1)}" data-y="${y.toFixed(1)}"${c0 !== c1 ? ` data-c="${c1}"` : ''} transform="translate(${x.toFixed(1)},${y.toFixed(1)})"><g class="body">${g}</g></g>`;
+  const prs = (x0, x1, y0, y1, z0, z1, col) => { // flat box in grid space: top + the two faces that face the camera
+    const P = (x, y, z) => jx(x, y, z).map(v => v.toFixed(1)).join(','), q = a => 'M' + a.map(p => P(...p)).join('L') + 'Z';
+    return `<path d="${q([[x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [x1, y0, z1]])}" fill="url(#rx-s-${col})"/><path d="${q([[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]])}" fill="url(#rx-s-${col})"/><path d="${q([[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]])}" fill="url(#rx-t-${col})"/><path class="ol2" d="${q([[x0, y0, z1], [x1, y0, z1], [x1, y1, z1], [x0, y1, z1]])}"/><path class="ol2" d="${q([[x1, y0, z0], [x1, y1, z0], [x1, y1, z1], [x1, y0, z1]])}"/><path class="ol2" d="${q([[x0, y0, z0], [x1, y0, z0], [x1, y0, z1], [x0, y0, z1]])}"/>`;
+  };
+  if (e.type === 'db') {
+    const rx = 33.66, ry = rx / 2, h = 38, body = `M${-rx},${-h}L${-rx},0A${rx},${ry} 0 0 0 ${rx},0L${rx},${-h}`;
+    return `<path d="${body}Z" fill="url(#rx-s-${c})"/><path d="${body}Z" fill="url(#rx-cs)"/><ellipse cy="${-h}" rx="${rx}" ry="${ry}" fill="url(#rx-t-${c})"/><ellipse cy="${-h - 1}" rx="${rx * .6}" ry="${ry * .5}" fill="#fff" fill-opacity=".22" filter="url(#rx-b2)"/><path class="ol" d="${body}"/><ellipse class="ol" cy="${-h}" rx="${rx}" ry="${ry}"/>`
+      + `<g class="gl" transform="translate(-8,${-h - 8}) scale(.667)">${I.db}</g><text class="bl" y="-10" font-size="12">${esc(e.label)}</text>`;
   }
-  // edges: clipped to the block silhouettes (start/end just outside them) and drawn before the nodes, so they stay behind blocks
-  const head = (pt, ang, cls) => { arrows.push([pt.x - 14, pt.y - 14, pt.x + 14, pt.y + 14]); return `<path class="iarrow${cls}" d="M-16,-8.5Q-15,-8 1,0Q-15,8 -16,8.5Z" transform="translate(${pt.x.toFixed(1)} ${pt.y.toFixed(1)}) rotate(${ang.toFixed(1)})${cls.includes('idle') ? ' scale(.72)' : ''}"/>`; };
-  const trims = {}, eIdx = new Map(), sil = id => p => { const n = nodeById(id), c = PX(n); return inSil(n, p.x - c.x, p.y - c.y); };
-  let ei = 0;
-  for (const e of l.edges) if (shownIds.has(e.from) && shownIds.has(e.to)) {
-    const rt = route(e.from, e.to), h = hot.get(key(e.from, e.to)), tm = trims[key(e.from, e.to)] = trimPath(rt.d, sil(rt.i1), sil(rt.i2)), dests = h ? h.to : new Set([e.to]);
-    const isNew = Math.max(first[e.from], first[e.to]) === si && !reducedMotion, cl = (h ? '' : ' idle') + (isNew ? ' fresh' : '');
-    eIdx.set(key(e.from, e.to), ei++); epts.push(...tm.pts);
-    edges += `<path class="iedge${h ? ' hot' : ''}${isNew ? ' fresh' : ''}" d="${tm.d}"/>`;
-    for (const dst of dests) over += dst === rt.i2 ? head(tm.e, tm.ae, cl) : head(tm.s, tm.as + 180, cl);
+  if (e.type === 'device') {
+    const sy = 2.2, pxs = 14 * sy;
+    return prism(84, 16, 'slab', cid, 'ol2') + prs(-2.8, 2.4, -2.3, 2.3, 16, 19, 'slab') + prs(-2.6, -2.2, -sy - .2, sy + .2, 19, 66, 'slab')
+      + `<g transform="matrix(1 -.5 0 1 ${(14 * -2.2).toFixed(1)} ${(7 * -2.2).toFixed(1)})"><rect x="${-pxs + 2}" y="-64" width="${2 * pxs - 4}" height="43" rx="2" fill="#f6f1e6"/><rect x="${-pxs + 2}" y="-64" width="${2 * pxs - 4}" height="8" rx="2" fill="#e4dccb"/>`
+      + `<circle cx="${-pxs + 8}" cy="-60" r="1.8" fill="#E5534B"/><circle cx="${-pxs + 14}" cy="-60" r="1.8" fill="#EFB041"/><circle cx="${-pxs + 20}" cy="-60" r="1.8" fill="#7FC278"/><rect x="${-pxs + 8}" y="-48" width="${pxs}" height="5" rx="2.5" fill="#d9cfb8"/><rect x="${-pxs + 8}" y="-39" width="${pxs * 1.3}" height="5" rx="2.5" fill="#e4dccb"/><rect x="${-pxs + 8}" y="-30" width="${pxs * .8}" height="5" rx="2.5" fill="#e4dccb"/></g>`;
   }
-  flows.forEach((f, i) => {
-    const rt = route(f.from, f.to), k = key(f.from, f.to), tm = trims[k]; if (!tm) return;
-    const rev = f.from === rt.i1 ? 0 : 1, kp = rev ? '1;1;0;0' : '0;0;1;1';
-    for (const dl of [0, 0.18]) {
-      const t1 = ((i * slot + dl) / T).toFixed(3), t2 = ((i * slot + 0.95 + dl) / T).toFixed(3), kt = `0;${t1};${t2};1`;
-      over += `<g class="ipacket k-${esc(f.kind)}${dl ? ' tail' : ''}" data-e="${eIdx.get(k)}" data-r="${rev}" data-i="${i}" data-d="${dl}" data-t="${esc(tokText(f))}" data-from="${esc(f.from)}" data-to="${esc(f.to)}" opacity="0"><animateMotion dur="${T}s" repeatCount="indefinite" path="${tm.d}" keyPoints="${kp}" keyTimes="${kt}" calcMode="spline" keySplines="0 0 1 1;.45 0 .2 1;0 0 1 1"/><animate attributeName="opacity" dur="${T}s" repeatCount="indefinite" keyTimes="0;${t1};${t1};${t2};${t2};1" values="0;0;1;1;0;0" calcMode="discrete"/><circle r="6"/></g>`;
-    }
-  });
-  // collision avoidance: every pill/chip/label gets a box; candidates are tried until the box keeps >= GAP from blocks, pills, chips, arrowheads and edge lines
-  const GAP = 8, bx = (cx, cy, w, h) => [cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2];
-  const free = r => !rects.concat(arrows).some(q => r[0] < q[2] + GAP && r[2] > q[0] - GAP && r[1] < q[3] + GAP && r[3] > q[1] - GAP) && !epts.some(p => p[0] > r[0] - GAP && p[0] < r[2] + GAP && p[1] > r[1] - GAP && p[1] < r[3] + GAP);
-  // node-anchored: try the wanted spot, then nudge vertically first, then sideways (nearest first)
-  const NUDGE = []; for (let dy = -192; dy <= 192; dy += 12) for (let dx = -240; dx <= 240; dx += 12) NUDGE.push([dx, dy]);
-  NUDGE.sort((a, b) => Math.hypot(a[0], a[1] * 1.6) - Math.hypot(b[0], b[1] * 1.6));
-  const spot = (cx, cy, w, h) => { for (const [dx, dy] of NUDGE) if (free(bx(cx + dx, cy + dy, w, h))) return [cx + dx, cy + dy]; return [cx, cy]; };
-  // line-anchored: beside the line (both sides, then further out), then slide along the line
-  const along = (tm, w, h, sides) => {
-    for (const al of [0, 40, -40, 80, -80, 120, -120, 170, -170]) {
-      const s = tm.len / 2 + al; if (s < 20 || s > tm.len - 20) continue;
-      const p = tm.at(s), a = tm.at(s - 2), b = tm.at(s + 2), tx = b.x - a.x, ty = b.y - a.y, tn = Math.hypot(tx, ty) || 1; let nx = -ty / tn, ny = tx / tn; if (ny > 0) { nx = -nx; ny = -ny; }
-      for (let step = 0; step < 4; step++) for (const sd of sides) {
-        const d = Math.abs(nx) * w / 2 + Math.abs(ny) * h / 2 + 14 + step * (h + 8), cx = p.x - sd * nx * d, cy = p.y - sd * ny * d;
-        if (free(bx(cx, cy, w, h))) return [cx, cy];
+  const w = e.label.split(' '), l1 = w.length > 1 ? w[0] : e.label, l2 = w.length > 1 ? w.slice(1).join(' ') : '';
+  return prism(56, 46, c, cid) + `<g class="gl" transform="translate(-7,-69) scale(.583)">${ico}</g><text class="bl" y="-44" font-size="13.5">${esc(l1)}</text>` + (l2 ? `<text class="bl s2" y="-33" font-size="10">${esc(l2)}</text>` : '');
+}
+const rxDefs = () => {
+  let s = '<filter id="rx-b6" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="6.5"/></filter><filter id="rx-b2" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="2.2"/></filter>'
+    + '<linearGradient id="rx-cs" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="#fff" stop-opacity=".28"/><stop offset=".45" stop-color="#fff" stop-opacity="0"/><stop offset="1" stop-color="#3a2a14" stop-opacity=".12"/></linearGradient>'
+    + '<pattern id="rx-grid" width="28" height="14" patternUnits="userSpaceOnUse"><path class="gr" d="M0,0L14,7L28,0M14,7L0,14M14,7L28,14"/></pattern>'
+    + '<radialGradient id="rx-fg" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#fff" stop-opacity="1"/><stop offset=".42" stop-color="#fff" stop-opacity=".92"/><stop offset=".78" stop-color="#fff" stop-opacity=".35"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>'
+    + '<mask id="rx-fm" maskUnits="userSpaceOnUse" x="-1400" y="-840" width="2800" height="1680"><rect x="-1400" y="-840" width="2800" height="1680" fill="url(#rx-fg)"/></mask>'
+    + '<marker id="rx-ar" viewBox="0 0 10 10" refX="8.6" refY="5" markerWidth="5.2" markerHeight="5.2" orient="auto-start-reverse"><path class="ah" d="M1,1.2L9,5L1,8.8z"/></marker><marker id="rx-ar-off" viewBox="0 0 10 10" refX="8.6" refY="5" markerWidth="5.2" markerHeight="5.2" orient="auto-start-reverse"><path class="ah off" d="M1,1.2L9,5L1,8.8z"/></marker>';
+  for (const [c, v] of Object.entries(RC)) s += `<linearGradient id="rx-t-${c}" x1="0" y1="0" x2=".35" y2="1"><stop offset="0" stop-color="${v[0]}"/><stop offset="1" stop-color="${v[1]}"/></linearGradient><linearGradient id="rx-s-${c}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${v[2]}"/><stop offset="1" stop-color="${v[3]}"/></linearGradient>`;
+  return s;
+};
+// ---- links: grid points -> rounded polyline (r 9), trimmed 3 px outside the source and 4 px before the target outline ----
+function rxLinkGeom(lk, sc) {
+  const A = sc.ents[lk.a], B = sc.ents[lk.b], g = (x, y) => jx(x, y), p = [g(A.x, A.y), ...(lk.via ? [g(...lk.via)] : []), g(B.x, B.y)];
+  let d = 'M' + p[0].join(',');
+  for (let i = 1; i < p.length - 1; i++) { const a = p[i - 1], b = p[i], c = p[i + 1], r = 9, u = [a[0] - b[0], a[1] - b[1]], v = [c[0] - b[0], c[1] - b[1]], lu = Math.hypot(...u), lv = Math.hypot(...v); d += `L${(b[0] + u[0] / lu * r).toFixed(1)},${(b[1] + u[1] / lu * r).toFixed(1)}Q${b[0]},${b[1]} ${(b[0] + v[0] / lv * r).toFixed(1)},${(b[1] + v[1] / lv * r).toFixed(1)}`; }
+  d += 'L' + p[p.length - 1].join(',');
+  const t = document.createElementNS(NS, 'path'); t.setAttribute('d', d);
+  const L = t.getTotalLength(), sa = rxSil(A), sb = rxSil(B), ins = (q, s) => s.some(pl => pinPoly(q.x, q.y, pl));
+  let a = 0, b = L; while (a < L / 2 && ins(t.getPointAtLength(a), sa)) a++; while (b > L / 2 && ins(t.getPointAtLength(b), sb)) b--;
+  a += 3; b -= lk.heads === 'none' ? 3 : 4;
+  const n = Math.max(2, Math.ceil((b - a) / 2)), q = []; for (let i = 0; i <= n; i++) { const o = t.getPointAtLength(a + (b - a) * i / n); q.push([o.x, o.y]); }
+  return { d: 'M' + q.map(o => o[0].toFixed(1) + ',' + o[1].toFixed(1)).join('L'), pts: q };
+}
+// link labels: candidate slots along the path on 4 sides, lowest overlap cost wins
+function rxPlaceLabels(sc) {
+  const boxes = [], obst = Object.values(sc.ents).map(e => { const [cx, cy] = jx(e.x, e.y), x = rxExt(e); return [cx - x.hw, cy + x.top, cx + x.hw, cy + x.bot]; }), pos = {};
+  for (const e of Object.values(sc.ents)) { const [cx, cy] = jx(e.x, e.y), x = rxExt(e); let u = 0, d = 0; for (const t of e.tags) { const w = pw(t), yy = t.below ? cy + x.bot + 8 + 10.5 + 26 * d++ : cy + x.top - 8 - 10.5 - 26 * u++; boxes.push([cx - w / 2, yy - 10.5, cx + w / 2, yy + 10.5]); } }
+  const geo = Object.values(sc.links).map(k => RX.L[k.id] || (RX.L[k.id] = rxLinkGeom(k, sc))), ov = (r, q) => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1];
+  for (const k of Object.values(sc.links)) {
+    if (!k.label) continue;
+    const g = RX.L[k.id], w = k.label.length * 5.8 + 18, h = PH, n = g.pts.length; let best = null;
+    for (const f of [.5, .4, .6, .3, .7, .2, .8]) {
+      const i = Math.min(n - 2, Math.max(0, Math.round(f * (n - 1)))), P = g.pts[i];
+      for (const [dx, dy] of [[0, -(h / 2 + 7)], [0, h / 2 + 7], [-(w / 2 + 7), 0], [w / 2 + 7, 0]]) {
+        const r = [P[0] + dx - w / 2, P[1] + dy - h / 2, P[0] + dx + w / 2, P[1] + dy + h / 2]; let cost = Math.abs(f - .5) * 60 + (dx ? 12 : 0);
+        for (const o of obst) if (ov(r, o)) cost += 170; for (const o of boxes) if (ov(r, o)) cost += 90;
+        for (const gg of geo) for (let m = 0; m < gg.pts.length; m += 4) { const q = gg.pts[m]; if (q[0] > r[0] - 3 && q[0] < r[2] + 3 && q[1] > r[1] - 3 && q[1] < r[3] + 3) cost += 18; }
+        if (!best || cost < best.cost) best = { cost, x: P[0] + dx, y: P[1] + dy, r };
       }
     }
-    const m = tm.at(tm.len / 2); return [m.x, m.y + 44];
-  };
-  const slots = {}; let chipOut = '', lblOut = '';
-  flows.forEach((f, fi) => {
-    if (!f.label) return;
-    const tm = trims[key(f.from, f.to)]; if (!tm) return;
-    const pr = pillSvg(0, 0, f.label, null, 'iflabel', 36, 15), [mx, my] = along(tm, pr.w, 36, [1, -1]), q = pillSvg(mx, my, f.label, null, 'iflabel', 36, 15);
-    lblOut += q.svg.replace(/^<g /, `<g data-f="${fi}" `); rects.push(bx(mx, my, q.w, 36));
+    pos[k.id] = [best.x, best.y]; boxes.push(best.r);
+  }
+  return pos;
+}
+// camera: zoom fits the bounds (16 px margin, snapped down to .05, cap 1.6); the previous camera is kept while the new bounds still fit
+function rxPlan(sc, prev) {
+  const bs = Object.values(sc.ents).map(rxBox); if (!bs.length) return prev || { cx: 0, cy: 0, z: 1 };
+  const x0 = Math.min(...bs.map(b => b[0])), y0 = Math.min(...bs.map(b => b[1])), x1 = Math.max(...bs.map(b => b[2])), y1 = Math.max(...bs.map(b => b[3])), { W, H } = RX, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  if (prev) { const vw = W / prev.z, vh = H / prev.z, pd = 12 / prev.z; if (x0 >= prev.cx - vw / 2 + pd && x1 <= prev.cx + vw / 2 - pd && y0 >= prev.cy - vh / 2 + pd && y1 <= prev.cy + vh / 2 - pd && Math.abs(cx - prev.cx) < .15 * vw && Math.abs(cy - prev.cy) < .15 * vh) return prev; }
+  return { cx, cy, z: Math.max(.3, Math.floor(Math.min(1.6, (W - 32) / (x1 - x0), (H - 32) / (y1 - y0)) / .05 + 1e-6) * .05) };
+}
+const rxVB = c => [c.cx - RX.W / c.z / 2, c.cy - RX.H / c.z / 2, RX.W / c.z, RX.H / c.z];
+function rxFrame() { // plan every step up front so the camera stays stable between steps
+  const dg = $('#diagram'); RX.W = dg.clientWidth > 100 ? dg.clientWidth : 900; RX.H = dg.clientHeight > 100 ? dg.clientHeight : 520;
+  let p = null; RX.cams = RX.sc.map(s => p = rxPlan(s, p));
+}
+const rxSet = (el, a) => { for (const k in a) el.setAttribute(k, a[k]); return el; };
+const rxMk = (n, a, p) => { const e = rxSet(document.createElementNS(NS, n), a || {}); if (p) p.append(e); return e; };
+function rxMount(l) {
+  const dg = $('#diagram'); cancelAnimationFrame(RX.raf);
+  RX.slug = l.slug; RX.sc = rxScenes(l); rxFrame(); RX.key = ''; RX.L = {}; RX.ents = new Map(); RX.links = new Map(); RX.pks = []; RX.fxs = []; RX.flows = []; RX.cur = { ents: {}, links: {}, routes: [] }; RX.settled = true; RX.camTw = null; RX.spotIds = [];
+  dg.innerHTML = `<svg id="svg" class="rx" viewBox="0 0 ${RX.W} ${RX.H}" preserveAspectRatio="xMidYMid meet" role="img" aria-labelledby="svg-title svg-desc"><title id="svg-title">${esc(l.title)} diagram</title><desc id="svg-desc"></desc><defs>${rxDefs()}</defs><g id="rx-floor"><rect x="-1400" y="-840" width="2800" height="1680" fill="url(#rx-grid)" mask="url(#rx-fm)"/></g><g id="rx-links"></g><g id="rx-pk"></g><g id="rx-ents"></g><g id="rx-over"></g></svg>`;
+  RX.svg = $('#svg'); RX.last = performance.now(); RX.raf = requestAnimationFrame(rxTick);
+}
+// ---- goTo: diff the new scene against what is on screen, schedule tweens ----
+function rxGo(si, instant) {
+  const R = RX, sc = R.sc[si], now = performance.now(), prev = R.cur, k = instant ? 0 : 1; R.si = si; R.cur = sc;
+  const removed = [], changed = [], added = [];
+  for (const [id, e] of R.ents) if (!e.dying && !sc.ents[id]) removed.push(id);
+  for (const id in sc.ents) { const e = R.ents.get(id); if (e && e.dying) { e.g.remove(); e.o.remove(); R.ents.delete(id); } const o = R.ents.get(id); if (!o) added.push(id); else if (JSON.stringify(o.spec) !== JSON.stringify(sc.ents[id])) changed.push(id); }
+  const ex = removed.length > 0, c = ex ? .55 * RT.exit * k : 0, lead = (changed.length ? c + .75 * RT.move : ex ? .7 * RT.exit : 0) * k;
+  added.sort((a, b) => (sc.ents[a].x - sc.ents[a].y) - (sc.ents[b].x - sc.ents[b].y) || sc.ents[a].x - sc.ents[b].x);
+  let end = 0; const done = {};
+  removed.forEach(id => { const e = R.ents.get(id); e.dying = true; e.tw = { k: 'exit', t0: now, dur: RT.exit * k, l0: e.lift }; end = Math.max(end, RT.exit * k); });
+  changed.forEach(id => { const e = R.ents.get(id), s = sc.ents[id]; e.tw = { k: 'move', t0: now + c, dur: RT.move * k, from: { x: e.x, y: e.y, cpu: e.cpu, lift: e.lift }, to: s, tagsTo: s.tags, swapped: false }; e.spec = s; end = Math.max(end, c + RT.move * k); });
+  added.forEach((id, i) => {
+    const s = sc.ents[id], g = rxMk('g', { opacity: 0 }, $('#rx-ents')), o = rxMk('g', { opacity: 0 }, $('#rx-over')), sh = rxMk('g', {}, g), bd = rxMk('g', {}, g);
+    sh.innerHTML = rxShadow(s); bd.innerHTML = rxBody(s);
+    const dl = lead + i * RT.stagger * k; done[id] = dl + .8 * RT.enter * k;
+    R.ents.set(id, { id, spec: s, x: s.x, y: s.y, cpu: (s.tags.find(t => t.cpu != null) || {}).cpu, lift: 0, tags: s.tags, g, bd, sh, o, tw: { k: 'enter', t0: now + dl, dur: RT.enter * k, l0: ZL[s.type] }, dying: false }); end = Math.max(end, dl + RT.enter * k);
   });
-  for (const c of chips) {
-    const n = shownIds.has(c.node) && nodeById(c.node); if (!n || (c.at || '').startsWith('edge:')) continue;
-    const at = c.at || 'top', sk = c.node + '|' + at, k = slots[sk] = (slots[sk] || 0) + 1, { x, y } = PX(n), lap = n.kind === 'client', probe = chipSvg(0, 0, c), dk = (k - 1) * 38;
-    let cx, cy;
-    if (at === 'right') { cx = x + (lap ? 135 : 96) + probe.w / 2; cy = y + (lap ? -30 : 0) + dk; }
-    else if (at === 'left') { cx = x - (lap ? 135 : 96) - probe.w / 2; cy = y + (lap ? -30 : 0) + dk; }
-    else if (at === 'bottom') { cx = x; cy = y + (lap ? 168 : 118) + dk; }
-    else { cx = x + probe.w / 2 - 8; cy = y - (lap ? 176 : 80) - dk; }
-    [cx, cy] = spot(cx, cy, probe.w, 32); const q = chipSvg(cx, cy, c); chipOut += chipTag(q.svg, c); rects.push(bx(cx, cy, q.w, 32));
+  // sort entities back to front
+  [...R.ents.values()].sort((a, b) => (a.spec.x - a.spec.y) - (b.spec.x - b.spec.y) || a.spec.x - b.spec.x).forEach(e => $('#rx-ents').append(e.g));
+  // links: existing ones only change style, missing ones fade out, new ones draw in
+  const lblPos = rxPlaceLabels(sc); let p = 0;
+  for (const [id, lk] of R.links) if (!sc.links[id]) { lk.rm = now; end = Math.max(end, 300 * k); }
+  for (const id in sc.links) {
+    const s = sc.links[id], old = R.links.get(id), g = R.L[id] || (R.L[id] = rxLinkGeom(s, sc));
+    if (old && !old.rm) { if (old.spec.label !== s.label) { old.lt.textContent = s.label; old.lbl.setAttribute('opacity', 0); old.lw = now; } old.spec = s; old.lpos = lblPos[id]; rxLinkStyle(old); rxLabelPlace(old, s, lblPos[id]); continue; }
+    const ed = n => done[n] || 0, a = (Math.max(ed(s.a), ed(s.b), c + (changed.length ? .6 * RT.move * k : 0)) + 60 * k + p++ * 90 * k);
+    const path = rxMk('path', { class: 'lk', d: g.d, fill: 'none' }, $('#rx-links')), len = path.getTotalLength(), lbl = rxMk('g', { class: 'pl t-paper', opacity: 0 }, $('#rx-over')), lt = rxMk('text', { 'font-size': 9.5, 'text-anchor': 'middle' });
+    const lk = { id, spec: s, path, len, d0: now + a, lbl, lt, lw: 0, g, done: false };
+    lt.textContent = s.label; lbl.append(rxMk('rect', { class: 'sh' }), rxMk('rect', { class: 'bg' }), lt); R.links.set(id, lk); rxLinkStyle(lk); rxLabelPlace(lk, s, lblPos[id]); end = Math.max(end, a + RT.draw * k);
   }
-  for (const c of chips) {
-    const at = c.at || ''; if (!at.startsWith('edge:') || !shownIds.has(c.node)) continue;
-    const [a, b] = at.slice(5).split('-'), tm = trims[key(a, b)]; if (!tm) continue;
-    const probe = chipSvg(0, 0, c), [cx, cy] = along(tm, probe.w, 32, [-1, 1]), q = chipSvg(cx, cy, c); chipOut += chipTag(q.svg, c); rects.push(bx(cx, cy, q.w, 32));
+  // camera
+  const to = rxVB(R.cams[si]), cd = (ex ? .4 * RT.exit : 0) * k; R.camTw = { t0: now + cd, dur: RT.move * k, from: R.vb.slice(), to }; end = Math.max(end, cd + RT.move * k);
+  // packets: the old ones fade out, flows restart (accumulator .6) once everything has settled
+  for (const q of R.pks) if (!q.leave) q.leave = now;
+  R.flows = reducedMotion ? [] : sc.routes.map(r => ({ r, acc: .6 })); R.end = now + end; R.settled = false; R.spotIds = instant ? [] : [...added, ...changed];
+  R.svg.querySelector('desc').textContent = `${sc.title}. Components: ${Object.values(sc.ents).map(e => e.label).join(', ')}.`;
+  if (instant) { for (const e of R.ents.values()) rxEnt(e, now + 1e6); for (const lk of R.links.values()) rxLink(lk, now + 1e6); R.vb = to; R.camTw = null; R.svg.setAttribute('viewBox', to.map(v => v.toFixed(2)).join(' ')); R.settled = true; }
+}
+const rxShadow = s => { const sil = rxSil(s)[0], [cx, cy] = jx(s.x, s.y); return `<path d="M${sil.map(q => (q[0] - cx).toFixed(1) + ',' + (q[1] - cy).toFixed(1)).join('L')}Z" fill="#6b5236" fill-opacity=".26" filter="url(#rx-b6)"/>`; };
+function rxLinkStyle(lk) {
+  const s = lk.spec, off = s.style === 'off';
+  lk.path.setAttribute('class', 'lk ' + (off ? 'off' : 'on')); lk.path.setAttribute('marker-end', lk.drawn ? `url(#rx-ar${off ? '-off' : ''})` : '');
+  if (s.heads === 'both') lk.path.setAttribute('marker-start', lk.drawn ? `url(#rx-ar${off ? '-off' : ''})` : ''); else lk.path.removeAttribute('marker-start');
+}
+function rxLabelPlace(lk, s, pos) {
+  const lb = lk.lbl; lk.lpos = pos; lb.style.display = s.label && pos ? '' : 'none'; if (!s.label || !pos) return;
+  const w = s.label.length * 5.8 + 18, [rs, rb] = lb.querySelectorAll('rect');
+  rxSet(rs, { x: pos[0] - w / 2, y: pos[1] - PH / 2 + 2, width: w, height: PH, rx: 10.5 }); rxSet(rb, { x: pos[0] - w / 2, y: pos[1] - PH / 2, width: w, height: PH, rx: 10.5 }); rxSet(lk.lt, { x: pos[0], y: pos[1] + 3.3 });
+}
+// ---- per-frame state ----
+function rxEnt(e, now) {
+  const t = e.tw; let op = 1, pop = 1;
+  if (t) {
+    const p = t.dur ? c01((now - t.t0) / t.dur) : 1;
+    if (t.k === 'enter') { op = pop = EZ.out(p); e.lift = t.l0 * (1 - EZ.back(p)); }
+    else if (t.k === 'exit') { op = pop = 1 - EZ.io(p); e.lift = t.l0 - 22 * EZ.io(p); if (p >= 1) { e.g.remove(); e.o.remove(); RX.ents.delete(e.id); return; } }
+    else {
+      const q = EZ.io(p), f = t.from, s = t.to, cpu = (s.tags.find(u => u.cpu != null) || {}).cpu;
+      e.x = lerp(f.x, s.x, q); e.y = lerp(f.y, s.y, q); e.lift = lerp(f.lift, 0, q); e.cpu = cpu == null ? f.cpu : f.cpu == null ? cpu : lerp(f.cpu, cpu, q);
+      if (p >= .5 && !t.swapped) { t.swapped = true; e.tags = t.tagsTo; }
+      pop = p < .42 ? 1 - p / .42 : p < .55 ? 0 : p < .95 ? (p - .55) / .4 : 1;
+    }
+    if (p >= 1) { if (t.k === 'move') { e.tags = t.tagsTo; e.cpu = (t.to.tags.find(u => u.cpu != null) || {}).cpu; e.x = t.to.x; e.y = t.to.y; } e.tw = null; e.lift = 0; if (t.k === 'enter') { op = pop = 1; } }
   }
-  over += lblOut;
-  const defs = [...used].map(k => `<g class="kind-${esc(k)}"><radialGradient id="ig-t-${esc(k)}" cx=".5" cy=".38" r=".75"><stop class="ga" offset="0"/><stop class="gb" offset="1"/></radialGradient><linearGradient id="ig-l-${esc(k)}" x1="0" y1="0" x2="0" y2="1"><stop class="gc" offset="0"/><stop class="gd" offset="1"/></linearGradient><linearGradient id="ig-r-${esc(k)}" x1="0" y1="0" x2="0" y2="1"><stop class="ge" offset="0"/><stop class="gf" offset="1"/></linearGradient></g>`).join('')
-    + `<clipPath id="icl"><path d="${roundPoly(CUBE, 18)}"/></clipPath><clipPath id="ipl"><path d="${roundPoly([iso(-72, -72, 0), iso(72, -72, 0), iso(72, -72, -16), iso(72, 72, -16), iso(-72, 72, -16), iso(-72, 72, 0)], 24)}"/></clipPath>`;
-  // camera: frame everything revealed so far (nodes + chips + labels)
-  const dg = $('#diagram'), cw = dg.clientWidth, chh = dg.clientHeight, fit = matchMedia('(min-width:1281px)').matches && cw > 200 && chh > 100, asp = fit ? cw / chh : W / H;
-  const rr = rects.length ? rects : [[0, 0, 100, 100]], x0 = Math.min(...rr.map(r => r[0])) - 36, x1 = Math.max(...rr.map(r => r[2])) + 36, y0 = Math.min(...rr.map(r => r[1])) - 30, y1 = Math.max(...rr.map(r => r[3])) + 36;
-  let vw = Math.max(x1 - x0, 760), vh = y1 - y0; const mx = (x0 + x1) / 2, my = (y0 + y1) / 2;
-  if (vw / vh < asp) vw = vh * asp; else vh = vw / asp;
-  const target = [mx - vw / 2, my - vh / 2, vw, vh];
-  const desc = `${s.caption} Components: ${shown.map(n => n.label).join(', ')}.${flows.length ? ' Messages: ' + flows.map(f => `${nodeLabel(l, f.from)} to ${nodeLabel(l, f.to)}${f.label ? ' (' + f.label + ')' : ''}`).join('; ') + '.' : ''}${chips.length ? ' Status: ' + chips.map(c => `${nodeLabel(l, c.node)} ${c.text}`).join('; ') + '.' : ''}`;
-  dg.innerHTML = `<svg id="svg" class="ill" viewBox="${target.map(v => v.toFixed(1)).join(' ')}" preserveAspectRatio="xMidYMid meet" role="img" aria-labelledby="svg-title svg-desc"><title id="svg-title">${esc(l.title)} diagram</title><desc id="svg-desc">${esc(desc)}</desc><defs>${defs}</defs>${edges}${nodes}${over}${chipOut}</svg>`;
-  const el = $('#svg');
-  el.querySelectorAll('.ichip').forEach((c, i) => { c.style.animationDelay = (0.45 + i * 0.12) + 's'; });
-  flyTo(el, target, l.slug);
-  if (prevFocus) { el.getBoundingClientRect(); el.querySelectorAll('.inode[data-c]').forEach(n => n.setAttribute('class', `inode kind-${n.getAttribute('class').match(/kind-(\S+)/)[1]}${n.dataset.c}`)); }
-  if (paused) { el.setCurrentTime(0.5); el.pauseAnimations(); }
+  const [cx, cy] = jx(e.x, e.y), ls = Math.max(0, e.lift);
+  e.g.setAttribute('opacity', op.toFixed(3)); e.bd.setAttribute('transform', `translate(${cx.toFixed(2)} ${(cy - e.lift).toFixed(2)})`);
+  e.sh.setAttribute('transform', `translate(${cx.toFixed(2)} ${(cy + Math.min(9, 3 + 46 * .15)).toFixed(2)})`); e.sh.setAttribute('opacity', (1 / (1 + ls / 80)).toFixed(3));
+  e.o.setAttribute('opacity', pop.toFixed(3)); e.o.setAttribute('transform', `translate(${cx.toFixed(2)} ${(cy - e.lift).toFixed(2)})`);
+  const sig = e.tags === e.ts && e.cpu === e.cs ? 1 : 0; if (!sig) { e.o.innerHTML = rxPills(e.spec, e.tags, e.cpu); e.ts = e.tags; e.cs = e.cpu; }
+}
+function rxLink(lk, now) {
+  let op = 1, draw = c01((now - lk.d0) / RT.draw), q = EZ.io(draw);
+  if (lk.rm) { const p = c01((now - lk.rm) / 300); op = 1 - EZ.io(p); if (p >= 1) { lk.path.remove(); lk.lbl.remove(); RX.links.delete(lk.id); delete RX.L[lk.id]; return; } q = 1; }
+  const off = lk.spec.style === 'off', pa = lk.path;
+  if (!lk.drawn && q > .97) { lk.drawn = true; rxLinkStyle(lk); }
+  if (draw >= 1 && !lk.settled) { lk.settled = true; pa.removeAttribute('stroke-dasharray'); pa.removeAttribute('stroke-dashoffset'); }
+  if (!lk.settled) { if (off || lk.spec.style !== 'solid') pa.setAttribute('opacity', Math.min(1, q * 1.4).toFixed(3)); else { pa.setAttribute('stroke-dasharray', lk.len.toFixed(1)); pa.setAttribute('stroke-dashoffset', (lk.len * (1 - q)).toFixed(2)); } } else if (!lk.rm) pa.removeAttribute('opacity');
+  if (lk.rm) pa.setAttribute('opacity', op.toFixed(3));
+  let lo = lk.rm ? op : c01((q - .6) / .4); if (lk.lw) lo = Math.min(lo, c01((now - lk.lw) / 320)); lk.lbl.setAttribute('opacity', lo.toFixed(3));
+}
+function rxSettle() {
+  const R = RX; R.settled = true;
+  for (const id of R.spotIds) {
+    const e = R.ents.get(id); if (!e || e.dying) continue; const [cx, cy] = jx(e.x, e.y), w = e.type === 'device' ? 6 : e.type === 'db' ? 3.4 : 4, d = roundPoly([[cx - 14 * w, cy], [cx, cy - 7 * w], [cx + 14 * w, cy], [cx, cy + 7 * w]], 10);
+    const sp = rxMk('path', { class: 'spot', d }, $('#rx-floor')); sp.addEventListener('animationend', () => sp.remove());
+  }
+  R.spotIds = [];
+}
+// packets: circle r 4.3, 155 u/s, walk the route link by link (.16 s dwell, hidden), bounce reverses with the return colour, ring on arrival
+function rxSpawn(f) {
+  const R = RX, segs = []; let ok = true;
+  f.r.legs.forEach(g => { const lk = R.links.get(g.link); if (!lk) { ok = false; return; } segs.push(g.rev ? { lk, a: lk.len - 20, b: 16 } : { lk, a: 20, b: lk.len - 16 }); });
+  if (!ok || !segs.length) return;
+  const k = PK[f.r.kind] || PK.req, el = rxMk('circle', { r: k.r, fill: k.f, stroke: k.s, 'stroke-width': k.w, opacity: 0 }, $('#rx-pk'));
+  R.pks.push({ el, f: f.r, segs, i: 0, s: segs[0].a, back: false, wait: 0, hold: 0, leave: 0, k, spd: 155 * f.r.speed * (PKSPEED[f.r.kind] || 1) });
+}
+function rxPackets(dt, now) {
+  const R = RX;
+  for (const f of R.flows) { f.acc += dt * f.r.rate; while (f.acc >= 1) { f.acc -= 1; rxSpawn(f); } }
+  for (const q of R.pks.slice()) {
+    if (q.leave) continue;
+    if (q.hold > 0) { q.hold -= dt; if (q.f.hold) q.el.setAttribute('stroke-width', (1.5 + 1.9 * (.5 - .5 * Math.cos(2 * Math.PI * (q.f.hold - q.hold) / .8))).toFixed(2)); if (q.hold > 0) continue; q.el.setAttribute('stroke-width', q.k.w); }
+    if (q.wait > 0) { q.wait -= dt; if (q.wait > 0) continue; q.el.setAttribute('opacity', 1); }
+    const sg = q.segs[q.i]; let from = q.back ? sg.b : sg.a, to = q.back ? sg.a : sg.b; const d = to >= from ? 1 : -1;
+    q.s += d * q.spd * dt;
+    if ((q.s - to) * d >= 0) {
+      q.s = to; const last = q.back ? q.i === 0 : q.i === q.segs.length - 1;
+      if (!last) { q.i += q.back ? -1 : 1; const n = q.segs[q.i]; q.s = q.back ? n.b : n.a; q.wait = .16; q.el.setAttribute('opacity', 0); }
+      else if (q.f.bounce && !q.back) { q.back = true; q.el.setAttribute('fill', '#9fd28f'); q.hold = q.f.hold || .04; } // measured: the turn at the far end holds about one frame
+      else { const o = sg.lk.path.getPointAtLength(q.s); R.fxs.push({ el: rxMk('circle', { cx: o.x, cy: o.y, r: 4.3, fill: 'none', stroke: '#3fa456', 'stroke-width': 1.6, opacity: .9 }, $('#rx-pk')), t0: now }); q.el.remove(); R.pks.splice(R.pks.indexOf(q), 1); continue; }
+    }
+    const o = sg.lk.path.getPointAtLength(q.s); q.el.setAttribute('cx', o.x.toFixed(2)); q.el.setAttribute('cy', o.y.toFixed(2)); if (!q.wait && q.el.getAttribute('opacity') !== '1') q.el.setAttribute('opacity', 1);
+  }
+}
+function rxTick() {
+  const R = RX; if (!R.svg || !R.svg.isConnected) { R.svg = null; R.raf = 0; return; }
+  const now = performance.now(), dt = Math.min(now - R.last, 50) / 1000; R.last = now;
+  for (const e of [...R.ents.values()]) rxEnt(e, now); for (const lk of [...R.links.values()]) rxLink(lk, now);
+  const t = R.camTw; if (t) { const p = c01((now - t.t0) / t.dur), q = EZ.io(p); R.vb = t.from.map((v, i) => lerp(v, t.to[i], q)); R.svg.setAttribute('viewBox', R.vb.map(v => v.toFixed(2)).join(' ')); if (p >= 1) R.camTw = null; }
+  if (!R.settled && now >= R.end) rxSettle();
+  if (R.settled && !paused) rxPackets(dt, now);
+  for (const q of R.pks.slice()) if (q.leave) { const p = (now - q.leave) / 260; if (p >= 1) { q.el.remove(); R.pks.splice(R.pks.indexOf(q), 1); } else q.el.setAttribute('opacity', (1 - p).toFixed(3)); }
+  for (const x of R.fxs.slice()) { const p = (now - x.t0) / 450; if (p >= 1) { x.el.remove(); R.fxs.splice(R.fxs.indexOf(x), 1); } else { const e = EZ.out(p); x.el.setAttribute('r', (4.3 * lerp(.8, 2, e)).toFixed(2)); x.el.setAttribute('opacity', (.9 * (1 - e)).toFixed(3)); } }
+  R.raf = requestAnimationFrame(rxTick);
+}
+function drawIllustrated(l, s) {
+  const si = l.steps.indexOf(s), key = l.slug + '#' + si;
+  if (!RX.svg || RX.svg !== $('#svg') || RX.slug !== l.slug) rxMount(l);
+  const dg = $('#diagram');
+  if (RX.key === key) { if (dg.clientWidth !== RX.W || dg.clientHeight !== RX.H) { rxFrame(); RX.vb = rxVB(RX.cams[si]); RX.camTw = null; RX.svg.setAttribute('viewBox', RX.vb.map(v => v.toFixed(2)).join(' ')); } return; }
+  const cold = !RX.key; RX.key = key;
+  if (cold) { RX.vb = rxVB(RX.cams[si]); RX.svg.setAttribute('viewBox', RX.vb.map(v => v.toFixed(2)).join(' ')); }
+  rxGo(si, reducedMotion);
   syncPause();
-  // GSAP is loaded lazily; until (or unless) it is there, the SMIL/CSS renderer above stays in charge
-  if (window.gsap) enhance(el); else loadGsap().then(ok => ok && enhance(el));
 }
-let gsapReady = null, tl = null;
-function loadGsap() {
-  return gsapReady ||= new Promise(res => {
-    const ld = (f, ok) => { const s = document.createElement('script'); s.src = 'vendor/gsap/' + f; s.onload = ok; s.onerror = () => res(false); document.head.append(s); };
-    ld('gsap.min.js', () => ld('MotionPathPlugin.min.js', () => { try { gsap.registerPlugin(MotionPathPlugin); res(true); } catch { res(false); } }));
-  });
-}
-// one master gsap timeline per step: blocks pop in -> edges draw -> message tokens fly (request -> arrive pulse -> think -> response) -> chips land; then the token pass loops
-function enhance(el) {
-  const g = window.gsap; if (!g || $('#svg') !== el) return;
-  const q = s => [...el.querySelectorAll(s)], edgeEls = q('.iedge'), NS = 'http://www.w3.org/2000/svg';
-  const mk = (n, a, p) => { const e = document.createElementNS(NS, n); for (const k in a) e.setAttribute(k, a[k]); if (p) p.append(e); return e; };
-  const pk = q('.ipacket:not(.tail)').map(p => ({ i: +p.dataset.i, e: edgeEls[+p.dataset.e], rev: p.dataset.r === '1', text: p.dataset.t, from: p.dataset.from, to: p.dataset.to, kind: (p.getAttribute('class').match(/k-(\S+)/) || [])[1] || 'request' })).filter(f => f.e);
-  q('.ipacket').forEach(p => p.remove());
-  el.classList.add('gs');
-  if (reducedMotion) return; // end state only
-  tl = g.timeline();
-  const nodeEl = id => el.querySelector(`.inode[data-id="${id}"]`), nodeXY = id => { const n = nodeEl(id); return n ? [+n.dataset.x, +n.dataset.y] : [0, 0]; };
-  const bodies = q('.inode.rise .body');
-  if (bodies.length) tl.fromTo(bodies, { scale: .4, opacity: 0, transformOrigin: '50% 50%' }, { scale: 1, opacity: 1, duration: .55, ease: 'back.out(1.6)', stagger: .12, clearProps: 'transform,opacity' });
-  tl.addLabel('edges', bodies.length ? '>-0.1' : 0);
-  q('.iedge.fresh').forEach(p => { const L = p.getTotalLength(); tl.fromTo(p, { strokeDasharray: `${L} ${L}`, strokeDashoffset: L }, { strokeDashoffset: 0, duration: .6, ease: 'power1.out', clearProps: 'strokeDasharray,strokeDashoffset' }, 'edges'); });
-  const heads = q('.iarrow.fresh'); if (heads.length) tl.fromTo(heads, { opacity: 0 }, { opacity: 1, duration: .25, clearProps: 'opacity' }, 'edges+=.45');
-  tl.addLabel('flows', '>+0.1');
-  // overlay layer: tokens, trailing ghosts, receive ripples, "thinking" dots
-  const layer = mk('g', { class: 'itoks' }, el), chipEls = q('.ichip'), lblEls = q('.iflabel'), norm = t => (t || '').toLowerCase().replace(/[?\s]+$/, '');
-  const chipOf = chipEls.map(c => ({ el: c, n: c.dataset.n, t: (c.dataset.t || '').toLowerCase(), land: false }));
-  const toks = pk.map(f => {
-    const w = f.text ? Math.max(54, f.text.length * 7.6 + 36) : 18, gh = [.3, .2, .11].map(o => mk('circle', { class: `igh k-${f.kind}`, r: 5, opacity: 0, 'data-o': o }, layer)), t = mk('g', { class: `itok k-${f.kind}`, opacity: 0 }, layer);
-    if (f.text) { mk('rect', { x: -w / 2, y: -13, width: w, height: 26, rx: 13 }, t); mk('circle', { cx: -w / 2 + 13, cy: 0, r: 4.5 }, t); mk('text', { x: -w / 2 + 24, y: 4.3, 'font-size': 12.5 }, t).textContent = f.text; }
-    else mk('circle', { class: 'solo', r: 6 }, t);
-    // a chip on the destination that repeats the token text is where this token settles (FLIP-style morph)
-    const tx = norm(f.text), lc = tx ? chipOf.find(c => !c.land && c.n === f.to && c.t.includes(tx)) : null; if (lc) lc.land = true;
-    const bb = lc && lc.el.getBBox();
-    return { f, t, gh, len: f.e.getTotalLength(), lc, lcxy: bb ? [bb.x + bb.width / 2, bb.y + bb.height / 2] : null };
-  });
-  const rings = {}, dots = {};
-  for (const id of new Set(pk.map(f => f.to))) {
-    const [x, y] = nodeXY(id), kc = (nodeEl(id).getAttribute('class').match(/kind-(\S+)/) || [])[1];
-    rings[id] = mk('ellipse', { class: `iring kind-${kc}`, cx: x, cy: y + 6, rx: 74, ry: 44, opacity: 0 }, layer);
-    dots[id] = [-14, 0, 14].map(o => mk('circle', { class: 'ithink', cx: x + o, cy: y - 2, r: 4, opacity: 0 }, layer));
-  }
-  const landing = new Set(chipOf.filter(c => c.land).map(c => c.el));
-  g.set([...landing], { opacity: 0 });
-  const pulse = (t, at, id) => {
-    const b = nodeEl(id).querySelector('.body');
-    t.fromTo(rings[id], { opacity: .7, scale: .55, transformOrigin: '50% 50%' }, { opacity: 0, scale: 1.35, duration: .7, ease: 'power1.out' }, at)
-      .to(b, { scale: 1.06, transformOrigin: '50% 50%', duration: .16, ease: 'power2.out' }, at).to(b, { scale: 1, duration: .34, ease: 'power2.inOut' }, '>');
-  };
-  const think = (t, at, id) => t.fromTo(dots[id], { opacity: 0, y: 4 }, { opacity: 1, y: 0, duration: .1, stagger: .06, ease: 'sine.out' }, at).to(dots[id], { opacity: 0, duration: .12, stagger: .06, ease: 'sine.in' }, '>+0.02');
-  // one pass over every flow, in order: token flies -> receiver pulses -> (thinks) -> next token leaves. `first` also reveals labels/chips as the story reaches them.
-  const pass = first => {
-    const t = g.timeline(), shown = new Set(landing); let c = 0;
-    const reveal = (at, list) => { list = list.filter(x => !shown.has(x)); list.forEach(x => shown.add(x)); if (list.length) t.fromTo(list, { opacity: 0, y: 14 }, { opacity: 1, y: 0, duration: .4, ease: 'power2.out', stagger: .08, clearProps: 'transform,opacity' }, at); };
-    toks.forEach((k, i) => {
-      const { f, t: tk, gh, len } = k, dur = Math.max(.7, len / 400), path = { path: f.e, align: f.e, alignOrigin: [.5, .5], start: f.rev ? 1 : 0, end: f.rev ? 0 : 1 }, end = c + dur;
-      const lbl = first && lblEls.find(l => +l.dataset.f === f.i); if (lbl) t.fromTo(lbl, { opacity: 0, y: 8 }, { opacity: 1, y: 0, duration: .4, ease: 'power2.out', clearProps: 'transform,opacity' }, c);
-      t.fromTo(tk, { opacity: 0 }, { opacity: 1, duration: .2, ease: 'power1.out' }, c).fromTo(tk, { scale: .5, transformOrigin: '50% 50%' }, { scale: 1, duration: .3, ease: 'back.out(1.6)' }, c).to(tk, { motionPath: path, duration: dur, ease: 'sine.inOut' }, c);
-      gh.forEach((h, j) => { const at = c + .07 * (j + 1); t.fromTo(h, { opacity: 0 }, { opacity: +h.getAttribute('data-o'), duration: .2 }, at).to(h, { motionPath: path, duration: dur, ease: 'sine.inOut' }, at).to(h, { opacity: 0, duration: .2 }, at + dur - .2); });
-      if (k.lc) { // token hops onto its chip and becomes it
-        t.to(tk, { x: k.lcxy[0], y: k.lcxy[1], duration: .42, ease: 'power2.out' }, end).to(tk, { opacity: 0, duration: .22, ease: 'power1.in' }, end + .2)
-          .fromTo(k.lc.el, { opacity: 0, scale: .8, transformOrigin: '50% 50%' }, { opacity: 1, scale: 1, duration: .45, ease: 'back.out(1.5)' }, end + .12);
-      } else t.to(tk, { scale: .6, opacity: 0, duration: .22, ease: 'power1.in' }, end);
-      pulse(t, end - .05, f.to);
-      if (first) reveal(end, chipEls.filter(x => x.dataset.n === f.to));
-      const nx = toks[i + 1]; c = end + .1;
-      if (nx && nx.f.from === f.to) { think(t, c, f.to); c += .5; } else c += .15;
-      if (k.lc) c += .3;
-    });
-    if (first) reveal(c, chipEls);
-    return t;
-  };
-  tl.add(pass(true), 'flows');
-  if (toks.length) { const lp = g.timeline({ repeat: -1, repeatDelay: 1.2 }).add(pass(false)); tl.addLabel('loop', '>+1.2').add(lp, 'loop'); }
-  if (paused) tl.time(tl.labels.loop ?? tl.duration()).pause();
-}
+function rxReplay() { const R = RX, si = R.si; if (!R.svg) return; R.pks.forEach(q => q.el.remove()); R.pks = []; if (R.sc[si - 1]) rxGo(si - 1, true); else rxClear(); rxGo(si, reducedMotion); }
+function rxClear() { const R = RX; for (const e of R.ents.values()) { e.g.remove(); e.o.remove(); } for (const k of R.links.values()) { k.path.remove(); k.lbl.remove(); } R.ents = new Map(); R.links = new Map(); R.L = {}; R.cur = { ents: {}, links: {}, routes: [] }; R.vb = rxVB(R.cams[R.si]); }
 // step index at which each node first appears (focus or flow endpoint); never-referenced nodes appear at the last step
 function firstSeen(l) {
   const f = {}, last = l.steps.length - 1;
@@ -705,8 +732,8 @@ function firstSeen(l) {
   return f;
 }
 const nodeLabel = (l, id) => (l.nodes.find(n => n.id === id) || {}).label || id;
-function replay() { const el = $('#svg'); if (tl) tl.restart(); else if (el) el.setCurrentTime(0); if (paused) togglePause(); }
-function togglePause() { const el = $('#svg'); paused = !paused; if (tl) { if (paused) tl.pause(); else if (tl.progress() === 1) tl.restart(); else tl.play(); } else if (el) paused ? el.pauseAnimations() : el.unpauseAnimations(); syncPause(); }
+function replay() { const el = $('#svg'); if (RX.svg && RX.svg === el) rxReplay(); else if (el) el.setCurrentTime(0); if (paused) togglePause(); }
+function togglePause() { const el = $('#svg'); paused = !paused; if (!(RX.svg && RX.svg === el) && el) paused ? el.pauseAnimations() : el.unpauseAnimations(); syncPause(); }
 function syncPause() { const b = $('#pause'); $('#diagram').classList.toggle('paused', paused); if (b) { b.innerHTML = paused ? icon('play') + 'Play' : icon('pause') + 'Pause'; b.setAttribute('aria-pressed', String(paused)); } }
 function blockLabel(label) {
   if (label.length <= 12 || !label.includes(' ')) return [label];

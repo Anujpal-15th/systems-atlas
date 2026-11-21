@@ -18,42 +18,54 @@
       "kind": "client",
       "x": 10,
       "y": 40,
-      "url": "https://shop.example"
+      "url": "https://shop.example",
+      "gx": 0,
+      "gy": -12
     },
     {
       "id": "dns",
       "label": "DNS resolver",
       "kind": "dns",
       "x": 30,
-      "y": 16
+      "y": 16,
+      "gx": 0,
+      "gy": 1
     },
     {
       "id": "lb",
       "label": "Load balancer",
       "kind": "lb",
       "x": 40,
-      "y": 72
+      "y": 72,
+      "gx": 10,
+      "gy": -1
     },
     {
       "id": "app",
       "label": "App server",
       "kind": "server",
       "x": 64,
-      "y": 50
+      "y": 50,
+      "gx": 10,
+      "gy": 12
     },
     {
       "id": "db",
       "label": "Database",
       "kind": "db",
       "x": 88,
-      "y": 24
+      "y": 24,
+      "gx": 21,
+      "gy": 12
     },
     {
       "id": "cdn",
       "label": "CDN edge",
       "kind": "cdn",
       "x": 12,
-      "y": 92
+      "y": 92,
+      "gx": -11,
+      "gy": -12
     }
   ],
   "edges": [
@@ -111,13 +123,7 @@
         "browser"
       ],
       "flows": [],
-      "chips": [
-        {
-          "node": "browser",
-          "text": "shop.example → ?",
-          "at": "right"
-        }
-      ],
+      "chips": [],
       "metrics": {}
     },
     {
@@ -147,14 +153,12 @@
       ],
       "chips": [
         {
-          "node": "browser",
-          "text": "→ 203.0.113.7",
-          "at": "right"
+          "node": "dns",
+          "text": "203.0.113.7"
         },
         {
-          "node": "browser",
-          "text": "20 ms",
-          "at": "right"
+          "node": "dns",
+          "text": "20 ms"
         }
       ],
       "metrics": {
@@ -190,7 +194,7 @@
         {
           "node": "dns",
           "text": "cached · 5 min",
-          "at": "edge:browser-dns"
+          "tone": "green"
         },
         {
           "node": "lb",
@@ -279,7 +283,8 @@
         },
         {
           "node": "db",
-          "text": "indexed · 4 ms"
+          "text": "indexed · 4 ms",
+          "tone": "green"
         },
         {
           "node": "app",
@@ -320,12 +325,12 @@
       "chips": [
         {
           "node": "app",
-          "text": "200 OK"
+          "text": "200 OK",
+          "tone": "green"
         },
         {
           "node": "browser",
-          "text": "TTFB 235 ms",
-          "at": "right"
+          "text": "TTFB 235 ms"
         }
       ],
       "metrics": {
@@ -359,12 +364,12 @@
       "chips": [
         {
           "node": "cdn",
-          "text": "cache hit"
+          "text": "cache hit",
+          "tone": "green"
         },
         {
           "node": "cdn",
-          "text": "+75 ms",
-          "at": "right"
+          "text": "+75 ms"
         }
       ],
       "metrics": {
@@ -387,7 +392,8 @@
           "to": "db",
           "kind": "request",
           "label": "full scan, 900ms",
-          "token": "full scan"
+          "token": "full scan",
+          "pkt": "slow"
         },
         {
           "from": "db",
@@ -399,12 +405,13 @@
       "chips": [
         {
           "node": "db",
-          "text": "full scan"
+          "text": "full scan",
+          "tone": "red"
         },
         {
           "node": "db",
           "text": "900 ms",
-          "at": "right"
+          "tone": "red"
         },
         {
           "node": "app",
@@ -443,8 +450,7 @@
         },
         {
           "node": "browser",
-          "text": "+300 ms",
-          "at": "right"
+          "text": "+300 ms"
         }
       ],
       "metrics": {
@@ -472,8 +478,7 @@
       "chips": [
         {
           "node": "browser",
-          "text": "310 ms total",
-          "at": "right"
+          "text": "310 ms total"
         },
         {
           "node": "dns",
