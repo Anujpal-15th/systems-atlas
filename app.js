@@ -396,7 +396,7 @@ function drawDiagram(l, s) {
     }
   });
   const defs = [...prisms].map(k => `<g class="kind-${esc(k)}"><linearGradient id="gr-${esc(k)}" x1="0" y1="0" x2="1" y2="1"><stop class="gs-a" offset="0"/><stop class="gs-b" offset="1"/></linearGradient></g>`).join('');
-  $('#diagram').innerHTML = `<svg id="svg" viewBox="${target.map(v => v.toFixed(1)).join(' ')}" preserveAspectRatio="xMidYMid meet" role="img" aria-labelledby="svg-title svg-desc"><title id="svg-title">${esc(l.title)} diagram</title><desc id="svg-desc">${esc(s.caption)} Components: ${esc(shown.map(n => n.label).join(', '))}.${flows.length ? ' Messages: ' + esc(flows.map(f => `${nodeLabel(l, f.from)} to ${nodeLabel(l, f.to)}${f.label ? ' (' + f.label + ')' : ''}`).join('; ')) + '.' : ''}</desc><defs>${defs}</defs>${body}</svg>`;
+  $('#diagram').innerHTML = `<svg id="svg" viewBox="${target.map(v => v.toFixed(1)).join(' ')}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${esc(l.title)} diagram" aria-describedby="svg-desc"><desc id="svg-desc">${esc(s.caption)} Components: ${esc(shown.map(n => n.label).join(', '))}.${flows.length ? ' Messages: ' + esc(flows.map(f => `${nodeLabel(l, f.from)} to ${nodeLabel(l, f.to)}${f.label ? ' (' + f.label + ')' : ''}`).join('; ')) + '.' : ''}</desc><defs>${defs}</defs>${body}</svg>`;
   const el = $('#svg');
   // measure edges: draw-in length for new ones; trim hot ones short of the node and add an arrowhead at the destination
   const R0 = 82 * K;
@@ -584,7 +584,7 @@ const rxMk = (n, a, p) => { const e = rxSet(document.createElementNS(NS, n), a |
 function rxMount(l) {
   const dg = $('#diagram'); cancelAnimationFrame(RX.raf);
   RX.slug = l.slug; RX.sc = rxScenes(l); rxFrame(); RX.key = ''; RX.L = {}; RX.ents = new Map(); RX.links = new Map(); RX.pks = []; RX.fxs = []; RX.flows = []; RX.cur = { ents: {}, links: {}, routes: [] }; RX.settled = true; RX.camTw = null; RX.spotIds = [];
-  dg.innerHTML = `<svg id="svg" class="rx" viewBox="0 0 ${RX.W} ${RX.H}" preserveAspectRatio="xMidYMid meet" role="img" aria-labelledby="svg-title svg-desc"><title id="svg-title">${esc(l.title)} diagram</title><desc id="svg-desc"></desc><defs>${rxDefs()}</defs><g id="rx-floor"><rect x="-1400" y="-840" width="2800" height="1680" fill="url(#rx-grid)" mask="url(#rx-fm)"/></g><g id="rx-links"></g><g id="rx-pk"></g><g id="rx-ents"></g><g id="rx-over"></g></svg>`;
+  dg.innerHTML = `<svg id="svg" class="rx" viewBox="0 0 ${RX.W} ${RX.H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${esc(l.title)} diagram" aria-describedby="svg-desc"><desc id="svg-desc"></desc><defs>${rxDefs()}</defs><g id="rx-floor"><rect x="-1400" y="-840" width="2800" height="1680" fill="url(#rx-grid)" mask="url(#rx-fm)"/></g><g id="rx-links"></g><g id="rx-pk"></g><g id="rx-ents"></g><g id="rx-over"></g></svg>`;
   RX.svg = $('#svg'); RX.last = performance.now(); RX.raf = requestAnimationFrame(rxTick);
 }
 // ---- goTo: diff the new scene against what is on screen, schedule tweens ----
