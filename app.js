@@ -570,7 +570,8 @@ function rxPlaceLabels(sc) {
 // camera: zoom fits the bounds (16 px margin, snapped down to .05, cap 1.6); the previous camera is kept while the new bounds still fit
 function rxPlan(sc, prev) {
   const bs = Object.values(sc.ents).map(rxBox); if (!bs.length) return prev || { cx: 0, cy: 0, z: 1 };
-  const x0 = Math.min(...bs.map(b => b[0])), y0 = Math.min(...bs.map(b => b[1])), x1 = Math.max(...bs.map(b => b[2])), y1 = Math.max(...bs.map(b => b[3])), { W, H } = RX, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  // extra room around the blocks for link labels and pills that hang off the lines
+  const x0 = Math.min(...bs.map(b => b[0])) - 40, y0 = Math.min(...bs.map(b => b[1])) - 12, x1 = Math.max(...bs.map(b => b[2])) + 40, y1 = Math.max(...bs.map(b => b[3])) + 48, { W, H } = RX, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
   if (prev) { const vw = W / prev.z, vh = H / prev.z, pd = 12 / prev.z; if (x0 >= prev.cx - vw / 2 + pd && x1 <= prev.cx + vw / 2 - pd && y0 >= prev.cy - vh / 2 + pd && y1 <= prev.cy + vh / 2 - pd && Math.abs(cx - prev.cx) < .15 * vw && Math.abs(cy - prev.cy) < .15 * vh) return prev; }
   return { cx, cy, z: Math.max(.3, Math.floor(Math.min(1.6, (W - 32) / (x1 - x0), (H - 32) / (y1 - y0)) / .05 + 1e-6) * .05) };
 }
