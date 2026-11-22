@@ -133,7 +133,8 @@
         "leader"
       ],
       "flows": [],
-      "metrics": {}
+      "metrics": {},
+      "chips": []
     },
     {
       "tag": "CONCEPT",
@@ -184,7 +185,26 @@
         "wlat": "2",
         "lag": "10",
         "copies": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "leader",
+          "text": "leader"
+        },
+        {
+          "node": "leader",
+          "text": "1 copy at ack",
+          "at": "bottom"
+        },
+        {
+          "node": "fa",
+          "text": "lag 10 ms"
+        },
+        {
+          "node": "fc",
+          "text": "lag 70 ms+"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -226,7 +246,24 @@
       "metrics": {
         "wlat": "5",
         "copies": "2"
-      }
+      },
+      "chips": [
+        {
+          "node": "leader",
+          "text": "ack ~5 ms"
+        },
+        {
+          "node": "fa",
+          "text": "sync follower",
+          "tone": "green"
+        },
+        {
+          "node": "leader",
+          "text": "2 copies",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -254,7 +291,23 @@
       ],
       "metrics": {
         "lag": "10"
-      }
+      },
+      "chips": [
+        {
+          "node": "fb",
+          "text": "serves reads",
+          "tone": "green"
+        },
+        {
+          "node": "fb",
+          "text": "lag 10 ms",
+          "at": "bottom"
+        },
+        {
+          "node": "leader",
+          "text": "writes only"
+        }
+      ]
     },
     {
       "tag": "PROBLEM",
@@ -295,7 +348,25 @@
       ],
       "metrics": {
         "lag": "800"
-      }
+      },
+      "chips": [
+        {
+          "node": "fb",
+          "text": "old name shown",
+          "tone": "red"
+        },
+        {
+          "node": "fb",
+          "text": "lag 800 ms",
+          "tone": "red",
+          "at": "bottom"
+        },
+        {
+          "node": "leader",
+          "text": "new name saved",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "FIX",
@@ -321,7 +392,23 @@
           "label": "new name"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "leader",
+          "text": "reads for 10 s"
+        },
+        {
+          "node": "app",
+          "text": "read-your-writes",
+          "tone": "green"
+        },
+        {
+          "node": "fb",
+          "text": "pin per user",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "VARIANT",
@@ -351,7 +438,24 @@
         "wlat": "3",
         "lag": "70",
         "copies": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "leader2",
+          "text": "local ack 3 ms",
+          "tone": "green"
+        },
+        {
+          "node": "leader",
+          "text": "remote 70 ms",
+          "at": "bottom"
+        },
+        {
+          "node": "leader2",
+          "text": "conflicts",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "VARIANT",
@@ -425,7 +529,23 @@
         "wlat": "4",
         "lag": "70",
         "copies": "2"
-      }
+      },
+      "chips": [
+        {
+          "node": "fa",
+          "text": "w = 2 of 3"
+        },
+        {
+          "node": "fb",
+          "text": "r = 2"
+        },
+        {
+          "node": "app",
+          "text": "w + r > n",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "FAILURE",
@@ -462,7 +582,29 @@
       "metrics": {
         "wlat": "5",
         "copies": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "leader",
+          "text": "DOWN",
+          "tone": "red"
+        },
+        {
+          "node": "mon",
+          "text": "timeout 10-30 s"
+        },
+        {
+          "node": "fa",
+          "text": "promoted",
+          "tone": "green"
+        },
+        {
+          "node": "leader",
+          "text": "split brain risk",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -483,7 +625,23 @@
         "wlat": "5",
         "lag": "10",
         "copies": "2"
-      }
+      },
+      "chips": [
+        {
+          "node": "leader",
+          "text": "1 ordered log"
+        },
+        {
+          "node": "fa",
+          "text": "sync follower",
+          "tone": "green"
+        },
+        {
+          "node": "fb",
+          "text": "async reads",
+          "at": "bottom"
+        }
+      ]
     }
   ],
   "quiz": [

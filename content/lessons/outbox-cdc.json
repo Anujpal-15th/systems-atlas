@@ -150,7 +150,13 @@
         "lost": "0",
         "unsent": "0",
         "lag": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "orders",
+          "text": "1,000 orders/s"
+        }
+      ]
     },
     {
       "tag": "PROBLEM",
@@ -185,7 +191,25 @@
       ],
       "metrics": {
         "lost": "3600"
-      }
+      },
+      "chips": [
+        {
+          "node": "db",
+          "text": "committed",
+          "tone": "green"
+        },
+        {
+          "node": "broker",
+          "text": "publish fails",
+          "tone": "red"
+        },
+        {
+          "node": "orders",
+          "text": "3,600 lost / hr",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -214,7 +238,24 @@
       "metrics": {
         "lost": "0",
         "unsent": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "db",
+          "text": "2 INSERTs, 1 txn"
+        },
+        {
+          "node": "db",
+          "text": "COMMIT",
+          "tone": "green",
+          "at": "bottom"
+        },
+        {
+          "node": "orders",
+          "text": "0 lost",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -256,7 +297,22 @@
       "metrics": {
         "unsent": "1",
         "lag": "500"
-      }
+      },
+      "chips": [
+        {
+          "node": "cdc",
+          "text": "polling"
+        },
+        {
+          "node": "db",
+          "text": "1 unsent row"
+        },
+        {
+          "node": "cdc",
+          "text": "lag 500 ms",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CDC",
@@ -286,7 +342,23 @@
       "metrics": {
         "unsent": "0",
         "lag": "300"
-      }
+      },
+      "chips": [
+        {
+          "node": "db",
+          "text": "WAL"
+        },
+        {
+          "node": "cdc",
+          "text": "lag 300 ms",
+          "tone": "green"
+        },
+        {
+          "node": "cdc",
+          "text": "keeps log position",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -322,7 +394,22 @@
       ],
       "metrics": {
         "lag": "800"
-      }
+      },
+      "chips": [
+        {
+          "node": "search",
+          "text": "order indexed"
+        },
+        {
+          "node": "cache",
+          "text": "key invalidated"
+        },
+        {
+          "node": "updater",
+          "text": "lag 800 ms",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -376,7 +463,24 @@
       ],
       "metrics": {
         "lag": "900"
-      }
+      },
+      "chips": [
+        {
+          "node": "cdc",
+          "text": "crashed",
+          "tone": "red"
+        },
+        {
+          "node": "updater",
+          "text": "id 7f3a ×2"
+        },
+        {
+          "node": "search",
+          "text": "upsert, no-op",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -407,7 +511,31 @@
       "metrics": {
         "unsent": "90000",
         "lag": "90000"
-      }
+      },
+      "chips": [
+        {
+          "node": "broker",
+          "text": "down 90 s",
+          "tone": "red"
+        },
+        {
+          "node": "db",
+          "text": "90,000 unsent",
+          "tone": "red",
+          "at": "bottom"
+        },
+        {
+          "node": "orders",
+          "text": "still committing",
+          "tone": "green"
+        },
+        {
+          "node": "cdc",
+          "text": "lag 90 s",
+          "tone": "red",
+          "at": "top"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -429,7 +557,23 @@
         "lost": "0",
         "unsent": "0",
         "lag": "800"
-      }
+      },
+      "chips": [
+        {
+          "node": "orders",
+          "text": "0 lost",
+          "tone": "green"
+        },
+        {
+          "node": "updater",
+          "text": "idempotent"
+        },
+        {
+          "node": "search",
+          "text": "lag 800 ms",
+          "at": "bottom"
+        }
+      ]
     }
   ],
   "quiz": [

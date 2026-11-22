@@ -17,7 +17,8 @@
       "label": "Browser + OS",
       "kind": "client",
       "x": 10,
-      "y": 50
+      "y": 50,
+      "url": "https://example.com"
     },
     {
       "id": "resolver",
@@ -124,7 +125,8 @@
         "browser"
       ],
       "flows": [],
-      "metrics": {}
+      "metrics": {},
+      "chips": []
     },
     {
       "tag": "CONCEPT",
@@ -147,7 +149,17 @@
       "metrics": {
         "lookup": "2",
         "hops": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "resolver",
+          "text": "cache miss"
+        },
+        {
+          "node": "browser",
+          "text": "asks resolver"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -176,7 +188,17 @@
       "metrics": {
         "lookup": "22",
         "hops": "2"
-      }
+      },
+      "chips": [
+        {
+          "node": "root",
+          "text": "ask .com TLD"
+        },
+        {
+          "node": "resolver",
+          "text": "22 ms"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -205,7 +227,17 @@
       "metrics": {
         "lookup": "44",
         "hops": "3"
-      }
+      },
+      "chips": [
+        {
+          "node": "tld",
+          "text": "ask ns1.example"
+        },
+        {
+          "node": "resolver",
+          "text": "44 ms"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -242,7 +274,22 @@
         "lookup": "70",
         "hops": "4",
         "ttl": "300"
-      }
+      },
+      "chips": [
+        {
+          "node": "auth",
+          "text": "203.0.113.7"
+        },
+        {
+          "node": "auth",
+          "text": "TTL 300 s"
+        },
+        {
+          "node": "resolver",
+          "text": "≈ 70 ms cold",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -268,7 +315,19 @@
           "label": "CNAME + A"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "auth",
+          "text": "CNAME + A"
+        },
+        {
+          "node": "auth",
+          "text": "no CNAME at apex",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CACHE",
@@ -298,7 +357,20 @@
         "lookup": "2",
         "hops": "1",
         "ttl": "298"
-      }
+      },
+      "chips": [
+        {
+          "node": "resolver",
+          "text": "cached · 298 s",
+          "tone": "green"
+        },
+        {
+          "node": "resolver",
+          "text": "2 ms",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "GEODNS",
@@ -347,6 +419,16 @@
           "node": "eu",
           "text": "~15 ms away",
           "tone": "green"
+        },
+        {
+          "node": "auth",
+          "text": "→ EU IP",
+          "tone": "green"
+        },
+        {
+          "node": "resolver",
+          "text": "TTL 60 s",
+          "at": "bottom"
         }
       ]
     },
@@ -383,7 +465,29 @@
       ],
       "metrics": {
         "ttl": "60"
-      }
+      },
+      "chips": [
+        {
+          "node": "eu",
+          "text": "down",
+          "tone": "red"
+        },
+        {
+          "node": "browser",
+          "text": "stale IP · 60 s",
+          "tone": "red"
+        },
+        {
+          "node": "auth",
+          "text": "TTL 60 s",
+          "at": "bottom"
+        },
+        {
+          "node": "us",
+          "text": "takes over",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -405,7 +509,23 @@
         "lookup": "70",
         "hops": "4",
         "ttl": "300"
-      }
+      },
+      "chips": [
+        {
+          "node": "resolver",
+          "text": "cold ≈ 70 ms"
+        },
+        {
+          "node": "resolver",
+          "text": "cached 2 ms",
+          "tone": "green",
+          "at": "bottom"
+        },
+        {
+          "node": "auth",
+          "text": "TTL 300 s"
+        }
+      ]
     }
   ],
   "quiz": [

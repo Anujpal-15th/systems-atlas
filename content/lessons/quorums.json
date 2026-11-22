@@ -17,7 +17,8 @@
       "label": "Client",
       "kind": "client",
       "x": 9,
-      "y": 50
+      "y": 50,
+      "url": "https://shop.example"
     },
     {
       "id": "coord",
@@ -120,6 +121,12 @@
         "rc"
       ],
       "flows": [],
+      "chips": [
+        {
+          "node": "rb",
+          "text": "N = 3 replicas"
+        }
+      ],
       "metrics": {
         "n": "3",
         "fresh": "3",
@@ -182,6 +189,26 @@
           "label": "OK"
         }
       ],
+      "chips": [
+        {
+          "node": "coord",
+          "text": "2/3 acks",
+          "tone": "green"
+        },
+        {
+          "node": "ra",
+          "text": "v2 · 2 ms"
+        },
+        {
+          "node": "rb",
+          "text": "v2 · 2 ms"
+        },
+        {
+          "node": "rc",
+          "text": "down",
+          "tone": "red"
+        }
+      ],
       "metrics": {
         "need": "2",
         "fresh": "2",
@@ -237,6 +264,23 @@
           "label": "v2"
         }
       ],
+      "chips": [
+        {
+          "node": "rb",
+          "text": "v2",
+          "tone": "green"
+        },
+        {
+          "node": "rc",
+          "text": "v1 · stale",
+          "tone": "red"
+        },
+        {
+          "node": "coord",
+          "text": "R=2: picks v2",
+          "tone": "green"
+        }
+      ],
       "metrics": {
         "need": "2",
         "fresh": "2",
@@ -271,6 +315,19 @@
           "to": "client",
           "kind": "response",
           "label": "v1"
+        }
+      ],
+      "chips": [
+        {
+          "node": "rc",
+          "text": "returns v1",
+          "tone": "red"
+        },
+        {
+          "node": "coord",
+          "text": "R + W = 3, not > 3",
+          "tone": "red",
+          "at": "bottom"
         }
       ],
       "metrics": {
@@ -342,6 +399,28 @@
           "label": "OK"
         }
       ],
+      "chips": [
+        {
+          "node": "ra",
+          "text": "unreachable",
+          "tone": "red"
+        },
+        {
+          "node": "rc",
+          "text": "unreachable",
+          "tone": "red"
+        },
+        {
+          "node": "stand",
+          "text": "v3 + hint for C"
+        },
+        {
+          "node": "coord",
+          "text": "2 acks: B + D",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ],
       "metrics": {
         "need": "2",
         "fresh": "1",
@@ -386,6 +465,28 @@
           "label": "v1"
         }
       ],
+      "chips": [
+        {
+          "node": "ra",
+          "text": "v2",
+          "tone": "red"
+        },
+        {
+          "node": "rc",
+          "text": "v1",
+          "tone": "red"
+        },
+        {
+          "node": "coord",
+          "text": "returns v2 (stale)",
+          "tone": "red",
+          "at": "bottom"
+        },
+        {
+          "node": "stand",
+          "text": "v3 · not asked"
+        }
+      ],
       "metrics": {
         "need": "2",
         "fresh": "1",
@@ -414,6 +515,17 @@
           "to": "stand",
           "kind": "response",
           "label": "ack, drop hint"
+        }
+      ],
+      "chips": [
+        {
+          "node": "rc",
+          "text": "v3",
+          "tone": "green"
+        },
+        {
+          "node": "stand",
+          "text": "hint dropped"
         }
       ],
       "metrics": {
@@ -471,6 +583,23 @@
           "label": "repair: v3"
         }
       ],
+      "chips": [
+        {
+          "node": "rb",
+          "text": "v3"
+        },
+        {
+          "node": "ra",
+          "text": "v2 → v3 (repair)",
+          "tone": "green"
+        },
+        {
+          "node": "coord",
+          "text": "answers v3",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ],
       "metrics": {
         "fresh": "3",
         "ver": "3"
@@ -506,6 +635,17 @@
           "label": "keys in range 7"
         }
       ],
+      "chips": [
+        {
+          "node": "ra",
+          "text": "Merkle root sent"
+        },
+        {
+          "node": "rb",
+          "text": "range 7 differs",
+          "tone": "red"
+        }
+      ],
       "metrics": {
         "fresh": "3",
         "ver": "3"
@@ -526,6 +666,25 @@
         "stand"
       ],
       "flows": [],
+      "chips": [
+        {
+          "node": "coord",
+          "text": "2 + 2 > 3",
+          "tone": "green"
+        },
+        {
+          "node": "ra",
+          "text": "v3"
+        },
+        {
+          "node": "rb",
+          "text": "v3"
+        },
+        {
+          "node": "rc",
+          "text": "v3"
+        }
+      ],
       "metrics": {
         "n": "3",
         "need": "2",

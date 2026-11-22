@@ -138,7 +138,8 @@
         "commits": "0",
         "undone": "0",
         "elapsed": "0"
-      }
+      },
+      "chips": []
     },
     {
       "tag": "2PC",
@@ -211,7 +212,28 @@
       "metrics": {
         "lock": "15",
         "elapsed": "15"
-      }
+      },
+      "chips": [
+        {
+          "node": "orch",
+          "text": "coordinator"
+        },
+        {
+          "node": "orch",
+          "text": "~15 ms total",
+          "at": "bottom"
+        },
+        {
+          "node": "payment",
+          "text": "locked 15 ms",
+          "tone": "red"
+        },
+        {
+          "node": "shipping",
+          "text": "locked 15 ms",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "WHY NOT",
@@ -266,7 +288,24 @@
       "metrics": {
         "lock": "30000",
         "elapsed": "30000"
-      }
+      },
+      "chips": [
+        {
+          "node": "orch",
+          "text": "down 30 s",
+          "tone": "red"
+        },
+        {
+          "node": "payment",
+          "text": "locks held 30 s",
+          "tone": "red"
+        },
+        {
+          "node": "inventory",
+          "text": "voted YES, stuck",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -296,7 +335,23 @@
         "lock": "3",
         "commits": "1",
         "elapsed": "10"
-      }
+      },
+      "chips": [
+        {
+          "node": "payment",
+          "text": "1 of 3 committed",
+          "tone": "green"
+        },
+        {
+          "node": "payment",
+          "text": "lock 3 ms",
+          "at": "bottom"
+        },
+        {
+          "node": "orch",
+          "text": "10 ms / step"
+        }
+      ]
     },
     {
       "tag": "ORCHESTRATION",
@@ -332,7 +387,22 @@
       "metrics": {
         "commits": "2",
         "elapsed": "20"
-      }
+      },
+      "chips": [
+        {
+          "node": "inventory",
+          "text": "reserved",
+          "tone": "green"
+        },
+        {
+          "node": "shipping",
+          "text": "in progress"
+        },
+        {
+          "node": "orch",
+          "text": "20 ms elapsed"
+        }
+      ]
     },
     {
       "tag": "COMPENSATE",
@@ -370,7 +440,27 @@
         "commits": "2",
         "undone": "2",
         "elapsed": "50"
-      }
+      },
+      "chips": [
+        {
+          "node": "shipping",
+          "text": "no courier",
+          "tone": "red"
+        },
+        {
+          "node": "inventory",
+          "text": "stock released"
+        },
+        {
+          "node": "payment",
+          "text": "refund $40"
+        },
+        {
+          "node": "orch",
+          "text": "2 undone · 50 ms",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CHOREOGRAPHY",
@@ -428,7 +518,23 @@
         "commits": "2",
         "undone": "0",
         "elapsed": "30"
-      }
+      },
+      "chips": [
+        {
+          "node": "broker",
+          "text": "5 ms / hop"
+        },
+        {
+          "node": "broker",
+          "text": "no coordinator",
+          "tone": "green",
+          "at": "bottom"
+        },
+        {
+          "node": "orch",
+          "text": "~30 ms total"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -478,7 +584,22 @@
         "commits": "2",
         "undone": "2",
         "elapsed": "55"
-      }
+      },
+      "chips": [
+        {
+          "node": "shipping",
+          "text": "ShipFailed",
+          "tone": "red"
+        },
+        {
+          "node": "inventory",
+          "text": "StockReleased"
+        },
+        {
+          "node": "payment",
+          "text": "PaymentRefunded"
+        }
+      ]
     },
     {
       "tag": "PITFALLS",
@@ -513,7 +634,18 @@
       "metrics": {
         "undone": "2",
         "elapsed": "60"
-      }
+      },
+      "chips": [
+        {
+          "node": "orch",
+          "text": "idempotency key"
+        },
+        {
+          "node": "payment",
+          "text": "already done",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -535,7 +667,21 @@
         "commits": "2",
         "undone": "2",
         "elapsed": "50"
-      }
+      },
+      "chips": [
+        {
+          "node": "orch",
+          "text": "long flows"
+        },
+        {
+          "node": "broker",
+          "text": "short flows"
+        },
+        {
+          "node": "payment",
+          "text": "idempotent"
+        }
+      ]
     }
   ],
   "quiz": [

@@ -114,7 +114,8 @@
         "users"
       ],
       "flows": [],
-      "metrics": {}
+      "metrics": {},
+      "chips": []
     },
     {
       "tag": "CONCEPT",
@@ -134,7 +135,17 @@
           "label": "100 views / day"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "users",
+          "text": "1 day ≈ 10^5 s"
+        },
+        {
+          "node": "api",
+          "text": "1M/day ≈ 10/s"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -162,7 +173,22 @@
       ],
       "metrics": {
         "avg": "12000"
-      }
+      },
+      "chips": [
+        {
+          "node": "api",
+          "text": "12k reads/s"
+        },
+        {
+          "node": "api",
+          "text": "12 writes/s",
+          "at": "bottom"
+        },
+        {
+          "node": "users",
+          "text": "read:write 1000:1"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -184,7 +210,17 @@
       ],
       "metrics": {
         "peak": "36000"
-      }
+      },
+      "chips": [
+        {
+          "node": "api",
+          "text": "36k reads/s peak"
+        },
+        {
+          "node": "users",
+          "text": "peak = 3× avg"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -206,7 +242,22 @@
       ],
       "metrics": {
         "storage": "730"
-      }
+      },
+      "chips": [
+        {
+          "node": "store",
+          "text": "2 TB / day"
+        },
+        {
+          "node": "store",
+          "text": "730 TB / yr"
+        },
+        {
+          "node": "store",
+          "text": "≈ 2.2 PB × 3 copies",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -235,7 +286,22 @@
       ],
       "metrics": {
         "egress": "18"
-      }
+      },
+      "chips": [
+        {
+          "node": "cdn",
+          "text": "200 TB / day"
+        },
+        {
+          "node": "cdn",
+          "text": "18 Gbps avg"
+        },
+        {
+          "node": "cdn",
+          "text": "55 Gbps peak",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -268,7 +334,19 @@
           "label": "~10 ms disk"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "cache",
+          "text": "~0.5 ms",
+          "tone": "green"
+        },
+        {
+          "node": "db",
+          "text": "~10 ms disk",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -295,7 +373,25 @@
           "label": "~3.6k misses/s"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "api",
+          "text": "18 → 25 servers"
+        },
+        {
+          "node": "cache",
+          "text": "90% hit",
+          "tone": "green"
+        },
+        {
+          "node": "db",
+          "text": "72%",
+          "tone": "green",
+          "kind": "progress",
+          "value": 72
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -317,7 +413,25 @@
       ],
       "metrics": {
         "storage": "18250"
-      }
+      },
+      "chips": [
+        {
+          "node": "store",
+          "text": "50 TB / day",
+          "tone": "red"
+        },
+        {
+          "node": "store",
+          "text": "18 PB / yr",
+          "tone": "red"
+        },
+        {
+          "node": "store",
+          "text": "25× more",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -339,7 +453,21 @@
         "peak": "36000",
         "storage": "730",
         "egress": "18"
-      }
+      },
+      "chips": [
+        {
+          "node": "api",
+          "text": "12k → 36k QPS"
+        },
+        {
+          "node": "store",
+          "text": "730 TB / yr"
+        },
+        {
+          "node": "cdn",
+          "text": "18 Gbps"
+        }
+      ]
     }
   ],
   "quiz": [

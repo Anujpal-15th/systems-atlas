@@ -131,7 +131,18 @@
         "reads": "1000",
         "mem": "0",
         "err": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "db",
+          "text": "1,000 wasted reads",
+          "tone": "red"
+        },
+        {
+          "node": "db",
+          "text": "not found"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -153,7 +164,17 @@
       ],
       "metrics": {
         "mem": "1250"
-      }
+      },
+      "chips": [
+        {
+          "node": "bloom",
+          "text": "10M bits · 1.25 MB"
+        },
+        {
+          "node": "bloom",
+          "text": "k = 7"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -179,7 +200,19 @@
           "label": "no, skip disk"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "bloom",
+          "text": "definitely not",
+          "tone": "green"
+        },
+        {
+          "node": "bloom",
+          "text": "skip disk",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -218,7 +251,18 @@
           "label": "false positive"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "bloom",
+          "text": "maybe"
+        },
+        {
+          "node": "db",
+          "text": "false positive",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -234,7 +278,22 @@
         "reads": "10",
         "mem": "1250",
         "err": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "bloom",
+          "text": "10 bits/key"
+        },
+        {
+          "node": "bloom",
+          "text": "~1% false pos"
+        },
+        {
+          "node": "db",
+          "text": "1,000 → ~10 reads",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "LIMIT",
@@ -254,7 +313,19 @@
           "label": "delete user:42?"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "bloom",
+          "text": "no delete",
+          "tone": "red"
+        },
+        {
+          "node": "bloom",
+          "text": "more keys, more fp",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -284,7 +355,18 @@
       "metrics": {
         "mem": "54",
         "err": "0.1"
-      }
+      },
+      "chips": [
+        {
+          "node": "cms",
+          "text": "5 × 2,719 counters"
+        },
+        {
+          "node": "cms",
+          "text": "54 KB",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -310,7 +392,22 @@
           "label": "about 4,210"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "cms",
+          "text": "about 4,210"
+        },
+        {
+          "node": "cms",
+          "text": "never too low",
+          "tone": "green"
+        },
+        {
+          "node": "cms",
+          "text": "over by ≤ 0.1%"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -333,7 +430,22 @@
       "metrics": {
         "mem": "12",
         "err": "0.81"
-      }
+      },
+      "chips": [
+        {
+          "node": "hll",
+          "text": "12 KB",
+          "tone": "green"
+        },
+        {
+          "node": "hll",
+          "text": "0.8% error"
+        },
+        {
+          "node": "hll",
+          "text": "16,384 buckets"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -347,7 +459,22 @@
         "hll"
       ],
       "flows": [],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "bloom",
+          "text": "no = certain",
+          "tone": "green"
+        },
+        {
+          "node": "cms",
+          "text": "never too low"
+        },
+        {
+          "node": "hll",
+          "text": "~0.8% error"
+        }
+      ]
     }
   ],
   "quiz": [

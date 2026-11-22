@@ -136,7 +136,25 @@
         "dbq": "5",
         "hit": "99.9",
         "lat": "5"
-      }
+      },
+      "chips": [
+        {
+          "node": "cache",
+          "text": "99.9%",
+          "kind": "progress",
+          "value": 99.9,
+          "tone": "green"
+        },
+        {
+          "node": "db",
+          "text": "5 q/s",
+          "tone": "green"
+        },
+        {
+          "node": "db",
+          "text": "200 ms feed"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -186,7 +204,18 @@
         "dbq": "5",
         "hit": "99.9",
         "lat": "5"
-      }
+      },
+      "chips": [
+        {
+          "node": "cache",
+          "text": "miss",
+          "tone": "red"
+        },
+        {
+          "node": "cache",
+          "text": "ttl 60 s"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -225,7 +254,24 @@
         "dbq": "5",
         "hit": "99.9",
         "lat": "5"
-      }
+      },
+      "chips": [
+        {
+          "node": "db",
+          "text": "price updated",
+          "tone": "green"
+        },
+        {
+          "node": "cache",
+          "text": "old price",
+          "tone": "red"
+        },
+        {
+          "node": "cache",
+          "text": "stale until ttl",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -263,7 +309,22 @@
         "dbq": "5",
         "hit": "99.9",
         "lat": "5"
-      }
+      },
+      "chips": [
+        {
+          "node": "db",
+          "text": "committed",
+          "tone": "green"
+        },
+        {
+          "node": "cache",
+          "text": "key deleted"
+        },
+        {
+          "node": "cache",
+          "text": "ttl kept as backstop"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -301,7 +362,23 @@
         "dbq": "5000",
         "hit": "0",
         "lat": "2000"
-      }
+      },
+      "chips": [
+        {
+          "node": "cache",
+          "text": "miss x 1000",
+          "tone": "red"
+        },
+        {
+          "node": "db",
+          "text": "5,000 q/s",
+          "tone": "red"
+        },
+        {
+          "node": "db",
+          "text": "handles ~500 q/s"
+        }
+      ]
     },
     {
       "tag": "FIX",
@@ -345,7 +422,22 @@
         "dbq": "5",
         "hit": "99.9",
         "lat": "200"
-      }
+      },
+      "chips": [
+        {
+          "node": "cache",
+          "text": "lock held"
+        },
+        {
+          "node": "db",
+          "text": "1 query",
+          "tone": "green"
+        },
+        {
+          "node": "app",
+          "text": "waiters wait 200 ms"
+        }
+      ]
     },
     {
       "tag": "FIX",
@@ -395,7 +487,23 @@
         "dbq": "5",
         "hit": "99.9",
         "lat": "5"
-      }
+      },
+      "chips": [
+        {
+          "node": "cache",
+          "text": "hit",
+          "tone": "green"
+        },
+        {
+          "node": "db",
+          "text": "early refresh"
+        },
+        {
+          "node": "cache",
+          "text": "serves valid value",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -433,7 +541,25 @@
         "dbq": "2000",
         "hit": "60",
         "lat": "800"
-      }
+      },
+      "chips": [
+        {
+          "node": "cache",
+          "text": "100,000 keys · 60 s"
+        },
+        {
+          "node": "cache",
+          "text": "60%",
+          "kind": "progress",
+          "value": 60,
+          "tone": "red"
+        },
+        {
+          "node": "db",
+          "text": "2,000 q/s",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -476,7 +602,22 @@
         "dbq": "5",
         "hit": "99.99",
         "lat": "3"
-      }
+      },
+      "chips": [
+        {
+          "node": "cache",
+          "text": "150,000 reads/s",
+          "tone": "red"
+        },
+        {
+          "node": "cache",
+          "text": "~100,000 ops/s cap"
+        },
+        {
+          "node": "app",
+          "text": "local ttl 1-5 s"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -497,7 +638,18 @@
         "dbq": "5",
         "hit": "99.9",
         "lat": "5"
-      }
+      },
+      "chips": [
+        {
+          "node": "cache",
+          "text": "ttl + delete"
+        },
+        {
+          "node": "db",
+          "text": "5 q/s",
+          "tone": "green"
+        }
+      ]
     }
   ],
   "quiz": [

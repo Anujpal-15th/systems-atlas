@@ -17,7 +17,8 @@
       "label": "Clients",
       "kind": "user",
       "x": 8,
-      "y": 50
+      "y": 50,
+      "url": "https://shop.example"
     },
     {
       "id": "appa",
@@ -138,6 +139,7 @@
           "label": "create order"
         }
       ],
+      "chips": [],
       "metrics": {}
     },
     {
@@ -162,6 +164,21 @@
           "to": "appa",
           "kind": "response",
           "label": "id = 1001"
+        }
+      ],
+      "chips": [
+        {
+          "node": "db",
+          "text": "id = 1001"
+        },
+        {
+          "node": "appa",
+          "text": "8 bytes · 1 hop"
+        },
+        {
+          "node": "db",
+          "text": "cap ≈ 10k inserts/s",
+          "at": "bottom"
         }
       ],
       "metrics": {
@@ -194,6 +211,21 @@
           "label": "id 1001 (shard 2)"
         }
       ],
+      "chips": [
+        {
+          "node": "appa",
+          "text": "id 1001 (shard 1)"
+        },
+        {
+          "node": "appb",
+          "text": "id 1001 (shard 2)"
+        },
+        {
+          "node": "db",
+          "text": "duplicate ID",
+          "tone": "red"
+        }
+      ],
       "metrics": {
         "hops": "1",
         "size": "8"
@@ -222,6 +254,17 @@
           "to": "db",
           "kind": "request",
           "label": "INSERT uuid4"
+        }
+      ],
+      "chips": [
+        {
+          "node": "appa",
+          "text": "16 bytes · 0 hops"
+        },
+        {
+          "node": "db",
+          "text": "scattered writes",
+          "tone": "red"
         }
       ],
       "metrics": {
@@ -254,6 +297,17 @@
           "label": "append at end"
         }
       ],
+      "chips": [
+        {
+          "node": "appa",
+          "text": "48-bit time prefix"
+        },
+        {
+          "node": "idx",
+          "text": "append at end",
+          "tone": "green"
+        }
+      ],
       "metrics": {
         "hops": "0",
         "size": "16"
@@ -283,6 +337,21 @@
           "label": "64-bit id"
         }
       ],
+      "chips": [
+        {
+          "node": "idgen",
+          "text": "41+10+12 bits"
+        },
+        {
+          "node": "idgen",
+          "text": "4,096,000 IDs/s",
+          "at": "bottom"
+        },
+        {
+          "node": "appa",
+          "text": "0 hops · 8 bytes"
+        }
+      ],
       "metrics": {
         "hops": "0",
         "size": "8"
@@ -304,6 +373,18 @@
           "to": "appa",
           "kind": "fail",
           "label": "clock moved back"
+        }
+      ],
+      "chips": [
+        {
+          "node": "idgen",
+          "text": "clock moved back",
+          "tone": "red"
+        },
+        {
+          "node": "appa",
+          "text": "duplicate risk",
+          "tone": "red"
         }
       ],
       "metrics": {
@@ -333,6 +414,16 @@
           "to": "appa",
           "kind": "response",
           "label": "10000-10999"
+        }
+      ],
+      "chips": [
+        {
+          "node": "ticket",
+          "text": "10000-10999 lease"
+        },
+        {
+          "node": "appa",
+          "text": "1 hop per 1,000 IDs"
         }
       ],
       "metrics": {
@@ -372,6 +463,21 @@
           "label": "append at end"
         }
       ],
+      "chips": [
+        {
+          "node": "appa",
+          "text": "id …4101"
+        },
+        {
+          "node": "appb",
+          "text": "id …4102"
+        },
+        {
+          "node": "idx",
+          "text": "append at end",
+          "tone": "green"
+        }
+      ],
       "metrics": {
         "hops": "0",
         "size": "8"
@@ -393,6 +499,20 @@
         "idx"
       ],
       "flows": [],
+      "chips": [
+        {
+          "node": "db",
+          "text": "UUIDv7: 16 bytes"
+        },
+        {
+          "node": "idgen",
+          "text": "Snowflake: 8 bytes"
+        },
+        {
+          "node": "ticket",
+          "text": "block: 1 hop per 1k"
+        }
+      ],
       "metrics": {}
     }
   ],

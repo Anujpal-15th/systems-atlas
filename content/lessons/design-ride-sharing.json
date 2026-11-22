@@ -189,7 +189,21 @@
       ],
       "metrics": {
         "pings": "250"
-      }
+      },
+      "chips": [
+        {
+          "node": "gw",
+          "text": "250k pings/s"
+        },
+        {
+          "node": "driver",
+          "text": "ping / 4 s"
+        },
+        {
+          "node": "loc",
+          "text": "≈ 100 B each"
+        }
+      ]
     },
     {
       "tag": "INDEX",
@@ -215,7 +229,22 @@
           "label": "ok"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "geo",
+          "text": "≈ 100 MB"
+        },
+        {
+          "node": "geo",
+          "text": "TTL ≈ 30 s",
+          "at": "bottom"
+        },
+        {
+          "node": "loc",
+          "text": "250k writes/s"
+        }
+      ]
     },
     {
       "tag": "REQUEST",
@@ -242,7 +271,18 @@
           "label": "pickup + dropoff"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "gw",
+          "text": "authenticated",
+          "tone": "green"
+        },
+        {
+          "node": "match",
+          "text": "ride request"
+        }
+      ]
     },
     {
       "tag": "SEARCH",
@@ -270,7 +310,22 @@
       ],
       "metrics": {
         "cands": "42"
-      }
+      },
+      "chips": [
+        {
+          "node": "geo",
+          "text": "42 drivers"
+        },
+        {
+          "node": "match",
+          "text": "cell + neighbours"
+        },
+        {
+          "node": "match",
+          "text": "few ms",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "OFFER",
@@ -313,7 +368,21 @@
       ],
       "metrics": {
         "wait": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "match",
+          "text": "closest ~10 → ETA"
+        },
+        {
+          "node": "tripdb",
+          "text": "REQUESTED"
+        },
+        {
+          "node": "driver",
+          "text": "offer · 15 s"
+        }
+      ]
     },
     {
       "tag": "STATE",
@@ -362,7 +431,22 @@
       ],
       "metrics": {
         "wait": "8"
-      }
+      },
+      "chips": [
+        {
+          "node": "tripdb",
+          "text": "ACCEPTED",
+          "tone": "green"
+        },
+        {
+          "node": "geo",
+          "text": "driver busy"
+        },
+        {
+          "node": "driver",
+          "text": "request ≈ 8 s old"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -441,7 +525,28 @@
       "metrics": {
         "wait": "17",
         "cands": "41"
-      }
+      },
+      "chips": [
+        {
+          "node": "driver",
+          "text": "no answer · 15 s",
+          "tone": "red"
+        },
+        {
+          "node": "trip",
+          "text": "late accept rejected"
+        },
+        {
+          "node": "match",
+          "text": "request 17 s old",
+          "tone": "red"
+        },
+        {
+          "node": "match",
+          "text": "next candidate",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "SURGE",
@@ -488,7 +593,22 @@
       ],
       "metrics": {
         "surge": "1.4"
-      }
+      },
+      "chips": [
+        {
+          "node": "surge",
+          "text": "1.4x"
+        },
+        {
+          "node": "surge",
+          "text": "smoothed + capped",
+          "at": "bottom"
+        },
+        {
+          "node": "match",
+          "text": "quote locked"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -511,7 +631,21 @@
       "metrics": {
         "pings": "250",
         "surge": "1.4"
-      }
+      },
+      "chips": [
+        {
+          "node": "loc",
+          "text": "250k pings/s"
+        },
+        {
+          "node": "geo",
+          "text": "TTL ≈ 30 s"
+        },
+        {
+          "node": "surge",
+          "text": "1.4x"
+        }
+      ]
     }
   ],
   "quiz": [

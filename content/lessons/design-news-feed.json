@@ -185,7 +185,18 @@
       "metrics": {
         "writes": "1",
         "read": "800"
-      }
+      },
+      "chips": [
+        {
+          "node": "feed",
+          "text": "800 ms",
+          "tone": "red"
+        },
+        {
+          "node": "store",
+          "text": "11k loads/s"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -227,7 +238,23 @@
       ],
       "metrics": {
         "writes": "200"
-      }
+      },
+      "chips": [
+        {
+          "node": "post",
+          "text": "201 Created",
+          "tone": "green"
+        },
+        {
+          "node": "queue",
+          "text": "fan-out job"
+        },
+        {
+          "node": "queue",
+          "text": "200 writes",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -256,7 +283,22 @@
       ],
       "metrics": {
         "cache": "400"
-      }
+      },
+      "chips": [
+        {
+          "node": "cache",
+          "text": "500 IDs / user"
+        },
+        {
+          "node": "cache",
+          "text": "≈ 400 GB",
+          "at": "bottom"
+        },
+        {
+          "node": "worker",
+          "text": "230k writes/s"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -310,7 +352,23 @@
       ],
       "metrics": {
         "read": "60"
-      }
+      },
+      "chips": [
+        {
+          "node": "cache",
+          "text": "500 IDs · 1-2 ms",
+          "tone": "green"
+        },
+        {
+          "node": "feed",
+          "text": "60 ms",
+          "tone": "green"
+        },
+        {
+          "node": "store",
+          "text": "batched fetch"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -353,7 +411,24 @@
       ],
       "metrics": {
         "writes": "50000000"
-      }
+      },
+      "chips": [
+        {
+          "node": "queue",
+          "text": "50M followers",
+          "tone": "red"
+        },
+        {
+          "node": "worker",
+          "text": "backlog grows",
+          "tone": "red"
+        },
+        {
+          "node": "cache",
+          "text": "50M writes",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -408,7 +483,22 @@
       "metrics": {
         "writes": "200",
         "read": "70"
-      }
+      },
+      "chips": [
+        {
+          "node": "cache",
+          "text": "pushed IDs"
+        },
+        {
+          "node": "store",
+          "text": "celebrity pull"
+        },
+        {
+          "node": "feed",
+          "text": "70 ms",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -443,7 +533,22 @@
       ],
       "metrics": {
         "read": "120"
-      }
+      },
+      "chips": [
+        {
+          "node": "ranker",
+          "text": "300 candidates"
+        },
+        {
+          "node": "ranker",
+          "text": "top 20",
+          "at": "bottom"
+        },
+        {
+          "node": "feed",
+          "text": "120 ms"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -484,7 +589,24 @@
       ],
       "metrics": {
         "read": "400"
-      }
+      },
+      "chips": [
+        {
+          "node": "cache",
+          "text": "node lost",
+          "tone": "red"
+        },
+        {
+          "node": "feed",
+          "text": "rebuild by pull"
+        },
+        {
+          "node": "feed",
+          "text": "400 ms",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -508,7 +630,21 @@
         "writes": "200",
         "read": "120",
         "cache": "400"
-      }
+      },
+      "chips": [
+        {
+          "node": "cache",
+          "text": "400 GB"
+        },
+        {
+          "node": "feed",
+          "text": "120 ms"
+        },
+        {
+          "node": "worker",
+          "text": "200 writes / post"
+        }
+      ]
     }
   ],
   "quiz": [

@@ -128,7 +128,8 @@
       "metrics": {
         "reqs": "0",
         "conns": "0"
-      }
+      },
+      "chips": []
     },
     {
       "tag": "SHORT POLL",
@@ -170,7 +171,24 @@
       "metrics": {
         "reqs": "20000",
         "delay": "2500"
-      }
+      },
+      "chips": [
+        {
+          "node": "bob",
+          "text": "poll every 5 s"
+        },
+        {
+          "node": "lb",
+          "text": "20,000 req/s",
+          "tone": "red"
+        },
+        {
+          "node": "bob",
+          "text": "~2.5 s delay",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "LONG POLL",
@@ -213,7 +231,23 @@
         "reqs": "3333",
         "conns": "100000",
         "delay": "10"
-      }
+      },
+      "chips": [
+        {
+          "node": "gw2",
+          "text": "held ≤ 30 s"
+        },
+        {
+          "node": "lb",
+          "text": "3,300 req/s"
+        },
+        {
+          "node": "bob",
+          "text": "delay ≈ 10 ms",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "SSE",
@@ -256,7 +290,23 @@
         "reqs": "0",
         "conns": "100000",
         "delay": "10"
-      }
+      },
+      "chips": [
+        {
+          "node": "bob",
+          "text": "1 GET, stays open"
+        },
+        {
+          "node": "gw2",
+          "text": "100,000 conns"
+        },
+        {
+          "node": "bob",
+          "text": "auto-reconnect",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "WEBSOCKET",
@@ -323,7 +373,24 @@
         "reqs": "0",
         "conns": "100000",
         "delay": "10"
-      }
+      },
+      "chips": [
+        {
+          "node": "gw2",
+          "text": "101 Switching",
+          "tone": "green"
+        },
+        {
+          "node": "bob",
+          "text": "2-14 B header"
+        },
+        {
+          "node": "bob",
+          "text": "two-way",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -336,7 +403,18 @@
         "gw2"
       ],
       "flows": [],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "gw2",
+          "text": "holds Bob's socket"
+        },
+        {
+          "node": "gw2",
+          "text": "10-50 KB / conn",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "FAN-OUT",
@@ -398,7 +476,27 @@
       ],
       "metrics": {
         "delay": "30"
-      }
+      },
+      "chips": [
+        {
+          "node": "chat",
+          "text": "saved first",
+          "tone": "green"
+        },
+        {
+          "node": "bus",
+          "text": "room:42"
+        },
+        {
+          "node": "gw2",
+          "text": "Bob's socket"
+        },
+        {
+          "node": "bob",
+          "text": "delay 30 ms",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -435,7 +533,31 @@
         "reqs": "50000",
         "conns": "50000",
         "delay": "800"
-      }
+      },
+      "chips": [
+        {
+          "node": "gw2",
+          "text": "crashed",
+          "tone": "red"
+        },
+        {
+          "node": "gw2",
+          "text": "50,000 sockets lost",
+          "tone": "red",
+          "at": "bottom"
+        },
+        {
+          "node": "lb",
+          "text": "50,000 req/s",
+          "tone": "red"
+        },
+        {
+          "node": "bob",
+          "text": "delay ~800 ms",
+          "tone": "red",
+          "at": "top"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -454,7 +576,19 @@
         "reqs": "0",
         "conns": "100000",
         "delay": "30"
-      }
+      },
+      "chips": [
+        {
+          "node": "lb",
+          "text": "heartbeat 20-30 s"
+        },
+        {
+          "node": "lb",
+          "text": "idle cut ~60 s",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -476,7 +610,22 @@
         "reqs": "0",
         "conns": "100000",
         "delay": "30"
-      }
+      },
+      "chips": [
+        {
+          "node": "bob",
+          "text": "delay 30 ms",
+          "tone": "green"
+        },
+        {
+          "node": "gw2",
+          "text": "100,000 conns"
+        },
+        {
+          "node": "bus",
+          "text": "pub/sub"
+        }
+      ]
     }
   ],
   "quiz": [

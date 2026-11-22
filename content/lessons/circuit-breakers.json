@@ -153,7 +153,24 @@
         "errors": "0",
         "p99": "120",
         "recrate": "500"
-      }
+      },
+      "chips": [
+        {
+          "node": "rec",
+          "text": "40 ms"
+        },
+        {
+          "node": "shop",
+          "kind": "progress",
+          "value": 11,
+          "text": "11%"
+        },
+        {
+          "node": "shop",
+          "text": "500 req/s",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -201,7 +218,26 @@
         "errors": "60",
         "p99": "30000",
         "recrate": "500"
-      }
+      },
+      "chips": [
+        {
+          "node": "rec",
+          "text": "no reply · 30 s",
+          "tone": "red"
+        },
+        {
+          "node": "shop",
+          "kind": "progress",
+          "value": 100,
+          "text": "100%"
+        },
+        {
+          "node": "shop",
+          "text": "503 on checkout",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -244,7 +280,24 @@
         "errors": "0",
         "p99": "120",
         "recrate": "500"
-      }
+      },
+      "chips": [
+        {
+          "node": "cb",
+          "text": "CLOSED",
+          "tone": "green"
+        },
+        {
+          "node": "cb",
+          "text": "10 s window",
+          "at": "bottom"
+        },
+        {
+          "node": "rec",
+          "text": "ok",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -287,7 +340,30 @@
         "errors": "35",
         "p99": "600",
         "recrate": "500"
-      }
+      },
+      "chips": [
+        {
+          "node": "cb",
+          "text": "OPEN",
+          "tone": "red"
+        },
+        {
+          "node": "cb",
+          "text": "≥20 calls, ≥50% fail",
+          "at": "bottom"
+        },
+        {
+          "node": "rec",
+          "text": "timeout 500 ms",
+          "tone": "red"
+        },
+        {
+          "node": "shop",
+          "kind": "progress",
+          "value": 100,
+          "text": "100%"
+        }
+      ]
     },
     {
       "tag": "FAIL FAST",
@@ -318,7 +394,29 @@
         "errors": "5",
         "p99": "40",
         "recrate": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "cb",
+          "text": "OPEN · rejects",
+          "tone": "red"
+        },
+        {
+          "node": "shop",
+          "text": "3 busy threads",
+          "tone": "green"
+        },
+        {
+          "node": "rec",
+          "text": "0 calls/s",
+          "tone": "green"
+        },
+        {
+          "node": "cb",
+          "text": "~1 ms per call",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "FALLBACK",
@@ -362,7 +460,23 @@
         "errors": "0",
         "p99": "45",
         "recrate": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "cb",
+          "text": "fallback served",
+          "tone": "green"
+        },
+        {
+          "node": "cache",
+          "text": "top 20 popular"
+        },
+        {
+          "node": "shop",
+          "text": "200 OK",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -423,7 +537,18 @@
         "errors": "0",
         "p99": "120",
         "recrate": "500"
-      }
+      },
+      "chips": [
+        {
+          "node": "cb",
+          "text": "half-open"
+        },
+        {
+          "node": "rec",
+          "text": "3 of 3 probes ok",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "BULKHEAD",
@@ -473,7 +598,30 @@
         "errors": "0",
         "p99": "600",
         "recrate": "80"
-      }
+      },
+      "chips": [
+        {
+          "node": "cb",
+          "text": "pool 40/40 full",
+          "tone": "red"
+        },
+        {
+          "node": "pay",
+          "text": "charge ok",
+          "tone": "green"
+        },
+        {
+          "node": "pay",
+          "text": "own pool",
+          "at": "bottom"
+        },
+        {
+          "node": "shop",
+          "kind": "progress",
+          "value": 21,
+          "text": "21%"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -485,7 +633,18 @@
         "cb"
       ],
       "flows": [],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "cb",
+          "text": "min 20 calls"
+        },
+        {
+          "node": "cb",
+          "text": "404 / 400 not counted",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -500,7 +659,24 @@
         "errors": "0",
         "p99": "45",
         "recrate": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "cb",
+          "text": "fail fast",
+          "tone": "green"
+        },
+        {
+          "node": "shop",
+          "text": "0% errors",
+          "tone": "green"
+        },
+        {
+          "node": "cache",
+          "text": "popular items",
+          "at": "bottom"
+        }
+      ]
     }
   ],
   "quiz": [

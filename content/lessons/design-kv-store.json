@@ -118,7 +118,18 @@
         "coord"
       ],
       "flows": [],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "coord",
+          "text": "200,000 ops/s"
+        },
+        {
+          "node": "coord",
+          "text": "50 TB data",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "PARTITION",
@@ -142,7 +153,18 @@
         "acks": "0",
         "latency": "0",
         "versions": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "coord",
+          "text": "hash(cart:42)"
+        },
+        {
+          "node": "coord",
+          "text": "1/N of keys move",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "REPLICATE",
@@ -178,7 +200,25 @@
       ],
       "metrics": {
         "versions": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "coord",
+          "text": "N = 3 replicas"
+        },
+        {
+          "node": "a",
+          "text": "v1"
+        },
+        {
+          "node": "b",
+          "text": "v1"
+        },
+        {
+          "node": "c",
+          "text": "v1"
+        }
+      ]
     },
     {
       "tag": "QUORUM",
@@ -215,7 +255,24 @@
       "metrics": {
         "acks": "2",
         "latency": "4"
-      }
+      },
+      "chips": [
+        {
+          "node": "coord",
+          "text": "2 of 3 acks",
+          "tone": "green"
+        },
+        {
+          "node": "client",
+          "text": "OK · 4 ms",
+          "tone": "green"
+        },
+        {
+          "node": "c",
+          "text": "GC pause 40 ms",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "QUORUM",
@@ -269,7 +326,22 @@
       ],
       "metrics": {
         "latency": "3"
-      }
+      },
+      "chips": [
+        {
+          "node": "coord",
+          "text": "R + W = 4 > 3"
+        },
+        {
+          "node": "client",
+          "text": "v1 · 3 ms",
+          "tone": "green"
+        },
+        {
+          "node": "b",
+          "text": "v1"
+        }
+      ]
     },
     {
       "tag": "GOSSIP",
@@ -302,7 +374,21 @@
           "label": "gossip"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "a",
+          "text": "swap views / 1 s"
+        },
+        {
+          "node": "b",
+          "text": "heartbeat counters"
+        },
+        {
+          "node": "c",
+          "text": "suspect if stale"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -352,7 +438,27 @@
         "acks": "2",
         "latency": "4",
         "versions": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "c",
+          "text": "crashed",
+          "tone": "red"
+        },
+        {
+          "node": "a",
+          "text": "v2"
+        },
+        {
+          "node": "b",
+          "text": "v2"
+        },
+        {
+          "node": "coord",
+          "text": "W = 2 met",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "HANDOFF",
@@ -382,7 +488,23 @@
       "metrics": {
         "acks": "2",
         "versions": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "d",
+          "text": "hint for C"
+        },
+        {
+          "node": "d",
+          "text": "kept up to 3 h",
+          "at": "bottom"
+        },
+        {
+          "node": "c",
+          "text": "no copy yet",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "CONFLICT",
@@ -437,7 +559,26 @@
       "metrics": {
         "acks": "2",
         "versions": "2"
-      }
+      },
+      "chips": [
+        {
+          "node": "a",
+          "text": "v [A:1]"
+        },
+        {
+          "node": "b",
+          "text": "v [B:1]"
+        },
+        {
+          "node": "coord",
+          "text": "siblings: 2"
+        },
+        {
+          "node": "a",
+          "text": "keeps both",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -458,7 +599,18 @@
         "acks": "2",
         "latency": "4",
         "versions": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "coord",
+          "text": "N=3 · W=2 · R=2",
+          "tone": "green"
+        },
+        {
+          "node": "a",
+          "text": "eventual consistency"
+        }
+      ]
     }
   ],
   "quiz": [

@@ -132,7 +132,20 @@
       "metrics": {
         "servers": "2",
         "failed": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "browser",
+          "text": "logged out",
+          "tone": "red"
+        },
+        {
+          "node": "browser",
+          "text": "cart gone",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -165,7 +178,22 @@
           "label": "Set-Cookie sid=9f2"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "appa",
+          "text": "sess 9f2 in RAM"
+        },
+        {
+          "node": "browser",
+          "text": "cookie sid=9f2"
+        },
+        {
+          "node": "appa",
+          "text": "user 42 · 3 items",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "PROBLEM",
@@ -199,7 +227,24 @@
       ],
       "metrics": {
         "failed": "50"
-      }
+      },
+      "chips": [
+        {
+          "node": "appb",
+          "text": "sid unknown",
+          "tone": "red"
+        },
+        {
+          "node": "lb",
+          "text": "50% miss",
+          "tone": "red"
+        },
+        {
+          "node": "lb",
+          "text": "round robin",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -233,7 +278,24 @@
       ],
       "metrics": {
         "failed": "50"
-      }
+      },
+      "chips": [
+        {
+          "node": "lb",
+          "text": "sid 9f2 → A"
+        },
+        {
+          "node": "appa",
+          "text": "crashed",
+          "tone": "red"
+        },
+        {
+          "node": "appa",
+          "text": "pinned users lost",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "FIX",
@@ -262,7 +324,25 @@
       "metrics": {
         "failed": "0",
         "lookup": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "sessions",
+          "text": "sess:9f2 saved",
+          "tone": "green"
+        },
+        {
+          "node": "sessions",
+          "text": "expires 30 min",
+          "at": "bottom"
+        },
+        {
+          "node": "appa",
+          "text": "holds no state",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -322,7 +402,27 @@
       ],
       "metrics": {
         "lookup": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "appb",
+          "text": "any server",
+          "tone": "green"
+        },
+        {
+          "node": "sessions",
+          "text": "user 42"
+        },
+        {
+          "node": "sessions",
+          "text": "~1 ms",
+          "at": "bottom"
+        },
+        {
+          "node": "db",
+          "text": "3 items"
+        }
+      ]
     },
     {
       "tag": "ALTERNATIVE",
@@ -364,7 +464,23 @@
       ],
       "metrics": {
         "lookup": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "browser",
+          "text": "JWT · 15 min"
+        },
+        {
+          "node": "appb",
+          "text": "verify: µs"
+        },
+        {
+          "node": "appb",
+          "text": "no store lookup",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "PAYOFF",
@@ -420,7 +536,24 @@
         "servers": "1",
         "failed": "0",
         "lookup": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "appa",
+          "text": "health check fail",
+          "tone": "red"
+        },
+        {
+          "node": "appb",
+          "text": "serves all",
+          "tone": "green"
+        },
+        {
+          "node": "browser",
+          "text": "still logged in",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -441,7 +574,23 @@
         "servers": "2",
         "failed": "0",
         "lookup": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "sessions",
+          "text": "durable + fast"
+        },
+        {
+          "node": "appa",
+          "text": "disposable",
+          "tone": "green"
+        },
+        {
+          "node": "appb",
+          "text": "disposable",
+          "tone": "green"
+        }
+      ]
     }
   ],
   "quiz": [

@@ -93,6 +93,7 @@
         "store"
       ],
       "flows": [],
+      "chips": [],
       "metrics": {}
     },
     {
@@ -132,6 +133,18 @@
           "label": "already exists"
         }
       ],
+      "chips": [
+        {
+          "node": "a",
+          "text": "OK · leader",
+          "tone": "green"
+        },
+        {
+          "node": "b",
+          "text": "already exists",
+          "tone": "red"
+        }
+      ],
       "metrics": {}
     },
     {
@@ -156,6 +169,17 @@
           "to": "lock",
           "kind": "async",
           "label": "renew"
+        }
+      ],
+      "chips": [
+        {
+          "node": "lock",
+          "text": "fencing token 33"
+        },
+        {
+          "node": "a",
+          "text": "lease 10 s",
+          "tone": "green"
         }
       ],
       "metrics": {
@@ -195,6 +219,23 @@
           "label": "ok"
         }
       ],
+      "chips": [
+        {
+          "node": "a",
+          "text": "leader",
+          "tone": "green"
+        },
+        {
+          "node": "a",
+          "text": "renewing",
+          "at": "bottom"
+        },
+        {
+          "node": "store",
+          "text": "write ok · tok 33",
+          "tone": "green"
+        }
+      ],
       "metrics": {}
     },
     {
@@ -213,6 +254,18 @@
           "to": "lock",
           "kind": "fail",
           "label": "no renewal"
+        }
+      ],
+      "chips": [
+        {
+          "node": "a",
+          "text": "paused (GC)",
+          "tone": "red"
+        },
+        {
+          "node": "lock",
+          "text": "no renewal",
+          "tone": "red"
         }
       ],
       "metrics": {
@@ -247,6 +300,18 @@
           "to": "b",
           "kind": "response",
           "label": "10s lease, tok 34"
+        }
+      ],
+      "chips": [
+        {
+          "node": "lock",
+          "text": "A lease expired",
+          "tone": "red"
+        },
+        {
+          "node": "b",
+          "text": "leader · token 34",
+          "tone": "green"
         }
       ],
       "metrics": {
@@ -291,6 +356,23 @@
           "label": "ok (bad!)"
         }
       ],
+      "chips": [
+        {
+          "node": "a",
+          "text": "wakes at 15 s"
+        },
+        {
+          "node": "store",
+          "text": "stale write accepted",
+          "tone": "red"
+        },
+        {
+          "node": "store",
+          "text": "2 writers",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ],
       "metrics": {
         "pause": "15",
         "stale": "1"
@@ -333,6 +415,23 @@
           "label": "rejected: 33 < 34"
         }
       ],
+      "chips": [
+        {
+          "node": "store",
+          "text": "highest seen: 34"
+        },
+        {
+          "node": "store",
+          "text": "33 rejected",
+          "tone": "green",
+          "at": "bottom"
+        },
+        {
+          "node": "b",
+          "text": "token 34 ok",
+          "tone": "green"
+        }
+      ],
       "metrics": {
         "stale": "0"
       }
@@ -348,6 +447,16 @@
         "store"
       ],
       "flows": [],
+      "chips": [
+        {
+          "node": "lock",
+          "text": "majority needed"
+        },
+        {
+          "node": "store",
+          "text": "atomic token check"
+        }
+      ],
       "metrics": {}
     },
     {
@@ -363,6 +472,22 @@
         "store"
       ],
       "flows": [],
+      "chips": [
+        {
+          "node": "lock",
+          "text": "lease 10 s"
+        },
+        {
+          "node": "store",
+          "text": "rejects < 34",
+          "tone": "green"
+        },
+        {
+          "node": "b",
+          "text": "leader · tok 34",
+          "tone": "green"
+        }
+      ],
       "metrics": {
         "ttl": "10",
         "token": "34",

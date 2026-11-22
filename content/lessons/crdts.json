@@ -97,6 +97,16 @@
           "label": "10 likes"
         }
       ],
+      "chips": [
+        {
+          "node": "ra",
+          "text": "10 likes"
+        },
+        {
+          "node": "rb",
+          "text": "10 likes"
+        }
+      ],
       "metrics": {
         "a": "10",
         "b": "10",
@@ -136,6 +146,22 @@
           "label": "partitioned"
         }
       ],
+      "chips": [
+        {
+          "node": "ra",
+          "text": "11 likes"
+        },
+        {
+          "node": "rb",
+          "text": "12 likes"
+        },
+        {
+          "node": "ra",
+          "text": "partitioned",
+          "tone": "red",
+          "at": "edge:ra-rb"
+        }
+      ],
       "metrics": {
         "a": "11",
         "b": "12",
@@ -158,6 +184,22 @@
           "to": "ra",
           "kind": "replicate",
           "label": "12 @ t=10:04"
+        }
+      ],
+      "chips": [
+        {
+          "node": "ra",
+          "text": "12 likes"
+        },
+        {
+          "node": "rb",
+          "text": "12 likes"
+        },
+        {
+          "node": "ra",
+          "text": "1 like lost",
+          "tone": "red",
+          "at": "bottom"
         }
       ],
       "metrics": {
@@ -190,6 +232,21 @@
           "label": "state"
         }
       ],
+      "chips": [
+        {
+          "node": "ra",
+          "text": "commutative"
+        },
+        {
+          "node": "rb",
+          "text": "associative"
+        },
+        {
+          "node": "ra",
+          "text": "idempotent",
+          "at": "bottom"
+        }
+      ],
       "metrics": {}
     },
     {
@@ -216,6 +273,24 @@
           "label": "{A:5,B:7}"
         }
       ],
+      "chips": [
+        {
+          "node": "ra",
+          "text": "{A:6, B:7}",
+          "tone": "green"
+        },
+        {
+          "node": "rb",
+          "text": "{A:6, B:7}",
+          "tone": "green"
+        },
+        {
+          "node": "ra",
+          "text": "sum = 13",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ],
       "metrics": {
         "a": "13",
         "b": "13",
@@ -239,6 +314,18 @@
           "to": "rb",
           "kind": "replicate",
           "label": "{A:6,B:5} again"
+        }
+      ],
+      "chips": [
+        {
+          "node": "rb",
+          "text": "no change · still 13",
+          "tone": "green"
+        },
+        {
+          "node": "ra",
+          "text": "13 likes",
+          "tone": "green"
         }
       ],
       "metrics": {
@@ -285,6 +372,22 @@
           "label": "milk {#t9}"
         }
       ],
+      "chips": [
+        {
+          "node": "ra",
+          "text": "removes #t1"
+        },
+        {
+          "node": "rb",
+          "text": "adds #t9"
+        },
+        {
+          "node": "rb",
+          "text": "add wins",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ],
       "metrics": {}
     },
     {
@@ -325,6 +428,17 @@
           "label": "ops"
         }
       ],
+      "chips": [
+        {
+          "node": "ra",
+          "text": "unique id per char"
+        },
+        {
+          "node": "rb",
+          "text": "same order on all",
+          "tone": "green"
+        }
+      ],
       "metrics": {}
     },
     {
@@ -359,6 +473,22 @@
           "label": "balance -60"
         }
       ],
+      "chips": [
+        {
+          "node": "ra",
+          "text": "withdraw 80 ok"
+        },
+        {
+          "node": "rb",
+          "text": "withdraw 80 ok"
+        },
+        {
+          "node": "ra",
+          "text": "balance -60",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ],
       "metrics": {}
     },
     {
@@ -374,6 +504,24 @@
         "rb"
       ],
       "flows": [],
+      "chips": [
+        {
+          "node": "ra",
+          "text": "13 likes",
+          "tone": "green"
+        },
+        {
+          "node": "rb",
+          "text": "13 likes",
+          "tone": "green"
+        },
+        {
+          "node": "rb",
+          "text": "0 lost writes",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ],
       "metrics": {
         "a": "13",
         "b": "13",

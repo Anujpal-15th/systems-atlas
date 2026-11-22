@@ -117,7 +117,8 @@
         "client"
       ],
       "flows": [],
-      "metrics": {}
+      "metrics": {},
+      "chips": []
     },
     {
       "tag": "CONCEPT",
@@ -129,7 +130,23 @@
         "store"
       ],
       "flows": [],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "store",
+          "text": "11 nines",
+          "tone": "green"
+        },
+        {
+          "node": "store",
+          "text": "PUT / GET whole",
+          "at": "bottom"
+        },
+        {
+          "node": "store",
+          "text": "no in-place edit"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -158,7 +175,24 @@
       ],
       "metrics": {
         "apibytes": "2048"
-      }
+      },
+      "chips": [
+        {
+          "node": "api",
+          "text": "2 GB via API",
+          "tone": "red"
+        },
+        {
+          "node": "api",
+          "text": "20 TB at 10k users",
+          "tone": "red",
+          "at": "bottom"
+        },
+        {
+          "node": "store",
+          "text": "crossed twice"
+        }
+      ]
     },
     {
       "tag": "PATTERN",
@@ -193,7 +227,22 @@
       ],
       "metrics": {
         "apibytes": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "meta",
+          "text": "status: pending"
+        },
+        {
+          "node": "meta",
+          "text": "owner, key, size",
+          "at": "bottom"
+        },
+        {
+          "node": "store",
+          "text": "videos/u42/9f3a.mp4"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -222,7 +271,28 @@
       "metrics": {
         "apibytes": "0",
         "urlttl": "15"
-      }
+      },
+      "chips": [
+        {
+          "node": "api",
+          "text": "signed PUT"
+        },
+        {
+          "node": "api",
+          "text": "valid 15 min",
+          "at": "bottom"
+        },
+        {
+          "node": "client",
+          "text": "uploads direct",
+          "tone": "green"
+        },
+        {
+          "node": "api",
+          "text": "0 MB via API",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "MULTIPART",
@@ -281,7 +351,27 @@
       ],
       "metrics": {
         "parts": "32"
-      }
+      },
+      "chips": [
+        {
+          "node": "client",
+          "text": "32 parts x 64 MB"
+        },
+        {
+          "node": "store",
+          "text": "parts in parallel",
+          "at": "bottom"
+        },
+        {
+          "node": "api",
+          "text": "ETag list"
+        },
+        {
+          "node": "client",
+          "text": "retry 1 part",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "ASYNC",
@@ -320,7 +410,23 @@
           "label": "status=ready"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "store",
+          "text": "ObjectCreated"
+        },
+        {
+          "node": "worker",
+          "text": "at-least-once",
+          "at": "bottom"
+        },
+        {
+          "node": "meta",
+          "text": "pending -> ready",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "READ",
@@ -385,7 +491,23 @@
           "label": "video"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "cdn",
+          "text": "1st viewer: miss"
+        },
+        {
+          "node": "cdn",
+          "text": "later: cache hit",
+          "tone": "green"
+        },
+        {
+          "node": "meta",
+          "text": "DB lookup",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -408,7 +530,24 @@
       ],
       "metrics": {
         "parts": "20"
-      }
+      },
+      "chips": [
+        {
+          "node": "store",
+          "text": "20 of 32 parts",
+          "tone": "red"
+        },
+        {
+          "node": "meta",
+          "text": "stuck: pending",
+          "tone": "red",
+          "at": "bottom"
+        },
+        {
+          "node": "store",
+          "text": "abort after 7 d"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -429,7 +568,27 @@
         "apibytes": "0",
         "parts": "32",
         "urlttl": "15"
-      }
+      },
+      "chips": [
+        {
+          "node": "store",
+          "text": "bytes"
+        },
+        {
+          "node": "meta",
+          "text": "facts",
+          "at": "bottom"
+        },
+        {
+          "node": "api",
+          "text": "0 MB via API",
+          "tone": "green"
+        },
+        {
+          "node": "cdn",
+          "text": "edge reads"
+        }
+      ]
     }
   ],
   "quiz": [

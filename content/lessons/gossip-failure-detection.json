@@ -134,6 +134,13 @@
         "e"
       ],
       "flows": [],
+      "chips": [
+        {
+          "node": "a",
+          "text": "leader",
+          "tone": "green"
+        }
+      ],
       "metrics": {
         "gap": "0",
         "phi": "0",
@@ -165,6 +172,17 @@
           "label": "heartbeat #42"
         }
       ],
+      "chips": [
+        {
+          "node": "e",
+          "text": "heartbeat #42"
+        },
+        {
+          "node": "d",
+          "text": "gap 1 s · phi 0.4",
+          "tone": "green"
+        }
+      ],
       "metrics": {
         "gap": "1000",
         "phi": "0.4"
@@ -188,6 +206,18 @@
           "label": "no heartbeat"
         }
       ],
+      "chips": [
+        {
+          "node": "e",
+          "text": "crashed",
+          "tone": "red"
+        },
+        {
+          "node": "d",
+          "text": "5 s timeout fires",
+          "tone": "red"
+        }
+      ],
       "metrics": {
         "gap": "5000",
         "phi": "2.2"
@@ -209,6 +239,18 @@
           "to": "d",
           "kind": "fail",
           "label": "phi rising"
+        }
+      ],
+      "chips": [
+        {
+          "node": "d",
+          "text": "phi 8.1",
+          "tone": "red"
+        },
+        {
+          "node": "d",
+          "text": "threshold 8",
+          "at": "bottom"
         }
       ],
       "metrics": {
@@ -242,6 +284,20 @@
           "label": "E suspect v7"
         }
       ],
+      "chips": [
+        {
+          "node": "d",
+          "text": "suspects E"
+        },
+        {
+          "node": "b",
+          "text": "E suspect v7"
+        },
+        {
+          "node": "c",
+          "text": "E suspect v7"
+        }
+      ],
       "metrics": {
         "aware": "3"
       }
@@ -272,6 +328,17 @@
           "label": "E suspect v7"
         }
       ],
+      "chips": [
+        {
+          "node": "a",
+          "text": "E suspect v7"
+        },
+        {
+          "node": "d",
+          "text": "4 of 4 aware",
+          "tone": "green"
+        }
+      ],
       "metrics": {
         "aware": "4"
       }
@@ -298,6 +365,24 @@
           "to": "c",
           "kind": "async",
           "label": "I am back"
+        }
+      ],
+      "chips": [
+        {
+          "node": "e",
+          "text": "paused 20 s",
+          "tone": "red"
+        },
+        {
+          "node": "c",
+          "text": "phi 8.7",
+          "tone": "red"
+        },
+        {
+          "node": "e",
+          "text": "refutes: alive",
+          "tone": "green",
+          "at": "bottom"
         }
       ],
       "metrics": {
@@ -352,6 +437,23 @@
           "label": "write x=1"
         }
       ],
+      "chips": [
+        {
+          "node": "a",
+          "text": "x=1"
+        },
+        {
+          "node": "e",
+          "text": "x=2 · conflict",
+          "tone": "red"
+        },
+        {
+          "node": "c",
+          "text": "partitioned",
+          "tone": "red",
+          "at": "edge:c-d"
+        }
+      ],
       "metrics": {
         "gap": "20000",
         "phi": "8.7",
@@ -392,6 +494,18 @@
           "label": "no quorum"
         }
       ],
+      "chips": [
+        {
+          "node": "a",
+          "text": "3 of 5 = majority",
+          "tone": "green"
+        },
+        {
+          "node": "e",
+          "text": "no quorum",
+          "tone": "red"
+        }
+      ],
       "metrics": {
         "leaders": "1"
       }
@@ -410,6 +524,16 @@
         "e"
       ],
       "flows": [],
+      "chips": [
+        {
+          "node": "d",
+          "text": "phi 8 → suspect"
+        },
+        {
+          "node": "c",
+          "text": "≈ log N rounds"
+        }
+      ],
       "metrics": {
         "aware": "4",
         "leaders": "1"

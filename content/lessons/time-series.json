@@ -130,7 +130,8 @@
         "rawday": "17",
         "keep": "90",
         "query": "0"
-      }
+      },
+      "chips": []
     },
     {
       "tag": "FLOW",
@@ -157,7 +158,19 @@
           "label": "batch of 5,000"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "queue",
+          "text": "buffers spikes",
+          "tone": "green"
+        },
+        {
+          "node": "writer",
+          "text": "batch writes",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -185,7 +198,22 @@
       ],
       "metrics": {
         "rawday": "17"
-      }
+      },
+      "chips": [
+        {
+          "node": "hot",
+          "text": "1-2 bytes/point"
+        },
+        {
+          "node": "hot",
+          "text": "~17 GB/day",
+          "at": "bottom"
+        },
+        {
+          "node": "hot",
+          "text": "1-day chunk"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -213,7 +241,24 @@
       ],
       "metrics": {
         "query": "40"
-      }
+      },
+      "chips": [
+        {
+          "node": "dash",
+          "text": "p95, last hour"
+        },
+        {
+          "node": "hot",
+          "text": "newest chunk only",
+          "tone": "green"
+        },
+        {
+          "node": "hot",
+          "text": "~40 ms",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -235,7 +280,25 @@
       ],
       "metrics": {
         "query": "9000"
-      }
+      },
+      "chips": [
+        {
+          "node": "dash",
+          "text": "90 days of raw",
+          "tone": "red"
+        },
+        {
+          "node": "hot",
+          "text": "90 chunks",
+          "tone": "red"
+        },
+        {
+          "node": "dash",
+          "text": "~9 s",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -262,7 +325,22 @@
           "label": "1m + 1h points"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "rollup",
+          "text": "1 min: 6x fewer"
+        },
+        {
+          "node": "rollup",
+          "text": "1 hour: 360x fewer",
+          "at": "bottom"
+        },
+        {
+          "node": "cold",
+          "text": "count, sum, min, max"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -290,7 +368,24 @@
       ],
       "metrics": {
         "query": "30"
-      }
+      },
+      "chips": [
+        {
+          "node": "dash",
+          "text": "2,160 points",
+          "tone": "green"
+        },
+        {
+          "node": "cold",
+          "text": "hourly rollups",
+          "at": "bottom"
+        },
+        {
+          "node": "dash",
+          "text": "~30 ms",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -312,7 +407,23 @@
       ],
       "metrics": {
         "keep": "15"
-      }
+      },
+      "chips": [
+        {
+          "node": "hot",
+          "text": "raw: 15 days"
+        },
+        {
+          "node": "rollup",
+          "text": "1-min: 13 months"
+        },
+        {
+          "node": "hot",
+          "text": "drop whole chunks",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -346,7 +457,25 @@
           "label": "index/memory full"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "agents",
+          "text": "+ user_id label",
+          "tone": "red"
+        },
+        {
+          "node": "hot",
+          "text": "1M -> 100M series",
+          "tone": "red",
+          "at": "bottom"
+        },
+        {
+          "node": "hot",
+          "text": "memory grows",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -369,7 +498,23 @@
         "rawday": "17",
         "keep": "15",
         "query": "30"
-      }
+      },
+      "chips": [
+        {
+          "node": "hot",
+          "text": "chunks + compress"
+        },
+        {
+          "node": "cold",
+          "text": "rollups",
+          "at": "bottom"
+        },
+        {
+          "node": "dash",
+          "text": "~30 ms",
+          "tone": "green"
+        }
+      ]
     }
   ],
   "quiz": [

@@ -147,7 +147,19 @@
       "metrics": {
         "avail": "99.9",
         "down": "526"
-      }
+      },
+      "chips": [
+        {
+          "node": "app-a",
+          "text": "99.9% up"
+        },
+        {
+          "node": "app-a",
+          "text": "526 min/yr",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -183,7 +195,27 @@
       "metrics": {
         "avail": "99.79",
         "down": "1103"
-      }
+      },
+      "chips": [
+        {
+          "node": "lb",
+          "text": "99.99%"
+        },
+        {
+          "node": "app-a",
+          "text": "99.9%"
+        },
+        {
+          "node": "primary",
+          "text": "99.9%"
+        },
+        {
+          "node": "app-a",
+          "text": "series ≈ 99.79%",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -213,7 +245,23 @@
       "metrics": {
         "avail": "99.89",
         "down": "579"
-      }
+      },
+      "chips": [
+        {
+          "node": "app-a",
+          "text": "down 0.1%"
+        },
+        {
+          "node": "app-b",
+          "text": "down 0.1%"
+        },
+        {
+          "node": "lb",
+          "text": "tier 99.9999%",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -246,7 +294,22 @@
           "label": "50 req/s"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "app-a",
+          "text": "50 req/s"
+        },
+        {
+          "node": "app-b",
+          "text": "50 req/s"
+        },
+        {
+          "node": "lb",
+          "text": "keep each < 50% load",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -288,7 +351,23 @@
       ],
       "metrics": {
         "failover": "15"
-      }
+      },
+      "chips": [
+        {
+          "node": "app-a",
+          "text": "no reply",
+          "tone": "red"
+        },
+        {
+          "node": "monitor",
+          "text": "3 misses = down"
+        },
+        {
+          "node": "app-b",
+          "text": "200 OK",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -322,7 +401,22 @@
           "label": "change log"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "primary",
+          "text": "primary · writes"
+        },
+        {
+          "node": "standby",
+          "text": "standby · follows"
+        },
+        {
+          "node": "standby",
+          "text": "lag ms to s",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -373,7 +467,24 @@
         "failover": "30",
         "avail": "99.99",
         "down": "55"
-      }
+      },
+      "chips": [
+        {
+          "node": "primary",
+          "text": "down · fenced",
+          "tone": "red"
+        },
+        {
+          "node": "standby",
+          "text": "promoted",
+          "tone": "green"
+        },
+        {
+          "node": "standby",
+          "text": "~30 s failover",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -397,7 +508,29 @@
       "metrics": {
         "avail": "99.9994",
         "down": "3"
-      }
+      },
+      "chips": [
+        {
+          "node": "lb",
+          "text": "53 of 55 min/yr",
+          "tone": "red"
+        },
+        {
+          "node": "lb",
+          "text": "2 LBs · floating IP",
+          "tone": "green",
+          "at": "bottom"
+        },
+        {
+          "node": "monitor",
+          "text": "several checkers"
+        },
+        {
+          "node": "users",
+          "text": "≈ 3 min/yr",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -427,7 +560,25 @@
       "metrics": {
         "avail": "99.9",
         "down": "526"
-      }
+      },
+      "chips": [
+        {
+          "node": "app-a",
+          "text": "no reply",
+          "tone": "red"
+        },
+        {
+          "node": "app-b",
+          "text": "no reply",
+          "tone": "red"
+        },
+        {
+          "node": "lb",
+          "text": "shared fate",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -449,7 +600,23 @@
         "avail": "99.9994",
         "down": "3",
         "failover": "30"
-      }
+      },
+      "chips": [
+        {
+          "node": "users",
+          "text": "99.9994%",
+          "tone": "green"
+        },
+        {
+          "node": "users",
+          "text": "3 min/yr",
+          "at": "bottom"
+        },
+        {
+          "node": "standby",
+          "text": "30 s failover"
+        }
+      ]
     }
   ],
   "quiz": [

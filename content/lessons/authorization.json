@@ -16,7 +16,8 @@
       "label": "Alice's browser",
       "kind": "client",
       "x": 8,
-      "y": 50
+      "y": 50,
+      "url": "https://docs.example"
     },
     {
       "id": "gateway",
@@ -108,7 +109,8 @@
         "client"
       ],
       "flows": [],
-      "metrics": {}
+      "metrics": {},
+      "chips": []
     },
     {
       "tag": "FLOW",
@@ -128,7 +130,18 @@
           "label": "GET /docs/42"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "client",
+          "text": "tenant acme"
+        },
+        {
+          "node": "gateway",
+          "text": "token valid",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "RBAC",
@@ -163,7 +176,17 @@
       ],
       "metrics": {
         "decision": "4"
-      }
+      },
+      "chips": [
+        {
+          "node": "store",
+          "text": "alice: editor"
+        },
+        {
+          "node": "pdp",
+          "text": "~1 ms per hop"
+        }
+      ]
     },
     {
       "tag": "ABAC",
@@ -191,7 +214,18 @@
       ],
       "metrics": {
         "decision": "6"
-      }
+      },
+      "chips": [
+        {
+          "node": "store",
+          "text": "tenant=acme"
+        },
+        {
+          "node": "pdp",
+          "text": "same tenant · allow",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "REBAC",
@@ -219,7 +253,23 @@
       ],
       "metrics": {
         "decision": "8"
-      }
+      },
+      "chips": [
+        {
+          "node": "store",
+          "text": "alice → eng → Q3"
+        },
+        {
+          "node": "store",
+          "text": "target < 10 ms",
+          "at": "bottom"
+        },
+        {
+          "node": "pdp",
+          "text": "path found",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "CENTRAL",
@@ -266,7 +316,23 @@
       ],
       "metrics": {
         "decision": "5"
-      }
+      },
+      "chips": [
+        {
+          "node": "pdp",
+          "text": "allow",
+          "tone": "green"
+        },
+        {
+          "node": "pdp",
+          "text": "cached 30 s",
+          "at": "bottom"
+        },
+        {
+          "node": "app",
+          "text": "fail closed"
+        }
+      ]
     },
     {
       "tag": "TENANT",
@@ -295,7 +361,18 @@
       "metrics": {
         "rows": "1",
         "foreign": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "db",
+          "text": "tenant=acme"
+        },
+        {
+          "node": "db",
+          "text": "1 row",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -324,7 +401,19 @@
       "metrics": {
         "rows": "1200",
         "foreign": "1199"
-      }
+      },
+      "chips": [
+        {
+          "node": "app",
+          "text": "no tenant filter",
+          "tone": "red"
+        },
+        {
+          "node": "db",
+          "text": "1,200 rows",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -380,7 +469,23 @@
         "decision": "3",
         "rows": "0",
         "foreign": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "client",
+          "text": "scope docs:read"
+        },
+        {
+          "node": "pdp",
+          "text": "deny",
+          "tone": "red"
+        },
+        {
+          "node": "client",
+          "text": "403 Forbidden",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -401,7 +506,19 @@
         "decision": "3",
         "rows": "0",
         "foreign": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "pdp",
+          "text": "default deny",
+          "tone": "green"
+        },
+        {
+          "node": "db",
+          "text": "row-level security",
+          "tone": "green"
+        }
+      ]
     }
   ],
   "quiz": [

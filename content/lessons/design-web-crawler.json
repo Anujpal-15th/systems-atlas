@@ -148,7 +148,17 @@
         "rate": "0",
         "workers": "0",
         "dupes": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "seeds",
+          "text": "100 seed URLs"
+        },
+        {
+          "node": "frontier",
+          "text": "≈ 400 pages/s"
+        }
+      ]
     },
     {
       "tag": "FRONTIER",
@@ -170,7 +180,18 @@
       ],
       "metrics": {
         "workers": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "frontier",
+          "text": "1 queue / host"
+        },
+        {
+          "node": "frontier",
+          "text": "bulk on disk",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "DNS",
@@ -199,7 +220,18 @@
       "metrics": {
         "dns": "1",
         "workers": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "dns",
+          "text": "198.51.100.4"
+        },
+        {
+          "node": "dns",
+          "text": "1 ms · cached",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "POLITE",
@@ -228,7 +260,23 @@
       "metrics": {
         "rate": "120",
         "workers": "60"
-      }
+      },
+      "chips": [
+        {
+          "node": "web",
+          "text": "200 + HTML",
+          "tone": "green"
+        },
+        {
+          "node": "fetcher",
+          "text": "60 in flight"
+        },
+        {
+          "node": "fetcher",
+          "text": "≈ 120 pages/s",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "PARSE",
@@ -250,7 +298,18 @@
       ],
       "metrics": {
         "rate": "120"
-      }
+      },
+      "chips": [
+        {
+          "node": "parser",
+          "text": "URLs normalised"
+        },
+        {
+          "node": "parser",
+          "text": "fragments dropped",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "DEDUP",
@@ -278,7 +337,27 @@
       ],
       "metrics": {
         "dupes": "78"
-      }
+      },
+      "chips": [
+        {
+          "node": "parser",
+          "text": "40 links"
+        },
+        {
+          "node": "dedup",
+          "text": "9 are new",
+          "tone": "green"
+        },
+        {
+          "node": "dedup",
+          "text": "78% already seen"
+        },
+        {
+          "node": "dedup",
+          "text": "Bloom ≈ 12 GB",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "LOOP",
@@ -315,7 +394,21 @@
       "metrics": {
         "rate": "120",
         "workers": "60"
-      }
+      },
+      "chips": [
+        {
+          "node": "frontier",
+          "text": "9 new URLs"
+        },
+        {
+          "node": "dedup",
+          "text": "content hash?"
+        },
+        {
+          "node": "store",
+          "text": "new page + hash"
+        }
+      ]
     },
     {
       "tag": "SCALE",
@@ -351,7 +444,22 @@
       "metrics": {
         "rate": "400",
         "workers": "200"
-      }
+      },
+      "chips": [
+        {
+          "node": "fetcher",
+          "text": "200 in flight"
+        },
+        {
+          "node": "frontier",
+          "text": "400 pages/s"
+        },
+        {
+          "node": "frontier",
+          "text": "shard by host hash",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -392,7 +500,27 @@
       ],
       "metrics": {
         "rate": "390"
-      }
+      },
+      "chips": [
+        {
+          "node": "fetcher",
+          "text": "timeout",
+          "tone": "red"
+        },
+        {
+          "node": "frontier",
+          "text": "lease expired · retry"
+        },
+        {
+          "node": "frontier",
+          "text": "cap depth + host",
+          "at": "bottom"
+        },
+        {
+          "node": "fetcher",
+          "text": "≈ 390 pages/s"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -416,7 +544,21 @@
         "dns": "1",
         "dupes": "78",
         "workers": "200"
-      }
+      },
+      "chips": [
+        {
+          "node": "fetcher",
+          "text": "≈ 400 pages/s"
+        },
+        {
+          "node": "dns",
+          "text": "1 ms"
+        },
+        {
+          "node": "dedup",
+          "text": "78% seen"
+        }
+      ]
     }
   ],
   "quiz": [

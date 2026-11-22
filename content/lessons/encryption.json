@@ -17,7 +17,8 @@
       "label": "Browser",
       "kind": "client",
       "x": 10,
-      "y": 55
+      "y": 55,
+      "url": "https://shop.example"
     },
     {
       "id": "edge",
@@ -111,7 +112,8 @@
         "rtt": "0",
         "kms": "0",
         "keys": "0"
-      }
+      },
+      "chips": []
     },
     {
       "tag": "CONCEPT",
@@ -124,7 +126,22 @@
         "edge"
       ],
       "flows": [],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "browser",
+          "text": "AES-256-GCM"
+        },
+        {
+          "node": "edge",
+          "text": "key pair"
+        },
+        {
+          "node": "edge",
+          "text": "asym ~1000x slower",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -152,7 +169,23 @@
       ],
       "metrics": {
         "rtt": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "edge",
+          "text": "cert ok",
+          "tone": "green"
+        },
+        {
+          "node": "edge",
+          "text": "1 RTT · +50 ms"
+        },
+        {
+          "node": "browser",
+          "text": "session key",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -172,7 +205,23 @@
           "label": "ciphertext"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "edge",
+          "text": "ciphertext"
+        },
+        {
+          "node": "browser",
+          "text": "AES-GCM"
+        },
+        {
+          "node": "browser",
+          "text": "forward secrecy",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -198,7 +247,18 @@
           "label": "ciphertext"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "edge",
+          "text": "TLS ends here"
+        },
+        {
+          "node": "app",
+          "text": "mTLS",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -234,7 +294,23 @@
       "metrics": {
         "kms": "1",
         "keys": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "kms",
+          "text": "master key stays",
+          "tone": "green"
+        },
+        {
+          "node": "app",
+          "text": "plain key discarded"
+        },
+        {
+          "node": "db",
+          "text": "ciphertext + wrapped",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -275,7 +351,18 @@
       ],
       "metrics": {
         "kms": "2"
-      }
+      },
+      "chips": [
+        {
+          "node": "kms",
+          "text": "decrypt logged",
+          "tone": "green"
+        },
+        {
+          "node": "app",
+          "text": "decrypts locally"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -322,7 +409,23 @@
       ],
       "metrics": {
         "kms": "3"
-      }
+      },
+      "chips": [
+        {
+          "node": "kms",
+          "text": "master key v2"
+        },
+        {
+          "node": "db",
+          "text": "wrapped key v1 → v2"
+        },
+        {
+          "node": "db",
+          "text": "bulk untouched",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -349,7 +452,17 @@
           "label": "SHA-256 checksum"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "store",
+          "text": "encrypted backup"
+        },
+        {
+          "node": "db",
+          "text": "SHA-256 · 32 B"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -370,7 +483,18 @@
         "rtt": "1",
         "kms": "3",
         "keys": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "kms",
+          "text": "every use logged",
+          "tone": "green"
+        },
+        {
+          "node": "db",
+          "text": "data key wrapped"
+        }
+      ]
     }
   ],
   "quiz": [

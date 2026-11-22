@@ -119,7 +119,13 @@
         "pipeline": "0",
         "tests": "0",
         "errors": "0.2"
-      }
+      },
+      "chips": [
+        {
+          "node": "dev",
+          "text": "40-line change"
+        }
+      ]
     },
     {
       "tag": "TRUNK",
@@ -146,7 +152,21 @@
           "label": "webhook"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "dev",
+          "text": "branch lives hours"
+        },
+        {
+          "node": "repo",
+          "text": "trunk: main"
+        },
+        {
+          "node": "ci",
+          "text": "webhook trigger"
+        }
+      ]
     },
     {
       "tag": "BUILD",
@@ -160,7 +180,23 @@
       "flows": [],
       "metrics": {
         "pipeline": "2"
-      }
+      },
+      "chips": [
+        {
+          "node": "ci",
+          "text": "shop-api:a1b2c3d"
+        },
+        {
+          "node": "ci",
+          "text": "clean runner",
+          "tone": "green"
+        },
+        {
+          "node": "ci",
+          "text": "build ≈ 2 min",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "TEST",
@@ -175,7 +211,19 @@
       "metrics": {
         "pipeline": "8",
         "tests": "1240"
-      }
+      },
+      "chips": [
+        {
+          "node": "ci",
+          "text": "1,240 tests pass",
+          "tone": "green"
+        },
+        {
+          "node": "ci",
+          "text": "≈ 6 min",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "ARTIFACT",
@@ -203,7 +251,22 @@
       ],
       "metrics": {
         "pipeline": "10"
-      }
+      },
+      "chips": [
+        {
+          "node": "registry",
+          "text": "shop-api:a1b2c3d"
+        },
+        {
+          "node": "registry",
+          "text": "sha256 digest"
+        },
+        {
+          "node": "registry",
+          "text": "+2 min",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "DEPLOY",
@@ -239,7 +302,22 @@
       "metrics": {
         "pipeline": "14",
         "errors": "0.2"
-      }
+      },
+      "chips": [
+        {
+          "node": "staging",
+          "text": "smoke tests"
+        },
+        {
+          "node": "prod",
+          "text": "same image"
+        },
+        {
+          "node": "prod",
+          "text": "total ≈ 14 min",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -253,7 +331,24 @@
       "flows": [],
       "metrics": {
         "errors": "6"
-      }
+      },
+      "chips": [
+        {
+          "node": "prod",
+          "text": "errors 6%",
+          "tone": "red"
+        },
+        {
+          "node": "prod",
+          "text": "was 0.2%",
+          "at": "bottom"
+        },
+        {
+          "node": "ci",
+          "text": "fix-forward 14 min",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "ROLLBACK",
@@ -276,7 +371,25 @@
       "metrics": {
         "pipeline": "1",
         "errors": "0.2"
-      }
+      },
+      "chips": [
+        {
+          "node": "registry",
+          "text": "shop-api:9f8e7d6",
+          "tone": "green"
+        },
+        {
+          "node": "prod",
+          "text": "rollback ≈ 1 min",
+          "tone": "green"
+        },
+        {
+          "node": "prod",
+          "text": "errors 0.2%",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -297,7 +410,23 @@
         "pipeline": "14",
         "tests": "1240",
         "errors": "0.2"
-      }
+      },
+      "chips": [
+        {
+          "node": "prod",
+          "text": "commit to users 14 min"
+        },
+        {
+          "node": "ci",
+          "text": "1,240 tests"
+        },
+        {
+          "node": "prod",
+          "text": "errors 0.2%",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     }
   ],
   "quiz": [

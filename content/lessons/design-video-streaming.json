@@ -198,7 +198,21 @@
       ],
       "metrics": {
         "source": "600"
-      }
+      },
+      "chips": [
+        {
+          "node": "upload",
+          "text": "presigned URL"
+        },
+        {
+          "node": "raw",
+          "text": "8 MB chunks"
+        },
+        {
+          "node": "meta",
+          "text": "processing"
+        }
+      ]
     },
     {
       "tag": "PIPELINE",
@@ -225,7 +239,17 @@
           "label": "pull job"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "queue",
+          "text": "job: video 81f"
+        },
+        {
+          "node": "workers",
+          "text": "parallel pieces"
+        }
+      ]
     },
     {
       "tag": "TRANSCODE",
@@ -247,7 +271,22 @@
       ],
       "metrics": {
         "renditions": "5"
-      }
+      },
+      "chips": [
+        {
+          "node": "workers",
+          "text": "5 renditions"
+        },
+        {
+          "node": "workers",
+          "text": "10.6 Mbps total",
+          "at": "bottom"
+        },
+        {
+          "node": "raw",
+          "text": "≈ 800 MB out"
+        }
+      ]
     },
     {
       "tag": "SEGMENT",
@@ -267,7 +306,22 @@
           "label": "4 s segments"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "origin",
+          "text": "150 segs / rendition"
+        },
+        {
+          "node": "origin",
+          "text": "≈ 750 files",
+          "at": "bottom"
+        },
+        {
+          "node": "workers",
+          "text": "4 s segments"
+        }
+      ]
     },
     {
       "tag": "PUBLISH",
@@ -287,7 +341,19 @@
           "label": "status: ready"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "meta",
+          "text": "ready",
+          "tone": "green"
+        },
+        {
+          "node": "meta",
+          "text": "manifest saved",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "PLAYBACK",
@@ -328,7 +394,21 @@
       ],
       "metrics": {
         "startup": "300"
-      }
+      },
+      "chips": [
+        {
+          "node": "meta",
+          "text": "manifest URL"
+        },
+        {
+          "node": "cdn",
+          "text": "master playlist"
+        },
+        {
+          "node": "viewer",
+          "text": "no video bytes yet"
+        }
+      ]
     },
     {
       "tag": "CDN",
@@ -370,7 +450,21 @@
       "metrics": {
         "startup": "1200",
         "hit": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "cdn",
+          "text": "miss · fetch"
+        },
+        {
+          "node": "origin",
+          "text": "segment kept at edge"
+        },
+        {
+          "node": "viewer",
+          "text": "start ≈ 1.2 s"
+        }
+      ]
     },
     {
       "tag": "ADAPT",
@@ -404,7 +498,25 @@
       ],
       "metrics": {
         "hit": "96"
-      }
+      },
+      "chips": [
+        {
+          "node": "viewer",
+          "text": "480p → 360p"
+        },
+        {
+          "node": "cdn",
+          "kind": "progress",
+          "value": 96,
+          "text": "96%",
+          "tone": "green"
+        },
+        {
+          "node": "cdn",
+          "text": "cache hit",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -429,7 +541,24 @@
         "renditions": "5",
         "startup": "1200",
         "hit": "96"
-      }
+      },
+      "chips": [
+        {
+          "node": "viewer",
+          "text": "start ≈ 1.2 s"
+        },
+        {
+          "node": "cdn",
+          "kind": "progress",
+          "value": 96,
+          "text": "96%",
+          "tone": "green"
+        },
+        {
+          "node": "workers",
+          "text": "5 renditions"
+        }
+      ]
     }
   ],
   "quiz": [

@@ -17,7 +17,8 @@
       "label": "Browser",
       "kind": "client",
       "x": 8,
-      "y": 50
+      "y": 50,
+      "url": "https://short.example"
     },
     {
       "id": "lb",
@@ -167,7 +168,22 @@
         "hit": "0",
         "dbq": "4000",
         "p99": "40"
-      }
+      },
+      "chips": [
+        {
+          "node": "create",
+          "text": "40 writes/s"
+        },
+        {
+          "node": "redirect",
+          "text": "4,000 reads/s"
+        },
+        {
+          "node": "db",
+          "text": "no cache yet",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "WRITE",
@@ -213,7 +229,18 @@
           "label": "201 short URL"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "create",
+          "text": "201 short URL",
+          "tone": "green"
+        },
+        {
+          "node": "db",
+          "text": "1 row inserted"
+        }
+      ]
     },
     {
       "tag": "KEYS",
@@ -252,7 +279,22 @@
           "label": "ok"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "keygen",
+          "text": "lease 1M ids"
+        },
+        {
+          "node": "create",
+          "text": "base62 · 7 chars"
+        },
+        {
+          "node": "keygen",
+          "text": "1 call / 1M links",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -278,7 +320,17 @@
           "label": "1M to 2M"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "create",
+          "text": "scrambled · unique"
+        },
+        {
+          "node": "keygen",
+          "text": "next 1M block"
+        }
+      ]
     },
     {
       "tag": "READ",
@@ -329,7 +381,24 @@
         "hit": "90",
         "dbq": "1200",
         "p99": "25"
-      }
+      },
+      "chips": [
+        {
+          "node": "cache",
+          "text": "hit · <1 ms",
+          "tone": "green"
+        },
+        {
+          "node": "cache",
+          "kind": "progress",
+          "value": 90,
+          "text": "90%"
+        },
+        {
+          "node": "redirect",
+          "text": "302 Location"
+        }
+      ]
     },
     {
       "tag": "MISS",
@@ -376,7 +445,24 @@
       ],
       "metrics": {
         "p99": "25"
-      }
+      },
+      "chips": [
+        {
+          "node": "cache",
+          "text": "miss",
+          "tone": "red"
+        },
+        {
+          "node": "db",
+          "text": "by key · few ms",
+          "tone": "green"
+        },
+        {
+          "node": "cache",
+          "text": "TTL 24h",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -409,7 +495,19 @@
           "label": "next click"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "redirect",
+          "text": "302 every click",
+          "tone": "green"
+        },
+        {
+          "node": "client",
+          "text": "301 hides clicks",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "ANALYTICS",
@@ -443,7 +541,22 @@
           "label": "add batch totals"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "queue",
+          "text": "click event"
+        },
+        {
+          "node": "worker",
+          "text": "batch of 500"
+        },
+        {
+          "node": "db",
+          "text": "1 row / key·min",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -474,7 +587,24 @@
         "hit": "0",
         "dbq": "12000",
         "p99": "180"
-      }
+      },
+      "chips": [
+        {
+          "node": "cache",
+          "text": "cold · 0% hits",
+          "tone": "red"
+        },
+        {
+          "node": "db",
+          "text": "12,000 reads/s",
+          "tone": "red"
+        },
+        {
+          "node": "redirect",
+          "text": "p99 180 ms",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -499,7 +629,22 @@
         "hit": "90",
         "dbq": "400",
         "p99": "25"
-      }
+      },
+      "chips": [
+        {
+          "node": "db",
+          "text": "6B rows · 3 TB"
+        },
+        {
+          "node": "cache",
+          "text": "12-24 GB hot set"
+        },
+        {
+          "node": "redirect",
+          "text": "p99 25 ms",
+          "tone": "green"
+        }
+      ]
     }
   ],
   "quiz": [

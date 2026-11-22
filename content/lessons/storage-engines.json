@@ -124,7 +124,8 @@
         "app"
       ],
       "flows": [],
-      "metrics": {}
+      "metrics": {},
+      "chips": []
     },
     {
       "tag": "B-TREE",
@@ -148,7 +149,24 @@
         "wamp": "160",
         "reads": "1",
         "files": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "btree",
+          "text": "16 KiB page"
+        },
+        {
+          "node": "btree",
+          "text": "~160x write amp",
+          "tone": "red"
+        },
+        {
+          "node": "btree",
+          "text": "1 disk read",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "WAL",
@@ -174,7 +192,23 @@
           "label": "durable"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "wal",
+          "text": "fsync"
+        },
+        {
+          "node": "wal",
+          "text": "sequential append",
+          "tone": "green"
+        },
+        {
+          "node": "wal",
+          "text": "replay on crash",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "LSM WRITE",
@@ -205,7 +239,23 @@
         "wamp": "1",
         "reads": "1",
         "files": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "mem",
+          "text": "memtable"
+        },
+        {
+          "node": "mem",
+          "text": "in RAM",
+          "at": "bottom"
+        },
+        {
+          "node": "mem",
+          "text": "~1 ms or less",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "FLUSH",
@@ -228,7 +278,22 @@
       "metrics": {
         "wamp": "2",
         "files": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "mem",
+          "text": "64 MiB limit"
+        },
+        {
+          "node": "sst",
+          "text": "immutable"
+        },
+        {
+          "node": "wal",
+          "text": "segment deleted",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "READ",
@@ -283,7 +348,24 @@
       "metrics": {
         "reads": "2",
         "files": "4"
-      }
+      },
+      "chips": [
+        {
+          "node": "sst",
+          "text": "Bloom filter",
+          "tone": "green"
+        },
+        {
+          "node": "sst",
+          "text": "L0 files overlap",
+          "at": "bottom"
+        },
+        {
+          "node": "sst",
+          "text": "8+ without filter",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "COMPACT",
@@ -314,7 +396,22 @@
         "wamp": "20",
         "reads": "2",
         "files": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "comp",
+          "text": "10-30x write amp"
+        },
+        {
+          "node": "comp",
+          "text": "size ratio 10",
+          "at": "bottom"
+        },
+        {
+          "node": "sst",
+          "text": "tombstones dropped"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -345,7 +442,25 @@
       "metrics": {
         "reads": "3",
         "files": "24"
-      }
+      },
+      "chips": [
+        {
+          "node": "sst",
+          "text": "24 L0 files",
+          "tone": "red"
+        },
+        {
+          "node": "app",
+          "text": "write stall",
+          "tone": "red"
+        },
+        {
+          "node": "comp",
+          "text": "falling behind",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -367,7 +482,22 @@
         "wamp": "20",
         "reads": "2",
         "files": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "btree",
+          "text": "80-160x write amp"
+        },
+        {
+          "node": "sst",
+          "text": "10-30x write amp"
+        },
+        {
+          "node": "wal",
+          "text": "WAL on both",
+          "at": "bottom"
+        }
+      ]
     }
   ],
   "quiz": [

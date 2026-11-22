@@ -124,7 +124,24 @@
         "tokens": "10",
         "allowed": "500",
         "rejected": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "abuser",
+          "text": "500 req/s",
+          "tone": "red"
+        },
+        {
+          "node": "service",
+          "text": "safe ~200 req/s"
+        },
+        {
+          "node": "service",
+          "text": "others time out",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -167,7 +184,23 @@
         "tokens": "9",
         "allowed": "2",
         "rejected": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "gateway",
+          "text": "cap 10 · +2/s"
+        },
+        {
+          "node": "gateway",
+          "text": "9 tokens left",
+          "at": "bottom"
+        },
+        {
+          "node": "client",
+          "text": "200 OK",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "REJECT",
@@ -197,7 +230,25 @@
         "tokens": "0",
         "allowed": "2",
         "rejected": "498"
-      }
+      },
+      "chips": [
+        {
+          "node": "gateway",
+          "text": "0 tokens",
+          "tone": "red"
+        },
+        {
+          "node": "abuser",
+          "text": "429 Too Many",
+          "tone": "red"
+        },
+        {
+          "node": "gateway",
+          "text": "2 req/s allowed",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -221,7 +272,23 @@
         "tokens": "0",
         "allowed": "2",
         "rejected": "498"
-      }
+      },
+      "chips": [
+        {
+          "node": "gateway",
+          "text": "leaks 2/s"
+        },
+        {
+          "node": "service",
+          "text": "steady 2/s",
+          "tone": "green"
+        },
+        {
+          "node": "gateway",
+          "text": "full → drop",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -244,7 +311,24 @@
       "metrics": {
         "allowed": "100",
         "rejected": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "abuser",
+          "text": "100 + 100 in 2 s",
+          "tone": "red"
+        },
+        {
+          "node": "gateway",
+          "text": "limit 100/min"
+        },
+        {
+          "node": "gateway",
+          "text": "2× limit at edge",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "DISTRIBUTED",
@@ -274,7 +358,23 @@
         "tokens": "7",
         "allowed": "2",
         "rejected": "498"
-      }
+      },
+      "chips": [
+        {
+          "node": "redis",
+          "text": "ok, 7 left",
+          "tone": "green"
+        },
+        {
+          "node": "gateway",
+          "text": "1 Lua script"
+        },
+        {
+          "node": "redis",
+          "text": "bucket per key",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -304,7 +404,18 @@
         "tokens": "5",
         "allowed": "20",
         "rejected": "480"
-      }
+      },
+      "chips": [
+        {
+          "node": "redis",
+          "text": "timeout 5 ms",
+          "tone": "red"
+        },
+        {
+          "node": "gateway",
+          "text": "local cap 20 req/s"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -342,7 +453,23 @@
         "tokens": "9",
         "allowed": "2",
         "rejected": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "gateway",
+          "text": "key: acme"
+        },
+        {
+          "node": "gateway",
+          "text": "within plan",
+          "tone": "green",
+          "at": "bottom"
+        },
+        {
+          "node": "db",
+          "text": "costly query"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -363,7 +490,17 @@
         "tokens": "9",
         "allowed": "2",
         "rejected": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "gateway",
+          "text": "429 + Retry-After"
+        },
+        {
+          "node": "redis",
+          "text": "shared counters"
+        }
+      ]
     }
   ],
   "quiz": [

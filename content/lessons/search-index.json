@@ -139,7 +139,8 @@
         "query": "300000",
         "shards": "0",
         "lag": "0"
-      }
+      },
+      "chips": []
     },
     {
       "tag": "CONCEPT",
@@ -166,7 +167,18 @@
           "label": "wireless headphone"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "api",
+          "text": "lowercase + stem"
+        },
+        {
+          "node": "s2",
+          "text": "headphones -> stem",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -195,7 +207,28 @@
       "metrics": {
         "query": "6",
         "shards": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "s2",
+          "text": "wireless: 3, 8, 21"
+        },
+        {
+          "node": "s2",
+          "text": "headphone: 8, 21, 40",
+          "at": "bottom"
+        },
+        {
+          "node": "s2",
+          "text": "match: 8, 21",
+          "tone": "green"
+        },
+        {
+          "node": "api",
+          "text": "6 ms",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -217,7 +250,24 @@
       ],
       "metrics": {
         "query": "9"
-      }
+      },
+      "chips": [
+        {
+          "node": "api",
+          "text": "BM25 ranking"
+        },
+        {
+          "node": "s2",
+          "text": "TF-IDF basis",
+          "at": "bottom"
+        },
+        {
+          "node": "api",
+          "text": "9 ms",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -254,7 +304,26 @@
       "metrics": {
         "shards": "3",
         "query": "12"
-      }
+      },
+      "chips": [
+        {
+          "node": "s1",
+          "text": "~100M docs"
+        },
+        {
+          "node": "s2",
+          "text": "~100M docs"
+        },
+        {
+          "node": "s3",
+          "text": "~100M docs"
+        },
+        {
+          "node": "api",
+          "text": "12 ms",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -297,7 +366,22 @@
       ],
       "metrics": {
         "query": "35"
-      }
+      },
+      "chips": [
+        {
+          "node": "s1",
+          "text": "top 10 hits"
+        },
+        {
+          "node": "api",
+          "text": "merge 3 lists",
+          "at": "bottom"
+        },
+        {
+          "node": "api",
+          "text": "35 ms"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -333,7 +417,27 @@
       ],
       "metrics": {
         "lag": "2"
-      }
+      },
+      "chips": [
+        {
+          "node": "db",
+          "text": "source of truth",
+          "tone": "green"
+        },
+        {
+          "node": "feed",
+          "text": "change stream"
+        },
+        {
+          "node": "indexer",
+          "text": "re-analyze",
+          "at": "bottom"
+        },
+        {
+          "node": "s3",
+          "text": "lag 2 s"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -355,7 +459,30 @@
       ],
       "metrics": {
         "lag": "180"
-      }
+      },
+      "chips": [
+        {
+          "node": "indexer",
+          "text": "crashed",
+          "tone": "red"
+        },
+        {
+          "node": "feed",
+          "text": "events kept",
+          "tone": "green"
+        },
+        {
+          "node": "s3",
+          "text": "stale results",
+          "tone": "red",
+          "at": "bottom"
+        },
+        {
+          "node": "indexer",
+          "text": "lag 3 min",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -378,7 +505,23 @@
         "query": "35",
         "shards": "3",
         "lag": "2"
-      }
+      },
+      "chips": [
+        {
+          "node": "api",
+          "text": "35 ms",
+          "tone": "green"
+        },
+        {
+          "node": "feed",
+          "text": "lag 2 s"
+        },
+        {
+          "node": "s2",
+          "text": "inverted index",
+          "at": "bottom"
+        }
+      ]
     }
   ],
   "quiz": [

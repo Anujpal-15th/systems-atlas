@@ -196,7 +196,23 @@
       ],
       "metrics": {
         "gateways": "200"
-      }
+      },
+      "chips": [
+        {
+          "node": "gw1",
+          "text": "101 Switching",
+          "tone": "green"
+        },
+        {
+          "node": "presence",
+          "text": "alice → gwA"
+        },
+        {
+          "node": "gw1",
+          "text": "200 gateways",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "SEND",
@@ -250,7 +266,22 @@
       ],
       "metrics": {
         "ack": "60"
-      }
+      },
+      "chips": [
+        {
+          "node": "store",
+          "text": "seq 4021 · durable",
+          "tone": "green"
+        },
+        {
+          "node": "chat",
+          "text": "ack 60 ms"
+        },
+        {
+          "node": "alice",
+          "text": "single tick"
+        }
+      ]
     },
     {
       "tag": "STORAGE",
@@ -276,7 +307,22 @@
           "label": "committed 4021"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "store",
+          "text": "sharded by conv id"
+        },
+        {
+          "node": "store",
+          "text": "0.8-1.2 TB/day",
+          "at": "bottom"
+        },
+        {
+          "node": "chat",
+          "text": "seq 4021 once"
+        }
+      ]
     },
     {
       "tag": "ROUTE",
@@ -357,7 +403,22 @@
       ],
       "metrics": {
         "deliv": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "presence",
+          "text": "gateway B"
+        },
+        {
+          "node": "bob",
+          "text": "delivered 4021"
+        },
+        {
+          "node": "alice",
+          "text": "double tick",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "GROUP",
@@ -400,7 +461,26 @@
       ],
       "metrics": {
         "deliv": "499"
-      }
+      },
+      "chips": [
+        {
+          "node": "chat",
+          "text": "499 recipients"
+        },
+        {
+          "node": "store",
+          "text": "1 copy",
+          "tone": "green"
+        },
+        {
+          "node": "bus",
+          "text": "m1 x499"
+        },
+        {
+          "node": "gw2",
+          "text": "1 batch / gateway"
+        }
+      ]
     },
     {
       "tag": "OFFLINE",
@@ -435,7 +515,23 @@
       ],
       "metrics": {
         "deliv": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "presence",
+          "text": "no route",
+          "tone": "red"
+        },
+        {
+          "node": "push",
+          "text": "wake-up push"
+        },
+        {
+          "node": "bob",
+          "text": "offline",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "SYNC",
@@ -489,7 +585,22 @@
       ],
       "metrics": {
         "deliv": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "bob",
+          "text": "after 4020"
+        },
+        {
+          "node": "store",
+          "text": "seq 4021-4030"
+        },
+        {
+          "node": "gw2",
+          "text": "10 messages",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -523,7 +634,21 @@
           "label": "SET ttl=70s"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "gw2",
+          "text": "ping / 30 s"
+        },
+        {
+          "node": "presence",
+          "text": "ttl 70 s"
+        },
+        {
+          "node": "chat",
+          "text": "batched refresh"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -548,7 +673,21 @@
         "gateways": "200",
         "ack": "60",
         "deliv": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "chat",
+          "text": "46,000 msgs/s"
+        },
+        {
+          "node": "gw1",
+          "text": "200 gateways"
+        },
+        {
+          "node": "push",
+          "text": "nudge only"
+        }
+      ]
     }
   ],
   "quiz": [

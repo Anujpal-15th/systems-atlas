@@ -132,7 +132,8 @@
         "inv"
       ],
       "flows": [],
-      "metrics": {}
+      "metrics": {},
+      "chips": []
     },
     {
       "tag": "REST",
@@ -176,7 +177,22 @@
         "trips": "1",
         "payload": "18",
         "latency": "70"
-      }
+      },
+      "chips": [
+        {
+          "node": "mobile",
+          "text": "RTT 60 ms"
+        },
+        {
+          "node": "orders",
+          "text": "~10 ms / call"
+        },
+        {
+          "node": "mobile",
+          "text": "18 KB",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -268,7 +284,26 @@
         "trips": "3",
         "payload": "40",
         "latency": "210"
-      }
+      },
+      "chips": [
+        {
+          "node": "mobile",
+          "text": "3 round trips",
+          "tone": "red"
+        },
+        {
+          "node": "mobile",
+          "text": "≈ 210 ms",
+          "tone": "red",
+          "at": "bottom"
+        },
+        {
+          "node": "mobile",
+          "text": "40 KB",
+          "tone": "red",
+          "at": "top"
+        }
+      ]
     },
     {
       "tag": "RPC",
@@ -311,7 +346,23 @@
         "trips": "1",
         "payload": "5",
         "latency": "12"
-      }
+      },
+      "chips": [
+        {
+          "node": "gw",
+          "text": "gRPC · HTTP/2"
+        },
+        {
+          "node": "inv",
+          "text": "12 ms",
+          "tone": "green"
+        },
+        {
+          "node": "inv",
+          "text": "3-10x smaller",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "GRAPHQL",
@@ -380,7 +431,29 @@
         "trips": "1",
         "payload": "6",
         "latency": "90"
-      }
+      },
+      "chips": [
+        {
+          "node": "mobile",
+          "text": "1 round trip",
+          "tone": "green"
+        },
+        {
+          "node": "gql",
+          "text": "~30 ms fan-out"
+        },
+        {
+          "node": "mobile",
+          "text": "6 KB",
+          "at": "bottom"
+        },
+        {
+          "node": "mobile",
+          "text": "≈ 90 ms",
+          "tone": "green",
+          "at": "top"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -425,7 +498,24 @@
           "label": "...x1000"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "gql",
+          "text": "N+1",
+          "tone": "red"
+        },
+        {
+          "node": "orders",
+          "text": "100s of calls",
+          "tone": "red"
+        },
+        {
+          "node": "gql",
+          "text": "POST · no HTTP cache",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "PAGINATION",
@@ -477,7 +567,23 @@
           "label": "50 + next cursor"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "db",
+          "text": "LIMIT 50"
+        },
+        {
+          "node": "gw",
+          "text": "next cursor"
+        },
+        {
+          "node": "db",
+          "text": "flat cost",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "VERSIONING",
@@ -511,7 +617,22 @@
           "label": "v1 and v2"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "mobile",
+          "text": "v1"
+        },
+        {
+          "node": "web",
+          "text": "v2"
+        },
+        {
+          "node": "orders",
+          "text": "v1 + v2 live",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -532,7 +653,20 @@
         "trips": "1",
         "payload": "6",
         "latency": "90"
-      }
+      },
+      "chips": [
+        {
+          "node": "mobile",
+          "text": "1 round trip",
+          "tone": "green"
+        },
+        {
+          "node": "mobile",
+          "text": "≈ 90 ms",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     }
   ],
   "quiz": [

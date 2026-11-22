@@ -135,7 +135,8 @@
         "budget": "43",
         "burn": "0",
         "blast": "0"
-      }
+      },
+      "chips": []
     },
     {
       "tag": "SLI",
@@ -177,7 +178,23 @@
       ],
       "metrics": {
         "sli": "100"
-      }
+      },
+      "chips": [
+        {
+          "node": "checkout",
+          "text": "good: <800 ms, no 5xx"
+        },
+        {
+          "node": "metrics",
+          "text": "good ÷ valid"
+        },
+        {
+          "node": "metrics",
+          "text": "SLI 100%",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "SLO",
@@ -193,7 +210,23 @@
       "metrics": {
         "sli": "100",
         "budget": "43"
-      }
+      },
+      "chips": [
+        {
+          "node": "metrics",
+          "text": "SLO 99.9% / 30 d"
+        },
+        {
+          "node": "metrics",
+          "text": "budget ≈ 43 min",
+          "tone": "green",
+          "at": "bottom"
+        },
+        {
+          "node": "checkout",
+          "text": "0.1% may fail"
+        }
+      ]
     },
     {
       "tag": "BUDGET",
@@ -229,7 +262,28 @@
       "metrics": {
         "sli": "99.97",
         "budget": "30"
-      }
+      },
+      "chips": [
+        {
+          "node": "payments",
+          "text": "13 min down",
+          "tone": "red"
+        },
+        {
+          "node": "checkout",
+          "text": "charge error",
+          "tone": "red"
+        },
+        {
+          "node": "metrics",
+          "text": "SLI ≈ 99.97%"
+        },
+        {
+          "node": "metrics",
+          "text": "30 min left",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "BURN RATE",
@@ -251,7 +305,23 @@
       ],
       "metrics": {
         "burn": "14.4"
-      }
+      },
+      "chips": [
+        {
+          "node": "metrics",
+          "text": "1.44% vs 0.1%"
+        },
+        {
+          "node": "metrics",
+          "text": "burn 14.4×",
+          "tone": "red",
+          "at": "bottom"
+        },
+        {
+          "node": "alerts",
+          "text": "page: fast burn"
+        }
+      ]
     },
     {
       "tag": "CHAOS",
@@ -287,7 +357,23 @@
       "metrics": {
         "burn": "0.1",
         "blast": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "chaos",
+          "text": "+300 ms delay"
+        },
+        {
+          "node": "metrics",
+          "text": "p99 450 ms"
+        },
+        {
+          "node": "metrics",
+          "text": "steady state",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "BLAST RADIUS",
@@ -322,7 +408,17 @@
       ],
       "metrics": {
         "blast": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "users",
+          "text": "1% sampled"
+        },
+        {
+          "node": "payments",
+          "text": "+300 ms"
+        }
+      ]
     },
     {
       "tag": "FINDING",
@@ -361,7 +457,29 @@
         "budget": "30",
         "burn": "5",
         "blast": "5"
-      }
+      },
+      "chips": [
+        {
+          "node": "chaos",
+          "text": "5% of traffic"
+        },
+        {
+          "node": "checkout",
+          "text": "pool saturated",
+          "tone": "red"
+        },
+        {
+          "node": "checkout",
+          "text": "no tight timeout",
+          "tone": "red",
+          "at": "bottom"
+        },
+        {
+          "node": "metrics",
+          "text": "burn 5×",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "ABORT",
@@ -398,7 +516,28 @@
       "metrics": {
         "burn": "0.1",
         "blast": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "metrics",
+          "text": "abort at 3× burn"
+        },
+        {
+          "node": "metrics",
+          "text": "burn 5× · limit hit",
+          "tone": "red",
+          "at": "bottom"
+        },
+        {
+          "node": "payments",
+          "text": "fault removed",
+          "tone": "green"
+        },
+        {
+          "node": "alerts",
+          "text": "abort notice"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -413,7 +552,18 @@
         "budget": "30",
         "burn": "0.1",
         "blast": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "metrics",
+          "text": "SLI ≈ 99.97%"
+        },
+        {
+          "node": "metrics",
+          "text": "30 min left",
+          "at": "bottom"
+        }
+      ]
     }
   ],
   "quiz": [

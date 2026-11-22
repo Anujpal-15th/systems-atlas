@@ -143,7 +143,18 @@
         "entries": "0",
         "imbalance": "0",
         "gap": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "client",
+          "text": "response lost",
+          "tone": "red"
+        },
+        {
+          "node": "client",
+          "text": "retry certain"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -176,7 +187,27 @@
           "label": "claimed"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "client",
+          "text": "Key: 7f3a..."
+        },
+        {
+          "node": "idem",
+          "text": "claimed",
+          "tone": "green"
+        },
+        {
+          "node": "idem",
+          "text": "unique constraint"
+        },
+        {
+          "node": "api",
+          "text": "409 if running",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -211,7 +242,23 @@
       ],
       "metrics": {
         "charges": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "ledger",
+          "text": "PENDING"
+        },
+        {
+          "node": "psp",
+          "text": "approved",
+          "tone": "green"
+        },
+        {
+          "node": "psp",
+          "text": "charges: 1",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -244,7 +291,23 @@
           "label": "state=UNKNOWN"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "api",
+          "text": "timeout 10 s",
+          "tone": "red"
+        },
+        {
+          "node": "psp",
+          "text": "charged · reply lost",
+          "tone": "red"
+        },
+        {
+          "node": "ledger",
+          "text": "UNKNOWN"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -304,7 +367,28 @@
       ],
       "metrics": {
         "charges": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "idem",
+          "text": "state: UNKNOWN"
+        },
+        {
+          "node": "psp",
+          "text": "original result",
+          "tone": "green"
+        },
+        {
+          "node": "client",
+          "text": "200 approved",
+          "tone": "green"
+        },
+        {
+          "node": "psp",
+          "text": "charges: 1",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -333,7 +417,23 @@
       "metrics": {
         "entries": "2",
         "imbalance": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "ledger",
+          "text": "debit 50.00"
+        },
+        {
+          "node": "ledger",
+          "text": "credit 50.00"
+        },
+        {
+          "node": "ledger",
+          "text": "sum = 0",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -373,7 +473,22 @@
           "label": "mark CAPTURED"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "queue",
+          "text": "evt_91 ×2 (dup)"
+        },
+        {
+          "node": "worker",
+          "text": "dedup by event id"
+        },
+        {
+          "node": "ledger",
+          "text": "CAPTURED",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "RECONCILE",
@@ -414,7 +529,23 @@
       ],
       "metrics": {
         "gap": "5000"
-      }
+      },
+      "chips": [
+        {
+          "node": "psp",
+          "text": "refund 50.00"
+        },
+        {
+          "node": "ledger",
+          "text": "50.00 missing",
+          "tone": "red"
+        },
+        {
+          "node": "worker",
+          "text": "gap 5,000 cents",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -444,7 +575,23 @@
         "entries": "4",
         "imbalance": "0",
         "gap": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "ledger",
+          "text": "adjust: refund"
+        },
+        {
+          "node": "ledger",
+          "text": "balanced · 4 rows",
+          "tone": "green"
+        },
+        {
+          "node": "worker",
+          "text": "gap 0",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -452,9 +599,36 @@
       "body": "Idempotency keys make client retries safe. A PENDING, UNKNOWN, CAPTURED state machine makes timeouts safe. The double-entry, append-only ledger makes the books self-checking. Deduped webhooks and daily reconciliation catch whatever still slips through. Each layer assumes the one before it will sometimes fail, and that mindset is the whole design.",
       "idea": "Assume every step can repeat or fail; build each layer so repeating it changes nothing.",
       "caption": "Safe retries, balanced books, and an independent audit.",
-      "focus": [],
+      "focus": [
+        "client",
+        "api",
+        "idem",
+        "ledger",
+        "psp",
+        "queue",
+        "worker"
+      ],
       "flows": [],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "idem",
+          "text": "same key, same result"
+        },
+        {
+          "node": "ledger",
+          "text": "append-only · sum 0",
+          "tone": "green"
+        },
+        {
+          "node": "worker",
+          "text": "daily recon"
+        },
+        {
+          "node": "queue",
+          "text": "webhooks deduped"
+        }
+      ]
     }
   ],
   "quiz": [

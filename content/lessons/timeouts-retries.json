@@ -118,7 +118,22 @@
         "attempts": "1",
         "load": "600",
         "ok": "70"
-      }
+      },
+      "chips": [
+        {
+          "node": "payment",
+          "text": "~80 ms · p99 400"
+        },
+        {
+          "node": "payment",
+          "text": "30% fail",
+          "tone": "red"
+        },
+        {
+          "node": "checkout",
+          "text": "600 req/s"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -148,7 +163,23 @@
         "timeout": "500",
         "attempts": "1",
         "ok": "70"
-      }
+      },
+      "chips": [
+        {
+          "node": "checkout",
+          "text": "timeout 500 ms"
+        },
+        {
+          "node": "payment",
+          "text": "no reply",
+          "tone": "red"
+        },
+        {
+          "node": "checkout",
+          "text": "connect 100-200 ms",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -190,7 +221,30 @@
         "attempts": "3",
         "load": "834",
         "ok": "97"
-      }
+      },
+      "chips": [
+        {
+          "node": "payment",
+          "text": "attempt 1: 503",
+          "tone": "red"
+        },
+        {
+          "node": "payment",
+          "text": "attempt 2: 200",
+          "tone": "green",
+          "at": "bottom"
+        },
+        {
+          "node": "checkout",
+          "text": "3 tries: 97%",
+          "tone": "green"
+        },
+        {
+          "node": "payment",
+          "text": "834 req/s",
+          "at": "right"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -225,7 +279,23 @@
       "metrics": {
         "attempts": "3",
         "load": "834"
-      }
+      },
+      "chips": [
+        {
+          "node": "checkout",
+          "text": "100 → 200 → 400 ms"
+        },
+        {
+          "node": "checkout",
+          "text": "cap 2 s",
+          "at": "bottom"
+        },
+        {
+          "node": "payment",
+          "text": "room to recover",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -266,7 +336,28 @@
       ],
       "metrics": {
         "ok": "97"
-      }
+      },
+      "chips": [
+        {
+          "node": "others",
+          "text": "retry +37 ms"
+        },
+        {
+          "node": "checkout",
+          "text": "retry +91 ms"
+        },
+        {
+          "node": "payment",
+          "text": "5,000 callers",
+          "tone": "red"
+        },
+        {
+          "node": "payment",
+          "text": "smooth trickle",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -310,7 +401,28 @@
         "attempts": "9",
         "load": "5400",
         "ok": "10"
-      }
+      },
+      "chips": [
+        {
+          "node": "client",
+          "text": "3 attempts"
+        },
+        {
+          "node": "checkout",
+          "text": "3 attempts"
+        },
+        {
+          "node": "payment",
+          "text": "5,400 req/s",
+          "tone": "red"
+        },
+        {
+          "node": "payment",
+          "text": "can serve ~500",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -347,7 +459,22 @@
         "attempts": "1 + 10%",
         "load": "660",
         "ok": "77"
-      }
+      },
+      "chips": [
+        {
+          "node": "checkout",
+          "text": "retries ≤ 10%"
+        },
+        {
+          "node": "payment",
+          "text": "660 req/s",
+          "tone": "green"
+        },
+        {
+          "node": "client",
+          "text": "fails fast"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -391,7 +518,27 @@
         "attempts": "1 + 10%",
         "load": "660",
         "ok": "77"
-      }
+      },
+      "chips": [
+        {
+          "node": "client",
+          "text": "deadline 2 s"
+        },
+        {
+          "node": "checkout",
+          "text": "~1400 ms left"
+        },
+        {
+          "node": "checkout",
+          "text": "≤ 1.8 s total",
+          "at": "bottom"
+        },
+        {
+          "node": "payment",
+          "text": "200 OK",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -410,7 +557,23 @@
         "attempts": "1 + 10%",
         "load": "660",
         "ok": "77"
-      }
+      },
+      "chips": [
+        {
+          "node": "checkout",
+          "text": "timeout 500 ms"
+        },
+        {
+          "node": "checkout",
+          "text": "retries ≤ 10%",
+          "at": "bottom"
+        },
+        {
+          "node": "payment",
+          "text": "660 req/s",
+          "tone": "green"
+        }
+      ]
     }
   ],
   "quiz": [

@@ -135,7 +135,18 @@
         "err2": "0",
         "err1": "0.2",
         "hit": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "old",
+          "text": "40 servers on v1"
+        },
+        {
+          "node": "router",
+          "text": "100% to v1",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "ROLLING",
@@ -167,7 +178,23 @@
         "err2": "0.2",
         "err1": "0.2",
         "hit": "10"
-      }
+      },
+      "chips": [
+        {
+          "node": "new",
+          "text": "4 of 40 on v2"
+        },
+        {
+          "node": "old",
+          "text": "36 of 40 on v1"
+        },
+        {
+          "node": "new",
+          "kind": "progress",
+          "value": 10,
+          "text": "10%"
+        }
+      ]
     },
     {
       "tag": "BLUE-GREEN",
@@ -199,7 +226,23 @@
         "err2": "0.2",
         "hit": "100",
         "err1": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "router",
+          "text": "flip to 100%"
+        },
+        {
+          "node": "new",
+          "text": "smoke-tested",
+          "tone": "green"
+        },
+        {
+          "node": "old",
+          "text": "kept for rollback",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CANARY",
@@ -231,7 +274,24 @@
         "err2": "0.2",
         "err1": "0.2",
         "hit": "5"
-      }
+      },
+      "chips": [
+        {
+          "node": "new",
+          "kind": "progress",
+          "value": 5,
+          "text": "5%"
+        },
+        {
+          "node": "old",
+          "text": "95% on v1"
+        },
+        {
+          "node": "router",
+          "text": "hold 10 min",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -263,7 +323,30 @@
         "err2": "5",
         "err1": "0.2",
         "hit": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "new",
+          "text": "v2 errors 5%",
+          "tone": "red"
+        },
+        {
+          "node": "old",
+          "text": "v1 errors 0.2%",
+          "tone": "green"
+        },
+        {
+          "node": "router",
+          "text": "fleet 0.44%",
+          "at": "bottom"
+        },
+        {
+          "node": "router",
+          "text": "v2 back to 0%",
+          "tone": "green",
+          "at": "right"
+        }
+      ]
     },
     {
       "tag": "FLAGS",
@@ -295,7 +378,23 @@
         "err2": "0.2",
         "err1": "0",
         "hit": "100"
-      }
+      },
+      "chips": [
+        {
+          "node": "flags",
+          "text": "new-checkout: 1%"
+        },
+        {
+          "node": "flags",
+          "text": "off in seconds",
+          "tone": "green",
+          "at": "bottom"
+        },
+        {
+          "node": "new",
+          "text": "v2 on all servers"
+        }
+      ]
     },
     {
       "tag": "DARK LAUNCH",
@@ -346,7 +445,24 @@
         "err2": "0.3",
         "err1": "0.2",
         "hit": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "new",
+          "text": "p99 180 ms",
+          "tone": "green"
+        },
+        {
+          "node": "new",
+          "text": "responses discarded",
+          "at": "bottom"
+        },
+        {
+          "node": "users",
+          "text": "sees v1 only",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "MIGRATION",
@@ -384,7 +500,28 @@
         "err2": "0.2",
         "err1": "0.2",
         "hit": "50"
-      }
+      },
+      "chips": [
+        {
+          "node": "db",
+          "text": "+ full_name column"
+        },
+        {
+          "node": "new",
+          "text": "writes both"
+        },
+        {
+          "node": "old",
+          "text": "uses name",
+          "at": "bottom"
+        },
+        {
+          "node": "new",
+          "kind": "progress",
+          "value": 50,
+          "text": "50%"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -394,7 +531,17 @@
       "caption": "Each tool limits risk at a different layer.",
       "focus": [],
       "flows": [],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "router",
+          "text": "canary + flag"
+        },
+        {
+          "node": "db",
+          "text": "expand/contract"
+        }
+      ]
     }
   ],
   "quiz": [

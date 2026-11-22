@@ -130,6 +130,12 @@
         "s5"
       ],
       "flows": [],
+      "chips": [
+        {
+          "node": "s3",
+          "text": "majority = 3 of 5"
+        }
+      ],
       "metrics": {
         "term": "1",
         "acks": "0",
@@ -173,6 +179,22 @@
           "to": "s5",
           "kind": "async",
           "label": "heartbeat T1"
+        }
+      ],
+      "chips": [
+        {
+          "node": "s1",
+          "text": "leader · term 1",
+          "tone": "green"
+        },
+        {
+          "node": "s2",
+          "text": "follower"
+        },
+        {
+          "node": "s1",
+          "text": "heartbeat 100 ms",
+          "at": "bottom"
         }
       ],
       "metrics": {
@@ -225,6 +247,21 @@
           "label": "append x=5"
         }
       ],
+      "chips": [
+        {
+          "node": "s1",
+          "text": "x=5 uncommitted"
+        },
+        {
+          "node": "s1",
+          "text": "1 of 3 acks",
+          "at": "bottom"
+        },
+        {
+          "node": "s4",
+          "text": "writes to disk"
+        }
+      ],
       "metrics": {
         "acks": "1",
         "need": "3"
@@ -262,6 +299,24 @@
           "label": "ok, committed"
         }
       ],
+      "chips": [
+        {
+          "node": "s1",
+          "text": "committed",
+          "tone": "green"
+        },
+        {
+          "node": "s1",
+          "text": "3/5 acks",
+          "tone": "green",
+          "at": "bottom"
+        },
+        {
+          "node": "client",
+          "text": "ok · 5 ms",
+          "tone": "green"
+        }
+      ],
       "metrics": {
         "acks": "3",
         "need": "3",
@@ -291,6 +346,23 @@
           "to": "s3",
           "kind": "fail",
           "label": "no heartbeat"
+        }
+      ],
+      "chips": [
+        {
+          "node": "s1",
+          "text": "silent",
+          "tone": "red"
+        },
+        {
+          "node": "s3",
+          "text": "no heartbeat",
+          "tone": "red"
+        },
+        {
+          "node": "client",
+          "text": "write waits ≈ 1 s",
+          "tone": "red"
         }
       ],
       "metrics": {
@@ -334,6 +406,28 @@
           "label": "granted"
         }
       ],
+      "chips": [
+        {
+          "node": "s3",
+          "text": "candidate · term 2"
+        },
+        {
+          "node": "s2",
+          "text": "vote granted",
+          "tone": "green"
+        },
+        {
+          "node": "s4",
+          "text": "vote granted",
+          "tone": "green"
+        },
+        {
+          "node": "s3",
+          "text": "3/5 votes",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ],
       "metrics": {
         "term": "2",
         "acks": "3",
@@ -363,6 +457,17 @@
           "to": "s3",
           "kind": "response",
           "label": "I step down"
+        }
+      ],
+      "chips": [
+        {
+          "node": "s3",
+          "text": "leader · term 2",
+          "tone": "green"
+        },
+        {
+          "node": "s1",
+          "text": "steps down"
         }
       ],
       "metrics": {
@@ -400,6 +505,23 @@
           "label": "granted"
         }
       ],
+      "chips": [
+        {
+          "node": "s3",
+          "text": "leader · 3 of 5",
+          "tone": "green"
+        },
+        {
+          "node": "s4",
+          "text": "2 of 3 votes",
+          "tone": "red"
+        },
+        {
+          "node": "s5",
+          "text": "can't commit",
+          "tone": "red"
+        }
+      ],
       "metrics": {
         "term": "2"
       }
@@ -435,6 +557,17 @@
           "label": "stored"
         }
       ],
+      "chips": [
+        {
+          "node": "s3",
+          "text": "3 of 5 acks",
+          "tone": "green"
+        },
+        {
+          "node": "client",
+          "text": "put /leader=A"
+        }
+      ],
       "metrics": {
         "term": "2",
         "acks": "3",
@@ -457,6 +590,23 @@
         "s5"
       ],
       "flows": [],
+      "chips": [
+        {
+          "node": "s3",
+          "text": "leader · term 2",
+          "tone": "green"
+        },
+        {
+          "node": "s3",
+          "text": "3/5 acks",
+          "tone": "green",
+          "at": "bottom"
+        },
+        {
+          "node": "client",
+          "text": "commit ≈ 5 ms"
+        }
+      ],
       "metrics": {
         "term": "2",
         "acks": "3",

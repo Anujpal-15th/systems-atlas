@@ -100,7 +100,8 @@
         "app"
       ],
       "flows": [],
-      "metrics": {}
+      "metrics": {},
+      "chips": []
     },
     {
       "tag": "RELATIONAL",
@@ -129,7 +130,23 @@
       "metrics": {
         "latency": "3",
         "ops": "8000"
-      }
+      },
+      "chips": [
+        {
+          "node": "sql",
+          "text": "schema enforced",
+          "tone": "green"
+        },
+        {
+          "node": "sql",
+          "text": "8,000 ops/s"
+        },
+        {
+          "node": "sql",
+          "text": "3 ms",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "JOINS",
@@ -158,7 +175,23 @@
       "metrics": {
         "latency": "800",
         "ops": "5"
-      }
+      },
+      "chips": [
+        {
+          "node": "sql",
+          "text": "ad hoc join"
+        },
+        {
+          "node": "sql",
+          "text": "~800 ms",
+          "at": "bottom"
+        },
+        {
+          "node": "sql",
+          "text": "no redesign",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "KEY-VALUE",
@@ -187,7 +220,23 @@
       "metrics": {
         "latency": "0.5",
         "ops": "100000"
-      }
+      },
+      "chips": [
+        {
+          "node": "kv",
+          "text": "0.5 ms",
+          "tone": "green"
+        },
+        {
+          "node": "kv",
+          "text": "100k ops/s",
+          "at": "bottom"
+        },
+        {
+          "node": "kv",
+          "text": "key lookup"
+        }
+      ]
     },
     {
       "tag": "DOCUMENT",
@@ -216,7 +265,22 @@
       "metrics": {
         "latency": "2",
         "ops": "20000"
-      }
+      },
+      "chips": [
+        {
+          "node": "doc",
+          "text": "1 read = 1 doc"
+        },
+        {
+          "node": "doc",
+          "text": "2 ms",
+          "at": "bottom"
+        },
+        {
+          "node": "doc",
+          "text": "schema in code"
+        }
+      ]
     },
     {
       "tag": "WIDE-COLUMN",
@@ -251,7 +315,22 @@
       "metrics": {
         "latency": "2",
         "ops": "40000"
-      }
+      },
+      "chips": [
+        {
+          "node": "wide",
+          "text": "200k writes/s"
+        },
+        {
+          "node": "wide",
+          "text": "40k/node",
+          "at": "bottom"
+        },
+        {
+          "node": "wide",
+          "text": "5 nodes"
+        }
+      ]
     },
     {
       "tag": "GRAPH",
@@ -280,7 +359,18 @@
       "metrics": {
         "latency": "5",
         "ops": "8000"
-      }
+      },
+      "chips": [
+        {
+          "node": "graph",
+          "text": "2-3 hops"
+        },
+        {
+          "node": "graph",
+          "text": "5 ms",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -309,7 +399,24 @@
       "metrics": {
         "latency": "3000",
         "ops": "2"
-      }
+      },
+      "chips": [
+        {
+          "node": "doc",
+          "text": "$lookup limited",
+          "tone": "red"
+        },
+        {
+          "node": "app",
+          "text": "join in code"
+        },
+        {
+          "node": "doc",
+          "text": "seconds",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -357,7 +464,23 @@
       "metrics": {
         "latency": "0.5",
         "ops": "100000"
-      }
+      },
+      "chips": [
+        {
+          "node": "sql",
+          "text": "default store"
+        },
+        {
+          "node": "kv",
+          "text": "checked first"
+        },
+        {
+          "node": "kv",
+          "text": "0.5 ms",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -374,7 +497,25 @@
         "graph"
       ],
       "flows": [],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "sql",
+          "text": "joins + txns"
+        },
+        {
+          "node": "kv",
+          "text": "key lookup"
+        },
+        {
+          "node": "wide",
+          "text": "heavy writes"
+        },
+        {
+          "node": "graph",
+          "text": "deep paths"
+        }
+      ]
     }
   ],
   "quiz": [

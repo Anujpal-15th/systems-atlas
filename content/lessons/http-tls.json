@@ -88,7 +88,17 @@
         "setup": "0",
         "conns": "0",
         "load": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "browser",
+          "text": "31 requests"
+        },
+        {
+          "node": "edge",
+          "text": "RTT 50 ms"
+        }
+      ]
     },
     {
       "tag": "CONNECT",
@@ -123,7 +133,18 @@
       "metrics": {
         "setup": "2",
         "conns": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "edge",
+          "text": "TCP = 1 RTT"
+        },
+        {
+          "node": "edge",
+          "text": "TCP + TLS ≈ 100 ms",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -155,7 +176,24 @@
           "label": "Finished + GET /"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "edge",
+          "text": "cert ok",
+          "tone": "green"
+        },
+        {
+          "node": "edge",
+          "text": "TLS 1.3 = 1 RTT",
+          "at": "bottom"
+        },
+        {
+          "node": "browser",
+          "text": "0-RTT: replayable",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "KEEP-ALIVE",
@@ -190,7 +228,23 @@
       "metrics": {
         "conns": "1",
         "load": "1650"
-      }
+      },
+      "chips": [
+        {
+          "node": "browser",
+          "text": "1 connection"
+        },
+        {
+          "node": "browser",
+          "text": "≈ 1650 ms",
+          "tone": "red",
+          "at": "bottom"
+        },
+        {
+          "node": "edge",
+          "text": "1 request at a time"
+        }
+      ]
     },
     {
       "tag": "HOL BLOCKING",
@@ -225,7 +279,23 @@
       "metrics": {
         "conns": "6",
         "load": "400"
-      }
+      },
+      "chips": [
+        {
+          "node": "browser",
+          "text": "6 connections"
+        },
+        {
+          "node": "browser",
+          "text": "≈ 400 ms",
+          "at": "bottom"
+        },
+        {
+          "node": "edge",
+          "text": "HOL: 2 s stall",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "POOLING",
@@ -264,7 +334,24 @@
           "label": "200"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "app",
+          "text": "pool · reused",
+          "tone": "green"
+        },
+        {
+          "node": "api",
+          "text": "pool · reused",
+          "tone": "green"
+        },
+        {
+          "node": "edge",
+          "text": "~1 ms handshake",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "HTTP/2",
@@ -293,7 +380,23 @@
       "metrics": {
         "conns": "1",
         "load": "200"
-      }
+      },
+      "chips": [
+        {
+          "node": "browser",
+          "text": "30 streams"
+        },
+        {
+          "node": "browser",
+          "text": "≈ 200 ms",
+          "tone": "green",
+          "at": "bottom"
+        },
+        {
+          "node": "edge",
+          "text": "1 TCP connection"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -327,7 +430,25 @@
       ],
       "metrics": {
         "load": "250"
-      }
+      },
+      "chips": [
+        {
+          "node": "edge",
+          "text": "packet lost",
+          "tone": "red"
+        },
+        {
+          "node": "browser",
+          "text": "all streams stall",
+          "tone": "red"
+        },
+        {
+          "node": "browser",
+          "text": "250 ms (1 loss)",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "HTTP/3",
@@ -369,7 +490,23 @@
         "setup": "1",
         "conns": "1",
         "load": "150"
-      }
+      },
+      "chips": [
+        {
+          "node": "browser",
+          "text": "setup 1 RTT"
+        },
+        {
+          "node": "browser",
+          "text": "≈ 150 ms",
+          "tone": "green",
+          "at": "bottom"
+        },
+        {
+          "node": "edge",
+          "text": "QUIC over UDP"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -388,7 +525,24 @@
         "setup": "1",
         "conns": "1",
         "load": "150"
-      }
+      },
+      "chips": [
+        {
+          "node": "browser",
+          "text": "H/1.1 ≈ 1650 ms",
+          "tone": "red"
+        },
+        {
+          "node": "browser",
+          "text": "H/2 ≈ 200 ms",
+          "at": "bottom"
+        },
+        {
+          "node": "edge",
+          "text": "H/3 ≈ 150 ms",
+          "tone": "green"
+        }
+      ]
     }
   ],
   "quiz": [

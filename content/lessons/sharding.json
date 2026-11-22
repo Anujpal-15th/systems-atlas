@@ -136,7 +136,8 @@
         "hot": "33",
         "fan": "1",
         "moved": "0"
-      }
+      },
+      "chips": []
     },
     {
       "tag": "CONCEPT",
@@ -190,7 +191,23 @@
       ],
       "metrics": {
         "fan": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "router",
+          "text": "key -> shard b"
+        },
+        {
+          "node": "map",
+          "text": "tiny, cached",
+          "at": "bottom"
+        },
+        {
+          "node": "client",
+          "text": "1 shard hit",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -226,7 +243,24 @@
       ],
       "metrics": {
         "hot": "34"
-      }
+      },
+      "chips": [
+        {
+          "node": "router",
+          "text": "hash(user_id)"
+        },
+        {
+          "node": "b",
+          "text": "even spread",
+          "tone": "green"
+        },
+        {
+          "node": "router",
+          "text": "range scan: all",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -261,7 +295,23 @@
       ],
       "metrics": {
         "hot": "90"
-      }
+      },
+      "chips": [
+        {
+          "node": "c",
+          "text": "~90% of writes",
+          "tone": "red"
+        },
+        {
+          "node": "a",
+          "text": "nearly idle",
+          "at": "bottom"
+        },
+        {
+          "node": "router",
+          "text": "range by month"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -297,7 +347,23 @@
       "metrics": {
         "hot": "34",
         "fan": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "client",
+          "text": "my orders"
+        },
+        {
+          "node": "b",
+          "text": "1 shard hit",
+          "tone": "green"
+        },
+        {
+          "node": "router",
+          "text": "key: user_id",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -325,7 +391,26 @@
       ],
       "metrics": {
         "hot": "62"
-      }
+      },
+      "chips": [
+        {
+          "node": "a",
+          "text": "hot partition",
+          "tone": "red"
+        },
+        {
+          "node": "a",
+          "text": "one tenant 40%",
+          "tone": "red",
+          "at": "bottom"
+        },
+        {
+          "node": "a",
+          "kind": "progress",
+          "value": 62,
+          "text": "62%"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -380,7 +465,23 @@
       "metrics": {
         "hot": "34",
         "fan": "3"
-      }
+      },
+      "chips": [
+        {
+          "node": "router",
+          "text": "scatter-gather"
+        },
+        {
+          "node": "router",
+          "text": "fan-out 3",
+          "tone": "red",
+          "at": "bottom"
+        },
+        {
+          "node": "c",
+          "text": "slowest sets time"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -417,7 +518,24 @@
       "metrics": {
         "shards": "4",
         "moved": "25"
-      }
+      },
+      "chips": [
+        {
+          "node": "router",
+          "text": "mod N: 75% move",
+          "tone": "red"
+        },
+        {
+          "node": "d",
+          "text": "new shard"
+        },
+        {
+          "node": "d",
+          "text": "~25% moved",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -454,7 +572,22 @@
       "metrics": {
         "hot": "25",
         "moved": "25"
-      }
+      },
+      "chips": [
+        {
+          "node": "d",
+          "text": "bulk copy"
+        },
+        {
+          "node": "map",
+          "text": "map updated",
+          "at": "bottom"
+        },
+        {
+          "node": "router",
+          "text": "brief write pause"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -477,7 +610,22 @@
         "hot": "25",
         "fan": "1",
         "moved": "25"
-      }
+      },
+      "chips": [
+        {
+          "node": "router",
+          "text": "shard key: user_id"
+        },
+        {
+          "node": "d",
+          "text": "4 shards"
+        },
+        {
+          "node": "map",
+          "text": "fixed buckets",
+          "at": "bottom"
+        }
+      ]
     }
   ],
   "quiz": [

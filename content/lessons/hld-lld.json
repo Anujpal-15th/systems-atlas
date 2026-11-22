@@ -120,7 +120,8 @@
         "user"
       ],
       "flows": [],
-      "metrics": {}
+      "metrics": {},
+      "chips": []
     },
     {
       "tag": "REQUIREMENTS",
@@ -137,6 +138,15 @@
         {
           "node": "user",
           "text": "create + redirect"
+        },
+        {
+          "node": "user",
+          "text": "redirect = instant"
+        },
+        {
+          "node": "user",
+          "text": "out: custom domains",
+          "at": "bottom"
         }
       ]
     },
@@ -155,7 +165,22 @@
         "writes": "40",
         "reads": "4000",
         "storage": "3"
-      }
+      },
+      "chips": [
+        {
+          "node": "svc",
+          "text": "40 writes/s"
+        },
+        {
+          "node": "svc",
+          "text": "4k reads/s",
+          "at": "bottom"
+        },
+        {
+          "node": "db",
+          "text": "6B links · 3 TB"
+        }
+      ]
     },
     {
       "tag": "HLD",
@@ -189,7 +214,17 @@
           "label": "read/write"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "svc",
+          "text": "stateless"
+        },
+        {
+          "node": "db",
+          "text": "stores links"
+        }
+      ]
     },
     {
       "tag": "API",
@@ -252,7 +287,23 @@
           "label": "302 redirect"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "svc",
+          "text": "code: aB3xK9"
+        },
+        {
+          "node": "gw",
+          "text": "201 Created",
+          "tone": "green"
+        },
+        {
+          "node": "gw",
+          "text": "302 + Location",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "DATA MODEL",
@@ -278,7 +329,18 @@
           "label": "stored"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "db",
+          "text": "PK = code"
+        },
+        {
+          "node": "db",
+          "text": "key-value lookup",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "LLD",
@@ -310,7 +372,23 @@
           "label": "retry new code"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "svc",
+          "text": "3.5T codes"
+        },
+        {
+          "node": "db",
+          "text": "code taken",
+          "tone": "red"
+        },
+        {
+          "node": "svc",
+          "text": "retry new code",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -339,7 +417,24 @@
       ],
       "metrics": {
         "reads": "4000"
-      }
+      },
+      "chips": [
+        {
+          "node": "cache",
+          "text": "hit",
+          "tone": "green"
+        },
+        {
+          "node": "cache",
+          "text": "can go stale",
+          "tone": "red",
+          "at": "bottom"
+        },
+        {
+          "node": "svc",
+          "text": "4,000 reads/s"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -373,7 +468,22 @@
           "label": "add counts"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "q",
+          "text": "click event"
+        },
+        {
+          "node": "worker",
+          "text": "counts lag a few s"
+        },
+        {
+          "node": "db",
+          "text": "4k writes/s avoided",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -395,7 +505,17 @@
         "writes": "40",
         "reads": "4000",
         "storage": "3"
-      }
+      },
+      "chips": [
+        {
+          "node": "svc",
+          "text": "40 w/s · 4k r/s"
+        },
+        {
+          "node": "db",
+          "text": "3 TB / 5 yr"
+        }
+      ]
     }
   ],
   "quiz": [

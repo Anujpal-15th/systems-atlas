@@ -127,7 +127,8 @@
         "pay"
       ],
       "flows": [],
-      "metrics": {}
+      "metrics": {},
+      "chips": []
     },
     {
       "tag": "PYRAMID",
@@ -156,7 +157,23 @@
       "metrics": {
         "tests": "1200",
         "suite": "40"
-      }
+      },
+      "chips": [
+        {
+          "node": "runner",
+          "text": "1,200 unit tests"
+        },
+        {
+          "node": "runner",
+          "text": "≈ 40 s",
+          "tone": "green",
+          "at": "bottom"
+        },
+        {
+          "node": "svc",
+          "text": "5 ms each"
+        }
+      ]
     },
     {
       "tag": "CONTRACT",
@@ -198,7 +215,22 @@
       "metrics": {
         "tests": "1240",
         "suite": "55"
-      }
+      },
+      "chips": [
+        {
+          "node": "broker",
+          "text": "40 contracts"
+        },
+        {
+          "node": "runner",
+          "text": "+15 s",
+          "at": "bottom"
+        },
+        {
+          "node": "pay",
+          "text": "verifies real code"
+        }
+      ]
     },
     {
       "tag": "INTEGRATION",
@@ -227,7 +259,23 @@
       "metrics": {
         "tests": "1320",
         "suite": "235"
-      }
+      },
+      "chips": [
+        {
+          "node": "db",
+          "text": "real Postgres",
+          "tone": "green"
+        },
+        {
+          "node": "svc",
+          "text": "80 tests"
+        },
+        {
+          "node": "db",
+          "text": "≈ 3 min",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "FAULT",
@@ -263,7 +311,24 @@
       "metrics": {
         "tests": "1335",
         "suite": "265"
-      }
+      },
+      "chips": [
+        {
+          "node": "pay",
+          "text": "+5 s delay",
+          "tone": "red"
+        },
+        {
+          "node": "svc",
+          "text": "gives up at 2 s"
+        },
+        {
+          "node": "svc",
+          "text": "charged once",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "LOAD",
@@ -299,7 +364,24 @@
       "metrics": {
         "p99": "180",
         "errors": "0.05"
-      }
+      },
+      "chips": [
+        {
+          "node": "load",
+          "text": "500 req/s"
+        },
+        {
+          "node": "svc",
+          "text": "p99 180 ms",
+          "tone": "green"
+        },
+        {
+          "node": "svc",
+          "text": "errors < 0.1%",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -329,7 +411,29 @@
       "metrics": {
         "p99": "2400",
         "errors": "33"
-      }
+      },
+      "chips": [
+        {
+          "node": "load",
+          "text": "1,500 req/s"
+        },
+        {
+          "node": "db",
+          "text": "pool exhausted",
+          "tone": "red"
+        },
+        {
+          "node": "svc",
+          "text": "p99 2.4 s",
+          "tone": "red"
+        },
+        {
+          "node": "svc",
+          "text": "33% fail",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -347,7 +451,20 @@
       "metrics": {
         "tests": "1335",
         "suite": "265"
-      }
+      },
+      "chips": [
+        {
+          "node": "runner",
+          "text": "flaky: quarantine",
+          "tone": "red"
+        },
+        {
+          "node": "runner",
+          "text": "fixed seeds",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -370,7 +487,24 @@
         "suite": "265",
         "p99": "180",
         "errors": "0.05"
-      }
+      },
+      "chips": [
+        {
+          "node": "runner",
+          "text": "1,335 tests · 265 s"
+        },
+        {
+          "node": "load",
+          "text": "p99 180 ms",
+          "tone": "green"
+        },
+        {
+          "node": "load",
+          "text": "errors 0.05%",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     }
   ],
   "quiz": [

@@ -145,7 +145,24 @@
         "instances": "6",
         "cpu": "60",
         "p95": "120"
-      }
+      },
+      "chips": [
+        {
+          "node": "users",
+          "text": "600 req/s"
+        },
+        {
+          "node": "fleet",
+          "kind": "progress",
+          "value": 60,
+          "text": "60%"
+        },
+        {
+          "node": "fleet",
+          "text": "6 instances",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "PROBLEM",
@@ -176,7 +193,27 @@
         "traffic": "1200",
         "cpu": "100",
         "p95": "1800"
-      }
+      },
+      "chips": [
+        {
+          "node": "users",
+          "text": "1,200 req/s",
+          "tone": "red"
+        },
+        {
+          "node": "fleet",
+          "kind": "progress",
+          "value": 100,
+          "text": "100%",
+          "tone": "red"
+        },
+        {
+          "node": "fleet",
+          "text": "p95 120 → 1,800 ms",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "METRICS",
@@ -196,7 +233,18 @@
           "label": "CPU 100%"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "metrics",
+          "text": "avg CPU 100%"
+        },
+        {
+          "node": "metrics",
+          "text": "1-min averages",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "REACTIVE",
@@ -223,7 +271,27 @@
           "label": "launch +4"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "scaler",
+          "text": "target 60%"
+        },
+        {
+          "node": "scaler",
+          "text": "desired = 10",
+          "at": "bottom"
+        },
+        {
+          "node": "cloud",
+          "text": "+4 instances"
+        },
+        {
+          "node": "metrics",
+          "text": "CPU capped at 100%",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "LAG",
@@ -243,7 +311,27 @@
           "label": "boot ~90 s"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "metrics",
+          "text": "noticed ~1 min late"
+        },
+        {
+          "node": "cloud",
+          "text": "boot 60-120 s"
+        },
+        {
+          "node": "cloud",
+          "text": "total 3-5 min",
+          "at": "bottom"
+        },
+        {
+          "node": "fleet",
+          "text": "still 1.8 s",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "WARM-UP",
@@ -280,7 +368,23 @@
         "instances": "12",
         "cpu": "60",
         "p95": "130"
-      }
+      },
+      "chips": [
+        {
+          "node": "fleet",
+          "text": "4 join · cold"
+        },
+        {
+          "node": "scaler",
+          "text": "CPU 72% → +2"
+        },
+        {
+          "node": "fleet",
+          "text": "12 inst · p95 130 ms",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "COOLDOWN",
@@ -319,7 +423,28 @@
         "instances": "11",
         "cpu": "30",
         "p95": "120"
-      }
+      },
+      "chips": [
+        {
+          "node": "metrics",
+          "text": "CPU 30%"
+        },
+        {
+          "node": "scaler",
+          "text": "cooldown 5-10 min"
+        },
+        {
+          "node": "fleet",
+          "kind": "progress",
+          "value": 30,
+          "text": "30%"
+        },
+        {
+          "node": "fleet",
+          "text": "12 → 11",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "SCHEDULED",
@@ -358,7 +483,28 @@
         "instances": "12",
         "cpu": "60",
         "p95": "120"
-      }
+      },
+      "chips": [
+        {
+          "node": "sched",
+          "text": "min 12 @ 11:35"
+        },
+        {
+          "node": "cloud",
+          "text": "+6 instances"
+        },
+        {
+          "node": "fleet",
+          "text": "ready by 11:45",
+          "tone": "green"
+        },
+        {
+          "node": "fleet",
+          "kind": "progress",
+          "value": 60,
+          "text": "60%"
+        }
+      ]
     },
     {
       "tag": "PREDICTIVE",
@@ -385,7 +531,17 @@
           "label": "live CPU"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "sched",
+          "text": "forecast: 12"
+        },
+        {
+          "node": "scaler",
+          "text": "+ reactive backup"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -406,7 +562,28 @@
         "instances": "12",
         "cpu": "60",
         "p95": "120"
-      }
+      },
+      "chips": [
+        {
+          "node": "fleet",
+          "text": "12 inst · 120 ms",
+          "tone": "green"
+        },
+        {
+          "node": "fleet",
+          "kind": "progress",
+          "value": 60,
+          "text": "60%"
+        },
+        {
+          "node": "scaler",
+          "text": "min / max set"
+        },
+        {
+          "node": "cloud",
+          "text": "lag 3-5 min"
+        }
+      ]
     }
   ],
   "quiz": [

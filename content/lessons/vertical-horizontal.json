@@ -150,7 +150,24 @@
         "cap": "800",
         "cpu": "85",
         "cost": "150"
-      }
+      },
+      "chips": [
+        {
+          "node": "s1",
+          "kind": "progress",
+          "value": 85,
+          "text": "85%"
+        },
+        {
+          "node": "s1",
+          "text": "800 req/s max",
+          "at": "bottom"
+        },
+        {
+          "node": "users",
+          "text": "680 req/s"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -181,7 +198,24 @@
         "cap": "2800",
         "cpu": "24",
         "cost": "600"
-      }
+      },
+      "chips": [
+        {
+          "node": "big",
+          "kind": "progress",
+          "value": 24,
+          "text": "24%"
+        },
+        {
+          "node": "big",
+          "text": "2,800 req/s"
+        },
+        {
+          "node": "big",
+          "text": "$600 / mo",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -205,7 +239,29 @@
         "cap": "9000",
         "cpu": "8",
         "cost": "2400"
-      }
+      },
+      "chips": [
+        {
+          "node": "big",
+          "text": "64 vCPU"
+        },
+        {
+          "node": "big",
+          "text": "9,000 req/s",
+          "at": "bottom"
+        },
+        {
+          "node": "big",
+          "text": "$2,400 / mo",
+          "at": "right"
+        },
+        {
+          "node": "big",
+          "text": "one box = SPOF",
+          "tone": "red",
+          "at": "top"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -247,7 +303,22 @@
         "cap": "2400",
         "cpu": "28",
         "cost": "470"
-      }
+      },
+      "chips": [
+        {
+          "node": "lb",
+          "text": "2,400 req/s"
+        },
+        {
+          "node": "s1",
+          "text": "800 req/s"
+        },
+        {
+          "node": "lb",
+          "text": "$470 / mo",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -318,7 +389,27 @@
       "metrics": {
         "cap": "2400",
         "cpu": "28"
-      }
+      },
+      "chips": [
+        {
+          "node": "s1",
+          "text": "227 req/s"
+        },
+        {
+          "node": "s2",
+          "kind": "progress",
+          "value": 28,
+          "text": "28%"
+        },
+        {
+          "node": "s3",
+          "text": "227 req/s"
+        },
+        {
+          "node": "db",
+          "text": "shared data"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -355,7 +446,28 @@
       "metrics": {
         "cap": "1600",
         "cpu": "43"
-      }
+      },
+      "chips": [
+        {
+          "node": "s2",
+          "text": "crashed",
+          "tone": "red"
+        },
+        {
+          "node": "lb",
+          "text": "cap 1,600 req/s",
+          "tone": "green",
+          "at": "bottom"
+        },
+        {
+          "node": "s1",
+          "text": "340 req/s"
+        },
+        {
+          "node": "s3",
+          "text": "340 req/s"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -395,7 +507,26 @@
       "metrics": {
         "cap": "2400",
         "cpu": "28"
-      }
+      },
+      "chips": [
+        {
+          "node": "s1",
+          "text": "own conn pool"
+        },
+        {
+          "node": "s2",
+          "text": "own conn pool"
+        },
+        {
+          "node": "s3",
+          "text": "own conn pool"
+        },
+        {
+          "node": "db",
+          "text": "limit near",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -421,7 +552,23 @@
           "label": "rows from RAM"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "db",
+          "text": "bigger instance"
+        },
+        {
+          "node": "db",
+          "text": "hot data in RAM",
+          "tone": "green",
+          "at": "bottom"
+        },
+        {
+          "node": "s1",
+          "text": "680 req/s"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -443,7 +590,22 @@
         "cap": "2400",
         "cpu": "28",
         "cost": "470"
-      }
+      },
+      "chips": [
+        {
+          "node": "db",
+          "text": "scale up"
+        },
+        {
+          "node": "s2",
+          "text": "scale out"
+        },
+        {
+          "node": "big",
+          "text": "ceiling · SPOF",
+          "tone": "red"
+        }
+      ]
     }
   ],
   "quiz": [

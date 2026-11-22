@@ -151,7 +151,17 @@
         "lag": "0",
         "lost": "0",
         "down": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "router",
+          "text": "all traffic to A"
+        },
+        {
+          "node": "dba",
+          "text": "writes commit"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -161,7 +171,17 @@
       "caption": "Two clocks start ticking when the region fails.",
       "focus": [],
       "flows": [],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "dba",
+          "text": "RPO: data you lose"
+        },
+        {
+          "node": "router",
+          "text": "RTO: time you are down"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -190,7 +210,18 @@
       ],
       "metrics": {
         "lag": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "dbb",
+          "text": "lag ≈ 1 s"
+        },
+        {
+          "node": "dba",
+          "text": "sync = +60–150 ms",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -217,7 +248,24 @@
           "label": "snapshot + logs"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "dbb",
+          "text": "bad DELETE copied",
+          "tone": "red"
+        },
+        {
+          "node": "vault",
+          "text": "snapshot + logs",
+          "tone": "green"
+        },
+        {
+          "node": "vault",
+          "text": "restore: hours",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -247,7 +295,24 @@
       "metrics": {
         "lost": "1",
         "down": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "appa",
+          "text": "unreachable",
+          "tone": "red"
+        },
+        {
+          "node": "dba",
+          "text": "≈ 1 s data stranded",
+          "tone": "red"
+        },
+        {
+          "node": "router",
+          "text": "health check fails",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -284,7 +349,27 @@
       "metrics": {
         "lost": "1",
         "down": "10"
-      }
+      },
+      "chips": [
+        {
+          "node": "dbb",
+          "text": "promoted",
+          "tone": "green"
+        },
+        {
+          "node": "appb",
+          "text": "warm → scaled up"
+        },
+        {
+          "node": "router",
+          "text": "RTO ≈ 10 min"
+        },
+        {
+          "node": "dbb",
+          "text": "RPO ≈ 1 s",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -323,7 +408,27 @@
         "lag": "1",
         "lost": "1",
         "down": "0.5"
-      }
+      },
+      "chips": [
+        {
+          "node": "router",
+          "text": "50% / 50%"
+        },
+        {
+          "node": "appa",
+          "text": "≤ 50% load"
+        },
+        {
+          "node": "dbb",
+          "text": "two-way sync"
+        },
+        {
+          "node": "router",
+          "text": "RTO ≈ 30 s",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -361,7 +466,28 @@
       "metrics": {
         "lost": "300",
         "down": "90"
-      }
+      },
+      "chips": [
+        {
+          "node": "appa",
+          "text": "EU users pinned"
+        },
+        {
+          "node": "dbb",
+          "text": "copy not allowed",
+          "tone": "red"
+        },
+        {
+          "node": "vault",
+          "text": "EU-only backup",
+          "tone": "green"
+        },
+        {
+          "node": "vault",
+          "text": "restore ≈ 90 min",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -392,7 +518,21 @@
       "metrics": {
         "lost": "1",
         "down": "10"
-      }
+      },
+      "chips": [
+        {
+          "node": "router",
+          "text": "5% → B"
+        },
+        {
+          "node": "vault",
+          "text": "restore test"
+        },
+        {
+          "node": "appb",
+          "text": "measure RPO / RTO"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -414,7 +554,21 @@
         "lag": "1",
         "lost": "1",
         "down": "10"
-      }
+      },
+      "chips": [
+        {
+          "node": "dbb",
+          "text": "RPO ≈ 1 s"
+        },
+        {
+          "node": "router",
+          "text": "RTO ≈ 10 min"
+        },
+        {
+          "node": "vault",
+          "text": "history backups"
+        }
+      ]
     }
   ],
   "quiz": [

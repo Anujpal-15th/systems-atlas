@@ -120,7 +120,8 @@
         "inflight": "0",
         "sent": "0",
         "dead": "0"
-      }
+      },
+      "chips": []
     },
     {
       "tag": "CONCEPT",
@@ -148,7 +149,18 @@
       ],
       "metrics": {
         "depth": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "producer",
+          "text": "done in ms",
+          "tone": "green"
+        },
+        {
+          "node": "queue",
+          "text": "depth 1"
+        }
+      ]
     },
     {
       "tag": "BUFFER",
@@ -173,7 +185,26 @@
       "metrics": {
         "depth": "2200",
         "sent": "800"
-      }
+      },
+      "chips": [
+        {
+          "node": "queue",
+          "text": "2,200 waiting"
+        },
+        {
+          "node": "w1",
+          "text": "40 / s"
+        },
+        {
+          "node": "w2",
+          "text": "40 / s"
+        },
+        {
+          "node": "queue",
+          "text": "drains in ~30 s",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "DELIVER",
@@ -204,7 +235,22 @@
         "depth": "2199",
         "inflight": "1",
         "sent": "800"
-      }
+      },
+      "chips": [
+        {
+          "node": "w1",
+          "text": "lease 30 s"
+        },
+        {
+          "node": "queue",
+          "text": "1 in flight"
+        },
+        {
+          "node": "queue",
+          "text": "2,199 waiting",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "ACK",
@@ -240,7 +286,24 @@
       "metrics": {
         "inflight": "0",
         "sent": "801"
-      }
+      },
+      "chips": [
+        {
+          "node": "mail",
+          "text": "200 OK",
+          "tone": "green"
+        },
+        {
+          "node": "queue",
+          "text": "acked · deleted",
+          "tone": "green"
+        },
+        {
+          "node": "w1",
+          "text": "sent 801",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -289,7 +352,28 @@
       "metrics": {
         "inflight": "1",
         "sent": "802"
-      }
+      },
+      "chips": [
+        {
+          "node": "w1",
+          "text": "crashed",
+          "tone": "red"
+        },
+        {
+          "node": "queue",
+          "text": "timeout 30 s"
+        },
+        {
+          "node": "w2",
+          "text": "try 2"
+        },
+        {
+          "node": "mail",
+          "text": "duplicate email",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -324,7 +408,24 @@
       "metrics": {
         "inflight": "0",
         "sent": "802"
-      }
+      },
+      "chips": [
+        {
+          "node": "w2",
+          "text": "key order-81"
+        },
+        {
+          "node": "mail",
+          "text": "dup ignored",
+          "tone": "green"
+        },
+        {
+          "node": "w2",
+          "text": "acked",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -360,7 +461,23 @@
       "metrics": {
         "inflight": "0",
         "dead": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "w1",
+          "text": "try 5",
+          "tone": "red"
+        },
+        {
+          "node": "queue",
+          "text": "max receives 5"
+        },
+        {
+          "node": "dlq",
+          "text": "1 dead letter",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -382,7 +499,23 @@
         "inflight": "0",
         "sent": "3000",
         "dead": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "queue",
+          "text": "depth 0",
+          "tone": "green"
+        },
+        {
+          "node": "mail",
+          "text": "3,000 sent"
+        },
+        {
+          "node": "dlq",
+          "text": "1 dead",
+          "tone": "red"
+        }
+      ]
     }
   ],
   "quiz": [

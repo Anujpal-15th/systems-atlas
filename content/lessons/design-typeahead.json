@@ -127,7 +127,18 @@
       "flows": [],
       "metrics": {
         "qps": "700"
-      }
+      },
+      "chips": [
+        {
+          "node": "user",
+          "text": "typed: wea"
+        },
+        {
+          "node": "user",
+          "text": "100 ms target",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -139,7 +150,19 @@
         "index"
       ],
       "flows": [],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "index",
+          "text": "node for 'wea'"
+        },
+        {
+          "node": "index",
+          "text": "subtree: millions",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -151,7 +174,19 @@
         "index"
       ],
       "flows": [],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "index",
+          "text": "top 10 per node",
+          "tone": "green"
+        },
+        {
+          "node": "index",
+          "text": "few GB / shard",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -180,7 +215,24 @@
       "metrics": {
         "latency": "35",
         "hit": "90"
-      }
+      },
+      "chips": [
+        {
+          "node": "edge",
+          "text": "hit · 35 ms",
+          "tone": "green"
+        },
+        {
+          "node": "edge",
+          "kind": "progress",
+          "value": 90,
+          "text": "90%"
+        },
+        {
+          "node": "user",
+          "text": "debounce 100-150 ms"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -222,7 +274,22 @@
       "metrics": {
         "latency": "60",
         "qps": "70"
-      }
+      },
+      "chips": [
+        {
+          "node": "edge",
+          "text": "miss"
+        },
+        {
+          "node": "svc",
+          "text": "1-5 ms"
+        },
+        {
+          "node": "svc",
+          "text": "70k req/s",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "PIPELINE",
@@ -242,7 +309,17 @@
           "label": "search submitted"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "queue",
+          "text": "completed searches"
+        },
+        {
+          "node": "svc",
+          "text": "off critical path"
+        }
+      ]
     },
     {
       "tag": "PIPELINE",
@@ -278,7 +355,21 @@
       ],
       "metrics": {
         "fresh": "60"
-      }
+      },
+      "chips": [
+        {
+          "node": "builder",
+          "text": "hourly rebuild"
+        },
+        {
+          "node": "counts",
+          "text": "counts written"
+        },
+        {
+          "node": "index",
+          "text": "new version"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -313,7 +404,22 @@
       ],
       "metrics": {
         "fresh": "5"
-      }
+      },
+      "chips": [
+        {
+          "node": "builder",
+          "text": "trending · 1 min"
+        },
+        {
+          "node": "index",
+          "text": "atomic swap"
+        },
+        {
+          "node": "svc",
+          "text": "age ≈ 5 min",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "BUDGET",
@@ -349,7 +455,25 @@
       ],
       "metrics": {
         "latency": "60"
-      }
+      },
+      "chips": [
+        {
+          "node": "edge",
+          "text": "30 ms RTT"
+        },
+        {
+          "node": "svc",
+          "text": "20 ms RTT"
+        },
+        {
+          "node": "index",
+          "text": "3 ms"
+        },
+        {
+          "node": "user",
+          "text": "≈ 60 ms miss"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -372,7 +496,24 @@
         "hit": "90",
         "qps": "70",
         "fresh": "60"
-      }
+      },
+      "chips": [
+        {
+          "node": "edge",
+          "kind": "progress",
+          "value": 90,
+          "text": "90%"
+        },
+        {
+          "node": "index",
+          "text": "top-10 per prefix"
+        },
+        {
+          "node": "user",
+          "text": "35 ms hit",
+          "tone": "green"
+        }
+      ]
     }
   ],
   "quiz": [

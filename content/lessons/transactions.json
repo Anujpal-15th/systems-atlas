@@ -132,7 +132,8 @@
         "versions": "1",
         "wait": "0",
         "bad": "0"
-      }
+      },
+      "chips": []
     },
     {
       "tag": "ATOMICITY",
@@ -159,7 +160,22 @@
           "label": "log both writes"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "wal",
+          "text": "log first"
+        },
+        {
+          "node": "wal",
+          "text": "replay on crash",
+          "at": "bottom"
+        },
+        {
+          "node": "engine",
+          "text": "all or nothing"
+        }
+      ]
     },
     {
       "tag": "DURABILITY",
@@ -195,7 +211,22 @@
       "metrics": {
         "total": "70",
         "versions": "2"
-      }
+      },
+      "chips": [
+        {
+          "node": "wal",
+          "text": "fsync 0.1-1 ms"
+        },
+        {
+          "node": "engine",
+          "text": "balance 70"
+        },
+        {
+          "node": "txa",
+          "text": "COMMIT ok",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "ANOMALY",
@@ -251,7 +282,25 @@
         "total": "70",
         "bad": "1",
         "versions": "2"
-      }
+      },
+      "chips": [
+        {
+          "node": "db",
+          "text": "balance 70",
+          "tone": "red"
+        },
+        {
+          "node": "db",
+          "text": "should be 40",
+          "tone": "red",
+          "at": "bottom"
+        },
+        {
+          "node": "engine",
+          "text": "lost update",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "ANOMALY",
@@ -294,7 +343,23 @@
         "total": "100",
         "bad": "1",
         "versions": "2"
-      }
+      },
+      "chips": [
+        {
+          "node": "txa",
+          "text": "uncommitted 70"
+        },
+        {
+          "node": "txb",
+          "text": "dirty read",
+          "tone": "red"
+        },
+        {
+          "node": "engine",
+          "text": "Read Committed",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "MVCC",
@@ -344,7 +409,23 @@
         "total": "100",
         "versions": "2",
         "bad": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "versions",
+          "text": "2 versions"
+        },
+        {
+          "node": "txb",
+          "text": "sees 100",
+          "at": "bottom"
+        },
+        {
+          "node": "engine",
+          "text": "no read blocking",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "LOCKING",
@@ -431,7 +512,23 @@
         "versions": "3",
         "wait": "12",
         "bad": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "lock",
+          "text": "A holds row lock"
+        },
+        {
+          "node": "txb",
+          "text": "waits 12 ms",
+          "at": "bottom"
+        },
+        {
+          "node": "db",
+          "text": "balance 40",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "ANOMALY",
@@ -476,7 +573,24 @@
         "versions": "4",
         "wait": "0",
         "bad": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "txa",
+          "text": "sees total 120"
+        },
+        {
+          "node": "versions",
+          "text": "write skew",
+          "tone": "red"
+        },
+        {
+          "node": "db",
+          "text": "total -80",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -539,7 +653,23 @@
         "wait": "0",
         "bad": "0",
         "versions": "3"
-      }
+      },
+      "chips": [
+        {
+          "node": "engine",
+          "text": "tracks reads/writes"
+        },
+        {
+          "node": "engine",
+          "text": "aborts one",
+          "tone": "red",
+          "at": "bottom"
+        },
+        {
+          "node": "txb",
+          "text": "retry"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -557,7 +687,22 @@
         "db"
       ],
       "flows": [],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "engine",
+          "text": "MVCC + locks"
+        },
+        {
+          "node": "wal",
+          "text": "fsync on commit",
+          "at": "bottom"
+        },
+        {
+          "node": "lock",
+          "text": "FOR UPDATE"
+        }
+      ]
     }
   ],
   "quiz": [

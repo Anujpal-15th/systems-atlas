@@ -139,7 +139,14 @@
       "flows": [],
       "metrics": {
         "calls": "3"
-      }
+      },
+      "chips": [
+        {
+          "node": "mobile",
+          "text": "3 separate calls",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -166,7 +173,22 @@
           "label": "GET /orders/42"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "fproxy",
+          "text": "client side"
+        },
+        {
+          "node": "gw",
+          "text": "server side"
+        },
+        {
+          "node": "fproxy",
+          "text": "dest sees the proxy",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -208,7 +230,22 @@
       ],
       "metrics": {
         "latency": "22"
-      }
+      },
+      "chips": [
+        {
+          "node": "gw",
+          "text": "TLS ends here"
+        },
+        {
+          "node": "gw",
+          "text": "+2 ms",
+          "at": "bottom"
+        },
+        {
+          "node": "orders",
+          "text": "20 ms"
+        }
+      ]
     },
     {
       "tag": "AUTH",
@@ -236,7 +273,23 @@
       ],
       "metrics": {
         "latency": "27"
-      }
+      },
+      "chips": [
+        {
+          "node": "auth",
+          "text": "verify ~5 ms"
+        },
+        {
+          "node": "auth",
+          "text": "ok · user 7",
+          "tone": "green",
+          "at": "bottom"
+        },
+        {
+          "node": "gw",
+          "text": "27 ms total"
+        }
+      ]
     },
     {
       "tag": "RATE LIMIT",
@@ -264,7 +317,29 @@
       ],
       "metrics": {
         "latency": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "fproxy",
+          "text": "5,000 req/s",
+          "tone": "red"
+        },
+        {
+          "node": "gw",
+          "text": "100 / min per key"
+        },
+        {
+          "node": "gw",
+          "text": "429 rejected",
+          "tone": "red",
+          "at": "bottom"
+        },
+        {
+          "node": "gw",
+          "text": "≈ 1 ms",
+          "at": "top"
+        }
+      ]
     },
     {
       "tag": "AGGREGATE",
@@ -345,7 +420,28 @@
       "metrics": {
         "calls": "1",
         "latency": "27"
-      }
+      },
+      "chips": [
+        {
+          "node": "fproxy",
+          "text": "1 call"
+        },
+        {
+          "node": "gw",
+          "text": "fan-out × 3"
+        },
+        {
+          "node": "gw",
+          "text": "27 ms",
+          "tone": "green",
+          "at": "bottom"
+        },
+        {
+          "node": "gw",
+          "text": "chained: 67 ms",
+          "at": "top"
+        }
+      ]
     },
     {
       "tag": "PATTERN",
@@ -387,7 +483,27 @@
       "metrics": {
         "calls": "1",
         "latency": "29"
-      }
+      },
+      "chips": [
+        {
+          "node": "bff",
+          "text": "+2 ms"
+        },
+        {
+          "node": "bff",
+          "text": "forwards token",
+          "at": "bottom"
+        },
+        {
+          "node": "mobile",
+          "text": "lean JSON"
+        },
+        {
+          "node": "mobile",
+          "text": "29 ms total",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -416,7 +532,29 @@
       ],
       "metrics": {
         "latency": "1000"
-      }
+      },
+      "chips": [
+        {
+          "node": "gw",
+          "text": "gateway down",
+          "tone": "red"
+        },
+        {
+          "node": "fproxy",
+          "text": "timeout · 1 s",
+          "tone": "red"
+        },
+        {
+          "node": "bff",
+          "text": "timeout · 1 s",
+          "tone": "red"
+        },
+        {
+          "node": "orders",
+          "text": "services healthy",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -439,7 +577,21 @@
       "metrics": {
         "calls": "1",
         "latency": "29"
-      }
+      },
+      "chips": [
+        {
+          "node": "gw",
+          "text": "route · auth · limit"
+        },
+        {
+          "node": "bff",
+          "text": "one per client type"
+        },
+        {
+          "node": "fproxy",
+          "text": "forward = client side"
+        }
+      ]
     }
   ],
   "quiz": [

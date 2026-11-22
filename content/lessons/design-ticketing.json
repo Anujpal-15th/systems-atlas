@@ -143,7 +143,17 @@
         "active": "200000",
         "held": "0",
         "sold": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "fans",
+          "text": "200,000 arrive"
+        },
+        {
+          "node": "db",
+          "text": "20,000 seats"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -169,7 +179,19 @@
           "label": "both write A12"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "api",
+          "text": "race condition",
+          "tone": "red"
+        },
+        {
+          "node": "db",
+          "text": "A12: both write",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -203,7 +225,24 @@
       ],
       "metrics": {
         "held": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "api",
+          "text": "UPDATE if free"
+        },
+        {
+          "node": "db",
+          "text": "1 row: yours",
+          "tone": "green"
+        },
+        {
+          "node": "db",
+          "text": "0 rows: taken",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -238,7 +277,22 @@
       ],
       "metrics": {
         "held": "4"
-      }
+      },
+      "chips": [
+        {
+          "node": "hold",
+          "text": "A12 held · 8 min"
+        },
+        {
+          "node": "hold",
+          "text": "SET NX EX 480",
+          "at": "bottom"
+        },
+        {
+          "node": "db",
+          "text": "held_until set"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -274,7 +328,23 @@
       "metrics": {
         "held": "3",
         "sold": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "api",
+          "text": "idempotency key"
+        },
+        {
+          "node": "pay",
+          "text": "paid",
+          "tone": "green"
+        },
+        {
+          "node": "db",
+          "text": "pending → SOLD",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -296,7 +366,22 @@
       ],
       "metrics": {
         "held": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "hold",
+          "text": "TTL passed"
+        },
+        {
+          "node": "sweeper",
+          "text": "release expired"
+        },
+        {
+          "node": "db",
+          "text": "seat → available",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -344,7 +429,23 @@
       ],
       "metrics": {
         "active": "200000"
-      }
+      },
+      "chips": [
+        {
+          "node": "fans",
+          "text": "200,000 clicks"
+        },
+        {
+          "node": "db",
+          "text": "overloaded",
+          "tone": "red"
+        },
+        {
+          "node": "hold",
+          "text": "seat map · 1-2 s stale",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -386,7 +487,22 @@
       "metrics": {
         "wait": "198000",
         "active": "2000"
-      }
+      },
+      "chips": [
+        {
+          "node": "room",
+          "text": "198,000 waiting"
+        },
+        {
+          "node": "api",
+          "text": "2,000 shopping"
+        },
+        {
+          "node": "fans",
+          "text": "signed token",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -418,7 +534,25 @@
         "active": "2000",
         "held": "800",
         "sold": "6000"
-      }
+      },
+      "chips": [
+        {
+          "node": "room",
+          "text": "190,000 waiting"
+        },
+        {
+          "node": "hold",
+          "text": "held: 800"
+        },
+        {
+          "node": "db",
+          "text": "sold: 6,000"
+        },
+        {
+          "node": "api",
+          "text": "max 4 / account"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -441,7 +575,22 @@
         "active": "0",
         "held": "0",
         "sold": "20000"
-      }
+      },
+      "chips": [
+        {
+          "node": "db",
+          "text": "20,000 sold",
+          "tone": "green"
+        },
+        {
+          "node": "hold",
+          "text": "expiring holds"
+        },
+        {
+          "node": "api",
+          "text": "one owner / seat"
+        }
+      ]
     }
   ],
   "quiz": [

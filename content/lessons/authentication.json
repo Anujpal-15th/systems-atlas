@@ -17,7 +17,8 @@
       "label": "Browser",
       "kind": "client",
       "x": 10,
-      "y": 50
+      "y": 50,
+      "url": "https://app.example"
     },
     {
       "id": "app",
@@ -121,7 +122,8 @@
         "app"
       ],
       "flows": [],
-      "metrics": {}
+      "metrics": {},
+      "chips": []
     },
     {
       "tag": "PASSWORD",
@@ -157,7 +159,17 @@
       "metrics": {
         "hash": "100",
         "ttl": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "app",
+          "text": "Argon2id · ~100 ms"
+        },
+        {
+          "node": "users",
+          "text": "salt + hash"
+        }
+      ]
     },
     {
       "tag": "SESSION",
@@ -212,7 +224,22 @@
         "lookups": "1",
         "ttl": "30",
         "hash": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "sessions",
+          "text": "TTL 30 min"
+        },
+        {
+          "node": "browser",
+          "text": "HttpOnly · Secure"
+        },
+        {
+          "node": "sessions",
+          "text": "1 lookup / request",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -241,7 +268,18 @@
       "metrics": {
         "lookups": "0",
         "ttl": "15"
-      }
+      },
+      "chips": [
+        {
+          "node": "browser",
+          "text": "JWT · exp 15 min"
+        },
+        {
+          "node": "app",
+          "text": "0 store reads",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "OAUTH",
@@ -299,7 +337,22 @@
           "label": "start session"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "idp",
+          "text": "code + PKCE"
+        },
+        {
+          "node": "app",
+          "text": "ID + access token"
+        },
+        {
+          "node": "sessions",
+          "text": "session started",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "MFA",
@@ -346,7 +399,22 @@
       ],
       "metrics": {
         "hash": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "phone",
+          "text": "passkey"
+        },
+        {
+          "node": "browser",
+          "text": "factor 2"
+        },
+        {
+          "node": "app",
+          "text": "login complete",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "REFRESH",
@@ -388,7 +456,22 @@
       "metrics": {
         "lookups": "1",
         "ttl": "15"
-      }
+      },
+      "chips": [
+        {
+          "node": "browser",
+          "text": "refresh: days"
+        },
+        {
+          "node": "sessions",
+          "text": "rotate on use"
+        },
+        {
+          "node": "app",
+          "text": "new pair",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -410,7 +493,19 @@
       ],
       "metrics": {
         "hash": "100"
-      }
+      },
+      "chips": [
+        {
+          "node": "users",
+          "text": "table dumped",
+          "tone": "red"
+        },
+        {
+          "node": "attacker",
+          "text": "10 guesses/s/core",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -431,7 +526,21 @@
         "hash": "100",
         "lookups": "1",
         "ttl": "15"
-      }
+      },
+      "chips": [
+        {
+          "node": "app",
+          "text": "~100 ms hash"
+        },
+        {
+          "node": "sessions",
+          "text": "1 lookup"
+        },
+        {
+          "node": "browser",
+          "text": "JWT 15 min"
+        }
+      ]
     }
   ],
   "quiz": [

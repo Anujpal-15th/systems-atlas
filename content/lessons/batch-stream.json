@@ -130,7 +130,17 @@
       ],
       "metrics": {
         "rate": "5000"
-      }
+      },
+      "chips": [
+        {
+          "node": "src",
+          "text": "5,000 events/s"
+        },
+        {
+          "node": "log",
+          "text": "~215 GB / day"
+        }
+      ]
     },
     {
       "tag": "BATCH",
@@ -150,7 +160,19 @@
           "label": "hourly files"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "lake",
+          "text": "hourly files"
+        },
+        {
+          "node": "lake",
+          "text": "rerunnable",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "MAPREDUCE",
@@ -185,7 +207,23 @@
       ],
       "metrics": {
         "lag": "4200"
-      }
+      },
+      "chips": [
+        {
+          "node": "batch",
+          "text": "~70 splits"
+        },
+        {
+          "node": "lake",
+          "text": "9 GB / hour"
+        },
+        {
+          "node": "serving",
+          "text": "1 h+ behind",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "STREAM",
@@ -227,7 +265,24 @@
       ],
       "metrics": {
         "lag": "2"
-      }
+      },
+      "chips": [
+        {
+          "node": "stream",
+          "text": "running sums"
+        },
+        {
+          "node": "serving",
+          "text": "~2 s behind",
+          "tone": "green"
+        },
+        {
+          "node": "dash",
+          "text": "fresh totals",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "WINDOWS",
@@ -247,7 +302,23 @@
           "label": "10:00-11:00 bucket"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "stream",
+          "text": "tumbling · 1 h"
+        },
+        {
+          "node": "stream",
+          "text": "sliding · 12 windows",
+          "at": "bottom"
+        },
+        {
+          "node": "stream",
+          "text": "session · 30 min gap",
+          "at": "top"
+        }
+      ]
     },
     {
       "tag": "LATE EVENTS",
@@ -283,7 +354,26 @@
       ],
       "metrics": {
         "late": "0.2"
-      }
+      },
+      "chips": [
+        {
+          "node": "stream",
+          "text": "watermark −2 min"
+        },
+        {
+          "node": "log",
+          "text": "t=10:58, at 11:03"
+        },
+        {
+          "node": "stream",
+          "text": "late 0.2%",
+          "at": "bottom"
+        },
+        {
+          "node": "serving",
+          "text": "correction"
+        }
+      ]
     },
     {
       "tag": "LAMBDA",
@@ -326,7 +416,22 @@
       ],
       "metrics": {
         "lag": "2"
-      }
+      },
+      "chips": [
+        {
+          "node": "stream",
+          "text": "fast, rough"
+        },
+        {
+          "node": "batch",
+          "text": "slow, exact"
+        },
+        {
+          "node": "serving",
+          "text": "merges both",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "KAPPA",
@@ -353,7 +458,23 @@
           "label": "new table"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "log",
+          "text": "replay from 0"
+        },
+        {
+          "node": "serving",
+          "text": "new table"
+        },
+        {
+          "node": "stream",
+          "text": "one codebase",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -382,7 +503,29 @@
       ],
       "metrics": {
         "lag": "70"
-      }
+      },
+      "chips": [
+        {
+          "node": "stream",
+          "text": "crashed 11:20",
+          "tone": "red"
+        },
+        {
+          "node": "stream",
+          "text": "checkpoint ~1 min",
+          "at": "bottom"
+        },
+        {
+          "node": "serving",
+          "text": "idempotent writes"
+        },
+        {
+          "node": "stream",
+          "text": "lag 70 s",
+          "tone": "red",
+          "at": "top"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -402,7 +545,23 @@
       "flows": [],
       "metrics": {
         "lag": "2"
-      }
+      },
+      "chips": [
+        {
+          "node": "stream",
+          "text": "~2 s lag",
+          "tone": "green"
+        },
+        {
+          "node": "batch",
+          "text": "hourly lag",
+          "at": "bottom"
+        },
+        {
+          "node": "log",
+          "text": "5,000 events/s"
+        }
+      ]
     }
   ],
   "quiz": [

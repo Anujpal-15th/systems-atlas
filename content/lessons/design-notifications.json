@@ -157,7 +157,13 @@
       "flows": [],
       "metrics": {
         "ingest": "600"
-      }
+      },
+      "chips": [
+        {
+          "node": "events",
+          "text": "600 / s avg"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -179,7 +185,18 @@
       ],
       "metrics": {
         "ingest": "600"
-      }
+      },
+      "chips": [
+        {
+          "node": "api",
+          "text": "queued first"
+        },
+        {
+          "node": "api",
+          "text": "tens of ms",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -205,7 +222,18 @@
           "label": "push, email"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "pref",
+          "text": "push + email ok"
+        },
+        {
+          "node": "pref",
+          "text": "quiet hours: delay",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -233,7 +261,23 @@
       ],
       "metrics": {
         "dupes": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "redis",
+          "text": "new · go",
+          "tone": "green"
+        },
+        {
+          "node": "redis",
+          "text": "SET NX · short TTL"
+        },
+        {
+          "node": "redis",
+          "text": "done · 24 h",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -276,7 +320,26 @@
       ],
       "metrics": {
         "depth": "300"
-      }
+      },
+      "chips": [
+        {
+          "node": "pushq",
+          "text": "push msg"
+        },
+        {
+          "node": "emailq",
+          "text": "email msg"
+        },
+        {
+          "node": "redis",
+          "text": "done · 24 h"
+        },
+        {
+          "node": "api",
+          "text": "202 Accepted",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -325,7 +388,30 @@
       "metrics": {
         "depth": "40",
         "sent": "99"
-      }
+      },
+      "chips": [
+        {
+          "node": "redis",
+          "text": "token granted",
+          "tone": "green"
+        },
+        {
+          "node": "provider",
+          "text": "250 OK",
+          "tone": "green"
+        },
+        {
+          "node": "provider",
+          "kind": "progress",
+          "value": 99,
+          "text": "99%",
+          "tone": "green"
+        },
+        {
+          "node": "emailq",
+          "text": "backlog 40"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -361,7 +447,30 @@
       "metrics": {
         "depth": "9000",
         "sent": "71"
-      }
+      },
+      "chips": [
+        {
+          "node": "provider",
+          "text": "503",
+          "tone": "red"
+        },
+        {
+          "node": "provider",
+          "kind": "progress",
+          "value": 71,
+          "text": "71%",
+          "tone": "red"
+        },
+        {
+          "node": "emailq",
+          "text": "backlog 9,000",
+          "tone": "red"
+        },
+        {
+          "node": "workers",
+          "text": "retry in 4 s"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -398,7 +507,23 @@
         "dupes": "0",
         "depth": "2500",
         "sent": "93"
-      }
+      },
+      "chips": [
+        {
+          "node": "emailq",
+          "text": "redelivered"
+        },
+        {
+          "node": "redis",
+          "text": "sent → skip",
+          "tone": "green"
+        },
+        {
+          "node": "workers",
+          "text": "duplicates: 0",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -436,7 +561,28 @@
         "ingest": "8000",
         "depth": "120000",
         "sent": "97"
-      }
+      },
+      "chips": [
+        {
+          "node": "api",
+          "text": "8,000 push / s"
+        },
+        {
+          "node": "pushq",
+          "text": "backlog 120,000",
+          "tone": "red"
+        },
+        {
+          "node": "workers",
+          "text": "drain at limit"
+        },
+        {
+          "node": "provider",
+          "kind": "progress",
+          "value": 97,
+          "text": "97%"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -461,7 +607,25 @@
         "depth": "40",
         "sent": "99",
         "dupes": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "provider",
+          "kind": "progress",
+          "value": 99,
+          "text": "99%",
+          "tone": "green"
+        },
+        {
+          "node": "redis",
+          "text": "duplicates: 0",
+          "tone": "green"
+        },
+        {
+          "node": "events",
+          "text": "600 / s avg"
+        }
+      ]
     }
   ],
   "quiz": [

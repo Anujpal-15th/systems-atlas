@@ -128,7 +128,18 @@
       "metrics": {
         "balance": "70",
         "stored": "3"
-      }
+      },
+      "chips": [
+        {
+          "node": "store",
+          "text": "3 events"
+        },
+        {
+          "node": "store",
+          "text": "balance 70",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "WRITE",
@@ -182,7 +193,27 @@
       "metrics": {
         "stored": "4",
         "replayed": "3"
-      }
+      },
+      "chips": [
+        {
+          "node": "store",
+          "text": "v3 → v4"
+        },
+        {
+          "node": "cmd",
+          "text": "replayed 3"
+        },
+        {
+          "node": "store",
+          "text": "4 events",
+          "at": "bottom"
+        },
+        {
+          "node": "client",
+          "text": "accepted v4",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -223,7 +254,24 @@
       ],
       "metrics": {
         "lag": "40"
-      }
+      },
+      "chips": [
+        {
+          "node": "readdb",
+          "text": "balance 70",
+          "tone": "red"
+        },
+        {
+          "node": "qry",
+          "text": "stale read",
+          "tone": "red",
+          "at": "bottom"
+        },
+        {
+          "node": "readdb",
+          "text": "lag ≈ 40 ms"
+        }
+      ]
     },
     {
       "tag": "PROJECT",
@@ -252,7 +300,18 @@
       ],
       "metrics": {
         "balance": "120"
-      }
+      },
+      "chips": [
+        {
+          "node": "proj",
+          "text": "applies event 4"
+        },
+        {
+          "node": "readdb",
+          "text": "balance 120",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "QUERY",
@@ -291,7 +350,24 @@
           "label": "120"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "readdb",
+          "text": "balance 120",
+          "tone": "green"
+        },
+        {
+          "node": "qry",
+          "text": "1 row read"
+        },
+        {
+          "node": "client",
+          "text": "sees 120",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "REBUILD",
@@ -321,7 +397,26 @@
       "metrics": {
         "stored": "50000000",
         "replayed": "50000000"
-      }
+      },
+      "chips": [
+        {
+          "node": "store",
+          "text": "50 M events"
+        },
+        {
+          "node": "proj",
+          "text": "20,000 / s"
+        },
+        {
+          "node": "proj",
+          "text": "≈ 40 min",
+          "at": "bottom"
+        },
+        {
+          "node": "readdb",
+          "text": "new view"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -343,7 +438,20 @@
       ],
       "metrics": {
         "replayed": "12150"
-      }
+      },
+      "chips": [
+        {
+          "node": "store",
+          "text": "12,150 events",
+          "tone": "red"
+        },
+        {
+          "node": "cmd",
+          "text": "≈ 12 MB per command",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "SNAPSHOT",
@@ -384,7 +492,24 @@
       ],
       "metrics": {
         "replayed": "150"
-      }
+      },
+      "chips": [
+        {
+          "node": "snap",
+          "text": "snapshot @ v12000"
+        },
+        {
+          "node": "store",
+          "text": "150 events",
+          "tone": "green"
+        },
+        {
+          "node": "cmd",
+          "text": "150 replayed",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -394,7 +519,8 @@
       "caption": "Power of history versus cost of immutability.",
       "focus": [],
       "flows": [],
-      "metrics": {}
+      "metrics": {},
+      "chips": []
     },
     {
       "tag": "RECAP",
@@ -415,7 +541,18 @@
       "metrics": {
         "balance": "120",
         "lag": "40"
-      }
+      },
+      "chips": [
+        {
+          "node": "readdb",
+          "text": "balance 120"
+        },
+        {
+          "node": "readdb",
+          "text": "lag 40 ms",
+          "at": "bottom"
+        }
+      ]
     }
   ],
   "quiz": [

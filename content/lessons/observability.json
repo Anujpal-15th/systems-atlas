@@ -204,7 +204,24 @@
         "errors": "0.1",
         "p99": "220",
         "pages": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "api",
+          "text": "400 req/s"
+        },
+        {
+          "node": "api",
+          "text": "errors 0.1%",
+          "tone": "green",
+          "at": "bottom"
+        },
+        {
+          "node": "api",
+          "text": "p99 220 ms",
+          "at": "right"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -231,7 +248,13 @@
           "label": "metrics+logs+spans"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "collector",
+          "text": "metrics+logs+traces"
+        }
+      ]
     },
     {
       "tag": "METRICS",
@@ -251,7 +274,22 @@
           "label": "RED + USE series"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "tsdb",
+          "text": "sample every 15 s"
+        },
+        {
+          "node": "tsdb",
+          "text": "RED + USE",
+          "at": "bottom"
+        },
+        {
+          "node": "collector",
+          "text": "OpenTelemetry"
+        }
+      ]
     },
     {
       "tag": "LOGS",
@@ -271,7 +309,23 @@
           "label": "JSON log lines"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "logs",
+          "text": "≈ 70 GB / day",
+          "tone": "red"
+        },
+        {
+          "node": "logs",
+          "text": "2 KB / request",
+          "at": "bottom"
+        },
+        {
+          "node": "collector",
+          "text": "JSON lines"
+        }
+      ]
     },
     {
       "tag": "TRACING",
@@ -318,7 +372,26 @@
           "label": "span: api"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "api",
+          "text": "trace 4bf9"
+        },
+        {
+          "node": "pay",
+          "text": "traceparent 4bf9"
+        },
+        {
+          "node": "db",
+          "text": "traceparent 4bf9"
+        },
+        {
+          "node": "collector",
+          "text": "sample 1%",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -354,7 +427,29 @@
       "metrics": {
         "errors": "4.8",
         "p99": "3000"
-      }
+      },
+      "chips": [
+        {
+          "node": "db",
+          "text": "writes wait > 2 s",
+          "tone": "red"
+        },
+        {
+          "node": "pay",
+          "text": "timeout 3 s"
+        },
+        {
+          "node": "api",
+          "text": "errors 4.8%",
+          "tone": "red"
+        },
+        {
+          "node": "api",
+          "text": "p99 3 s",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "ALERTING",
@@ -389,7 +484,29 @@
       ],
       "metrics": {
         "pages": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "tsdb",
+          "text": "4.8% for 5 min",
+          "tone": "red"
+        },
+        {
+          "node": "alert",
+          "text": "errors > 2% · 5 min"
+        },
+        {
+          "node": "alert",
+          "text": "burn 48×",
+          "tone": "red",
+          "at": "bottom"
+        },
+        {
+          "node": "oncall",
+          "text": "paged",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "DIAGNOSE",
@@ -435,7 +552,29 @@
           "label": "saturation high"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "tsdb",
+          "text": "errors + p99 up",
+          "tone": "red"
+        },
+        {
+          "node": "logs",
+          "text": "lock waits"
+        },
+        {
+          "node": "db",
+          "text": "span 2.1 s",
+          "tone": "red"
+        },
+        {
+          "node": "db",
+          "text": "CPU low",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -455,7 +594,22 @@
         "oncall"
       ],
       "flows": [],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "tsdb",
+          "text": "RED + USE"
+        },
+        {
+          "node": "logs",
+          "text": "why: lock waits"
+        },
+        {
+          "node": "alert",
+          "text": "symptoms only",
+          "tone": "green"
+        }
+      ]
     }
   ],
   "quiz": [

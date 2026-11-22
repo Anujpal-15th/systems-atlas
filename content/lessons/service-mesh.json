@@ -131,7 +131,8 @@
         "pay2"
       ],
       "flows": [],
-      "metrics": {}
+      "metrics": {},
+      "chips": []
     },
     {
       "tag": "CONCEPT",
@@ -153,7 +154,23 @@
       ],
       "metrics": {
         "ram": "80"
-      }
+      },
+      "chips": [
+        {
+          "node": "scorders",
+          "text": "Envoy sidecar"
+        },
+        {
+          "node": "scorders",
+          "text": "~80 MB RAM",
+          "at": "bottom"
+        },
+        {
+          "node": "orders",
+          "text": "app unchanged",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -187,7 +204,25 @@
           "label": "routes + cert"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "ctl",
+          "text": "pushes config"
+        },
+        {
+          "node": "scorders",
+          "text": "data plane"
+        },
+        {
+          "node": "scpay1",
+          "text": "data plane"
+        },
+        {
+          "node": "scpay2",
+          "text": "data plane"
+        }
+      ]
     },
     {
       "tag": "SECURITY",
@@ -213,7 +248,23 @@
           "label": "cert + key share"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "scorders",
+          "text": "client cert"
+        },
+        {
+          "node": "scpay1",
+          "text": "mTLS ok",
+          "tone": "green"
+        },
+        {
+          "node": "scpay1",
+          "text": "cert ≈ 24 h",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -269,7 +320,22 @@
         "success": "100",
         "latency": "14",
         "tries": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "orders",
+          "text": "14 ms call"
+        },
+        {
+          "node": "scorders",
+          "text": "+1–2 ms"
+        },
+        {
+          "node": "pay1",
+          "text": "200 OK",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -311,7 +377,25 @@
       "metrics": {
         "latency": "250",
         "tries": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "pay1",
+          "text": "stalled",
+          "tone": "red"
+        },
+        {
+          "node": "scorders",
+          "text": "timeout 250 ms",
+          "tone": "red"
+        },
+        {
+          "node": "scpay1",
+          "text": "no reply",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "RETRY",
@@ -354,7 +438,22 @@
         "success": "100",
         "latency": "264",
         "tries": "2"
-      }
+      },
+      "chips": [
+        {
+          "node": "scorders",
+          "text": "264 ms total"
+        },
+        {
+          "node": "scpay2",
+          "text": "retry #1"
+        },
+        {
+          "node": "pay2",
+          "text": "200 OK",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -375,7 +474,22 @@
         "ram": "80",
         "latency": "14",
         "tries": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "scorders",
+          "text": "50-100 MB per pod"
+        },
+        {
+          "node": "orders",
+          "text": "+2–4 ms"
+        },
+        {
+          "node": "scpay1",
+          "text": "1000 pods: 50-100 GB",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -438,7 +552,24 @@
         "success": "100",
         "latency": "14",
         "tries": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "ctl",
+          "text": "down",
+          "tone": "red"
+        },
+        {
+          "node": "scorders",
+          "text": "cached config",
+          "tone": "green"
+        },
+        {
+          "node": "pay1",
+          "text": "200 OK",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -456,7 +587,22 @@
         "ctl"
       ],
       "flows": [],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "ctl",
+          "text": "config + certs"
+        },
+        {
+          "node": "scorders",
+          "text": "mTLS + retries"
+        },
+        {
+          "node": "orders",
+          "text": "no app change",
+          "tone": "green"
+        }
+      ]
     }
   ],
   "quiz": [

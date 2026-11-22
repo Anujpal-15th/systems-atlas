@@ -155,7 +155,8 @@
         "moved": "0",
         "hit": "95",
         "hot": "100"
-      }
+      },
+      "chips": []
     },
     {
       "tag": "FLOW",
@@ -198,7 +199,18 @@
         "moved": "0",
         "hit": "95",
         "hot": "100"
-      }
+      },
+      "chips": [
+        {
+          "node": "ring",
+          "text": "hash(key) mod 3"
+        },
+        {
+          "node": "b",
+          "text": "7 mod 3 = 1 -> B",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "PROBLEM",
@@ -229,7 +241,24 @@
         "moved": "75",
         "hit": "24",
         "hot": "100"
-      }
+      },
+      "chips": [
+        {
+          "node": "ring",
+          "text": "mod 4: 75% remapped",
+          "tone": "red"
+        },
+        {
+          "node": "db",
+          "text": "hit 95% -> 24%",
+          "tone": "red"
+        },
+        {
+          "node": "d",
+          "text": "new node",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -272,7 +301,22 @@
         "moved": "0",
         "hit": "95",
         "hot": "100"
-      }
+      },
+      "chips": [
+        {
+          "node": "ring",
+          "text": "range 0 to 2^32"
+        },
+        {
+          "node": "b",
+          "text": "first clockwise"
+        },
+        {
+          "node": "client",
+          "text": "local lookup",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "ADD NODE",
@@ -304,7 +348,23 @@
         "moved": "25",
         "hit": "71",
         "hot": "100"
-      }
+      },
+      "chips": [
+        {
+          "node": "d",
+          "text": "takes ~25% of keys"
+        },
+        {
+          "node": "a",
+          "text": "loses an arc",
+          "at": "bottom"
+        },
+        {
+          "node": "ring",
+          "text": "only one arc",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "REMOVE NODE",
@@ -342,7 +402,28 @@
         "moved": "25",
         "hit": "71",
         "hot": "100"
-      }
+      },
+      "chips": [
+        {
+          "node": "b",
+          "text": "DOWN",
+          "tone": "red"
+        },
+        {
+          "node": "c",
+          "text": "new owner"
+        },
+        {
+          "node": "ring",
+          "text": "~25% miss once",
+          "at": "bottom"
+        },
+        {
+          "node": "db",
+          "text": "refill",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "PROBLEM",
@@ -366,7 +447,24 @@
         "moved": "25",
         "hit": "71",
         "hot": "190"
-      }
+      },
+      "chips": [
+        {
+          "node": "c",
+          "text": "arc up to 40%",
+          "tone": "red"
+        },
+        {
+          "node": "c",
+          "text": "up to 2x avg load",
+          "tone": "red",
+          "at": "bottom"
+        },
+        {
+          "node": "ring",
+          "text": "random arcs"
+        }
+      ]
     },
     {
       "tag": "FIX",
@@ -411,7 +509,23 @@
         "moved": "25",
         "hit": "71",
         "hot": "110"
-      }
+      },
+      "chips": [
+        {
+          "node": "ring",
+          "text": "128 vnodes/server"
+        },
+        {
+          "node": "a",
+          "text": "load within ~10%",
+          "tone": "green"
+        },
+        {
+          "node": "d",
+          "text": "dies: arcs spread",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "IN PRACTICE",
@@ -442,7 +556,22 @@
         "moved": "25",
         "hit": "71",
         "hot": "110"
-      }
+      },
+      "chips": [
+        {
+          "node": "a",
+          "text": "3 replicas"
+        },
+        {
+          "node": "b",
+          "text": "next 3 distinct"
+        },
+        {
+          "node": "ring",
+          "text": "gossip membership",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -464,7 +593,22 @@
         "moved": "25",
         "hit": "71",
         "hot": "110"
-      }
+      },
+      "chips": [
+        {
+          "node": "ring",
+          "text": "moves ~1/N"
+        },
+        {
+          "node": "ring",
+          "text": "mod N: N/(N+1)",
+          "at": "bottom"
+        },
+        {
+          "node": "d",
+          "text": "25% moved"
+        }
+      ]
     }
   ],
   "quiz": [

@@ -166,7 +166,17 @@
         "origin": "500",
         "legit": "100",
         "blocked": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "users",
+          "text": "500 req/s"
+        },
+        {
+          "node": "app",
+          "text": "10 Gbps link"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -196,7 +206,24 @@
         "attack": "400",
         "legit": "2",
         "origin": "10"
-      }
+      },
+      "chips": [
+        {
+          "node": "botnet",
+          "text": "400 Gbps",
+          "tone": "red"
+        },
+        {
+          "node": "app",
+          "text": "pipe full",
+          "tone": "red"
+        },
+        {
+          "node": "app",
+          "text": "10 Gbps link",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -234,7 +261,23 @@
         "attack": "400",
         "legit": "60",
         "origin": "300"
-      }
+      },
+      "chips": [
+        {
+          "node": "edge",
+          "text": "~4 Gbps per site"
+        },
+        {
+          "node": "users",
+          "text": "60% get through",
+          "tone": "red"
+        },
+        {
+          "node": "app",
+          "text": "300 req/s",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -265,7 +308,24 @@
         "origin": "500",
         "legit": "95",
         "blocked": "99"
-      }
+      },
+      "chips": [
+        {
+          "node": "scrub",
+          "text": "99% junk dropped",
+          "tone": "green"
+        },
+        {
+          "node": "edge",
+          "text": "SYN cookies"
+        },
+        {
+          "node": "app",
+          "text": "500 req/s",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "QUESTION",
@@ -304,7 +364,25 @@
         "origin": "8500",
         "legit": "30",
         "blocked": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "botnet",
+          "text": "8,000 req/s",
+          "tone": "red"
+        },
+        {
+          "node": "db",
+          "text": "8,000 slow queries",
+          "tone": "red"
+        },
+        {
+          "node": "app",
+          "text": "8,500 req/s",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -341,7 +419,23 @@
         "origin": "2000",
         "legit": "90",
         "blocked": "80"
-      }
+      },
+      "chips": [
+        {
+          "node": "waf",
+          "text": "bot score"
+        },
+        {
+          "node": "waf",
+          "text": "80% blocked",
+          "tone": "green"
+        },
+        {
+          "node": "app",
+          "text": "2,000 req/s",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -384,7 +478,22 @@
         "origin": "730",
         "legit": "98",
         "blocked": "97"
-      }
+      },
+      "chips": [
+        {
+          "node": "limiter",
+          "text": "60 searches/min"
+        },
+        {
+          "node": "limiter",
+          "text": "429 + Retry-After"
+        },
+        {
+          "node": "app",
+          "text": "730 req/s",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -416,7 +525,24 @@
         "origin": "645",
         "legit": "97",
         "blocked": "98"
-      }
+      },
+      "chips": [
+        {
+          "node": "botnet",
+          "text": "direct to origin",
+          "tone": "red"
+        },
+        {
+          "node": "edge",
+          "text": "edge-only origin",
+          "tone": "green"
+        },
+        {
+          "node": "app",
+          "text": "645 req/s",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -440,7 +566,23 @@
         "origin": "570",
         "legit": "98",
         "blocked": "99"
-      }
+      },
+      "chips": [
+        {
+          "node": "app",
+          "text": "570 req/s",
+          "tone": "green"
+        },
+        {
+          "node": "users",
+          "text": "98% real users OK",
+          "tone": "green"
+        },
+        {
+          "node": "edge",
+          "text": "99% junk blocked"
+        }
+      ]
     }
   ],
   "quiz": [

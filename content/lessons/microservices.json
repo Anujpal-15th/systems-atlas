@@ -17,7 +17,8 @@
       "label": "Client",
       "kind": "client",
       "x": 8,
-      "y": 50
+      "y": 50,
+      "url": "https://shop.example"
     },
     {
       "id": "gw",
@@ -178,7 +179,13 @@
         "hops": "1",
         "latency": "30",
         "avail": "99.8"
-      }
+      },
+      "chips": [
+        {
+          "node": "mono",
+          "text": "1 deployable"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -214,7 +221,18 @@
         "hops": "1",
         "latency": "30",
         "avail": "99.8"
-      }
+      },
+      "chips": [
+        {
+          "node": "mono",
+          "text": "in-process calls",
+          "tone": "green"
+        },
+        {
+          "node": "shared",
+          "text": "1 transaction"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -259,7 +277,21 @@
         "hops": "1",
         "latency": "32",
         "avail": "99.8"
-      }
+      },
+      "chips": [
+        {
+          "node": "gw",
+          "text": "single front door"
+        },
+        {
+          "node": "ordersdb",
+          "text": "order 4821"
+        },
+        {
+          "node": "client",
+          "text": "32 ms"
+        }
+      ]
     },
     {
       "tag": "DATA",
@@ -302,7 +334,24 @@
         "hops": "2",
         "latency": "36",
         "avail": "99.7"
-      }
+      },
+      "chips": [
+        {
+          "node": "paydb",
+          "text": "private to Payments",
+          "tone": "green"
+        },
+        {
+          "node": "orders",
+          "text": "no join, no txn",
+          "tone": "red"
+        },
+        {
+          "node": "pay",
+          "text": "avail 99.7%",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "COST",
@@ -345,7 +394,22 @@
         "hops": "2",
         "latency": "36",
         "avail": "99.7"
-      }
+      },
+      "chips": [
+        {
+          "node": "gw",
+          "text": "30 → 36 ms"
+        },
+        {
+          "node": "orders",
+          "text": "≈ 1 ms per hop",
+          "at": "bottom"
+        },
+        {
+          "node": "pay",
+          "text": "0.999³ ≈ 99.7%"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -390,7 +454,22 @@
         "hops": "2",
         "latency": "32",
         "avail": "99.7"
-      }
+      },
+      "chips": [
+        {
+          "node": "bus",
+          "text": "OrderPlaced"
+        },
+        {
+          "node": "gw",
+          "text": "202 Accepted",
+          "tone": "green"
+        },
+        {
+          "node": "pay",
+          "text": "paid later"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -420,7 +499,25 @@
         "hops": "2",
         "latency": "3036",
         "avail": "99.7"
-      }
+      },
+      "chips": [
+        {
+          "node": "pay",
+          "text": "3 s per call",
+          "tone": "red"
+        },
+        {
+          "node": "orders",
+          "text": "no timeout",
+          "tone": "red"
+        },
+        {
+          "node": "orders",
+          "text": "no free threads",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -438,7 +535,22 @@
         "hops": "2",
         "latency": "36",
         "avail": "99.7"
-      }
+      },
+      "chips": [
+        {
+          "node": "mono",
+          "text": "1 team → monolith",
+          "tone": "green"
+        },
+        {
+          "node": "orders",
+          "text": "own deploys"
+        },
+        {
+          "node": "pay",
+          "text": "own scaling"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -460,7 +572,22 @@
         "hops": "2",
         "latency": "36",
         "avail": "99.7"
-      }
+      },
+      "chips": [
+        {
+          "node": "gw",
+          "text": "36 ms"
+        },
+        {
+          "node": "pay",
+          "text": "avail 99.7%"
+        },
+        {
+          "node": "paydb",
+          "text": "own data",
+          "tone": "green"
+        }
+      ]
     }
   ],
   "quiz": [

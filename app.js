@@ -288,9 +288,9 @@ const RGS = [9, 6]; // canvas % -> screen px
 const rxSplit = s => { const w = s.split(' '); if (w.length < 3) return w.length > 1 ? [w[0], w[1]] : [s]; let k = 1, d = 1e9; for (let i = 1; i < w.length; i++) { const e = Math.abs(w.slice(0, i).join(' ').length - w.slice(i).join(' ').length); if (e < d) { d = e; k = i; } } return [w.slice(0, k).join(' '), w.slice(k).join(' ')]; };
 const rxPillLabel = n => { const t = rxType(n.kind); return t === 'db' ? rxSplit(n.label).some(w => w.length > 10) : t !== 'block'; }; // blocks and short db names carry their name on the body, everything else gets a name pill below
 function rxTags(n, s) {
-  const tags = []; if (n.url) tags.push({ text: n.url });
-  if (rxPillLabel(n)) tags.push({ text: n.label, tone: 'gray', below: true });
-  for (const c of s.chips || []) if (c.node === n.id && typeof c.text === 'string') tags.push({ text: c.text, tone: c.tone || 'paper', cpu: c.kind === 'progress' ? +c.value || 0 : undefined, below: c.at === 'bottom' });
+  const tags = []; if (n.url) tags.push({ text: n.url, k: 'url' });
+  if (rxPillLabel(n)) tags.push({ text: n.label, tone: 'gray', below: true, k: 'name' });
+  for (const c of s.chips || []) if (c.node === n.id && typeof c.text === 'string') tags.push({ k: 'chip', text: c.text, tone: c.tone || 'paper', cpu: c.kind === 'progress' ? +c.value || 0 : undefined, below: c.at === 'bottom' });
   return tags;
 }
 function rxGrid(l) {
@@ -368,7 +368,7 @@ function rxSil(e) {
 const pw = t => t.cpu != null ? 86 : t.text.length * 6.3 + 18, PH = 21;
 function rxPillSvg(t, cx, cy, size = 10.5, cpu = t.cpu) {
   const w = pw(t), x = cx - w / 2, y = cy - PH / 2, tone = t.tone || 'paper';
-  let g = `<g class="pl t-${tone}"><rect class="sh" x="${x.toFixed(1)}" y="${(y + 2).toFixed(1)}" width="${w.toFixed(1)}" height="${PH}" rx="10.5"/><rect class="bg" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${PH}" rx="10.5"/>`;
+  let g = `<g class="pl t-${tone}" data-k="${t.k || ''}"><rect class="sh" x="${x.toFixed(1)}" y="${(y + 2).toFixed(1)}" width="${w.toFixed(1)}" height="${PH}" rx="10.5"/><rect class="bg" x="${x.toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${PH}" rx="10.5"/>`;
   if (cpu != null) {
     const v = Math.max(0, Math.min(100, cpu)), col = v < 60 ? '#7fc278' : v < 85 ? '#efb041' : '#e5534b';
     g += `<text x="${(x + 9).toFixed(1)}" y="${(cy + 3.7).toFixed(1)}" font-size="${size}">cpu</text><rect class="bar" x="${(x + 33).toFixed(1)}" y="${(cy - 3.5).toFixed(1)}" width="28" height="7" rx="3.5"/><rect x="${(x + 33).toFixed(1)}" y="${(cy - 3.5).toFixed(1)}" width="${Math.max(2, 28 * v / 100).toFixed(1)}" height="7" rx="3.5" fill="${col}"/><text x="${(x + 66).toFixed(1)}" y="${(cy + 3.7).toFixed(1)}" font-size="${size}">${Math.round(v)}%</text>`;

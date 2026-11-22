@@ -118,7 +118,8 @@
         "pages": "0",
         "rows": "0",
         "ms": "0"
-      }
+      },
+      "chips": []
     },
     {
       "tag": "FULL SCAN",
@@ -155,7 +156,25 @@
         "pages": "125000",
         "rows": "10000000",
         "ms": "800"
-      }
+      },
+      "chips": [
+        {
+          "node": "table",
+          "text": "125,000 pages",
+          "tone": "red"
+        },
+        {
+          "node": "table",
+          "text": "10M row checks",
+          "tone": "red",
+          "at": "bottom"
+        },
+        {
+          "node": "app",
+          "text": "~800 ms",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -179,7 +198,22 @@
         "pages": "0",
         "rows": "0",
         "ms": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "index",
+          "text": "B+tree"
+        },
+        {
+          "node": "index",
+          "text": "~300 keys/page",
+          "at": "bottom"
+        },
+        {
+          "node": "index",
+          "text": "3 levels = 27M"
+        }
+      ]
     },
     {
       "tag": "SEEK",
@@ -236,7 +270,24 @@
         "pages": "53",
         "rows": "50",
         "ms": "3"
-      }
+      },
+      "chips": [
+        {
+          "node": "index",
+          "text": "3 index pages"
+        },
+        {
+          "node": "table",
+          "text": "53 pages",
+          "tone": "green"
+        },
+        {
+          "node": "app",
+          "text": "3 ms",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "COMPOSITE",
@@ -286,7 +337,24 @@
         "pages": "23",
         "rows": "20",
         "ms": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "index",
+          "text": "leftmost prefix"
+        },
+        {
+          "node": "index",
+          "text": "no sort step",
+          "tone": "green"
+        },
+        {
+          "node": "app",
+          "text": "1 ms",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "COVERING",
@@ -323,7 +391,24 @@
         "pages": "3",
         "rows": "20",
         "ms": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "index",
+          "text": "no table fetch",
+          "tone": "green"
+        },
+        {
+          "node": "index",
+          "text": "3 pages",
+          "tone": "green",
+          "at": "bottom"
+        },
+        {
+          "node": "index",
+          "text": "INCLUDE (total)"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -361,7 +446,22 @@
         "pages": "6",
         "rows": "0",
         "ms": "3"
-      }
+      },
+      "chips": [
+        {
+          "node": "table",
+          "text": "6 pages written"
+        },
+        {
+          "node": "index",
+          "text": "5 indexes"
+        },
+        {
+          "node": "index",
+          "text": "leaf split",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -385,7 +485,23 @@
         "pages": "125000",
         "rows": "10000000",
         "ms": "800"
-      }
+      },
+      "chips": [
+        {
+          "node": "table",
+          "text": "90% match"
+        },
+        {
+          "node": "table",
+          "text": "full scan wins",
+          "at": "bottom"
+        },
+        {
+          "node": "table",
+          "text": "9M fetches",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -405,7 +521,24 @@
         "pages": "3",
         "rows": "20",
         "ms": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "index",
+          "text": "3 page reads",
+          "tone": "green"
+        },
+        {
+          "node": "app",
+          "text": "1 ms",
+          "tone": "green",
+          "at": "bottom"
+        },
+        {
+          "node": "table",
+          "text": "scan if 90%"
+        }
+      ]
     }
   ],
   "quiz": [

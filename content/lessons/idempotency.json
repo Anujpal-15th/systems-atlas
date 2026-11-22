@@ -116,7 +116,19 @@
         "requests": "0",
         "dupes": "0",
         "dollars": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "client",
+          "text": "no reply · timeout",
+          "tone": "red"
+        },
+        {
+          "node": "api",
+          "text": "$40 charged",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -159,7 +171,19 @@
         "charges": "1",
         "requests": "1",
         "dollars": "40"
-      }
+      },
+      "chips": [
+        {
+          "node": "ledger",
+          "text": "1 charge · $40",
+          "tone": "green"
+        },
+        {
+          "node": "api",
+          "text": "200 OK",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -179,7 +203,19 @@
           "label": "reply lost"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "api",
+          "text": "reply lost",
+          "tone": "red"
+        },
+        {
+          "node": "client",
+          "text": "timeout 10 s",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -216,7 +252,25 @@
         "charges": "2",
         "requests": "2",
         "dollars": "80"
-      }
+      },
+      "chips": [
+        {
+          "node": "ledger",
+          "text": "2 charges · $80",
+          "tone": "red"
+        },
+        {
+          "node": "client",
+          "text": "billed $80",
+          "tone": "red"
+        },
+        {
+          "node": "api",
+          "text": "~1,000 dupes/day",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -240,7 +294,22 @@
         "charges": "0",
         "requests": "1",
         "dollars": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "client",
+          "text": "key 7f3a…"
+        },
+        {
+          "node": "api",
+          "text": "Idempotency-Key hdr"
+        },
+        {
+          "node": "client",
+          "text": "UUID per action",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -276,7 +345,23 @@
         "charges": "1",
         "requests": "1",
         "dollars": "40"
-      }
+      },
+      "chips": [
+        {
+          "node": "ledger",
+          "text": "7f3a · in-progress"
+        },
+        {
+          "node": "ledger",
+          "text": "1 charge · $40",
+          "tone": "green",
+          "at": "bottom"
+        },
+        {
+          "node": "api",
+          "text": "unique key"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -320,7 +405,29 @@
         "requests": "2",
         "dupes": "1",
         "dollars": "40"
-      }
+      },
+      "chips": [
+        {
+          "node": "api",
+          "text": "key seen"
+        },
+        {
+          "node": "api",
+          "text": "no 2nd charge",
+          "tone": "green",
+          "at": "bottom"
+        },
+        {
+          "node": "ledger",
+          "text": "1 charge · $40",
+          "tone": "green"
+        },
+        {
+          "node": "client",
+          "text": "200 (saved)",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -374,7 +481,22 @@
       ],
       "metrics": {
         "dupes": "2"
-      }
+      },
+      "chips": [
+        {
+          "node": "queue",
+          "text": "at-least-once"
+        },
+        {
+          "node": "worker",
+          "text": "try 2 · skipped",
+          "tone": "green"
+        },
+        {
+          "node": "workerdb",
+          "text": "seen 91"
+        }
+      ]
     },
     {
       "tag": "PITFALL",
@@ -404,7 +526,23 @@
       "metrics": {
         "requests": "3",
         "dupes": "2"
-      }
+      },
+      "chips": [
+        {
+          "node": "api",
+          "text": "422 mismatch",
+          "tone": "red"
+        },
+        {
+          "node": "client",
+          "text": "7f3a, $90"
+        },
+        {
+          "node": "ledger",
+          "text": "key TTL 24 h",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -425,7 +563,23 @@
         "charges": "1",
         "dupes": "2",
         "dollars": "40"
-      }
+      },
+      "chips": [
+        {
+          "node": "ledger",
+          "text": "1 charge · $40",
+          "tone": "green"
+        },
+        {
+          "node": "client",
+          "text": "1 key per intent"
+        },
+        {
+          "node": "workerdb",
+          "text": "dupes skipped",
+          "tone": "green"
+        }
+      ]
     }
   ],
   "quiz": [

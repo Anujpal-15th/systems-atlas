@@ -114,7 +114,8 @@
         "latency": "0",
         "pods": "0",
         "fns": "0"
-      }
+      },
+      "chips": []
     },
     {
       "tag": "CONCEPT",
@@ -126,7 +127,17 @@
         "pod"
       ],
       "flows": [],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "pod",
+          "text": "starts in < 1 s"
+        },
+        {
+          "node": "pod",
+          "text": "MB, not GB"
+        }
+      ]
     },
     {
       "tag": "ORCHESTRATE",
@@ -148,7 +159,23 @@
       ],
       "metrics": {
         "pods": "3"
-      }
+      },
+      "chips": [
+        {
+          "node": "sched",
+          "text": "desired: 3 replicas"
+        },
+        {
+          "node": "pod",
+          "text": "0.5 CPU · 512 MB"
+        },
+        {
+          "node": "pod",
+          "text": "3 running",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -202,7 +229,23 @@
       ],
       "metrics": {
         "latency": "25"
-      }
+      },
+      "chips": [
+        {
+          "node": "gw",
+          "text": "route to 1 of 3"
+        },
+        {
+          "node": "pod",
+          "text": "warm · 25 ms",
+          "tone": "green"
+        },
+        {
+          "node": "pod",
+          "text": "billed hourly",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -216,7 +259,22 @@
       "flows": [],
       "metrics": {
         "fns": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "fn",
+          "text": "0 copies when idle"
+        },
+        {
+          "node": "fn",
+          "text": "billed per ms"
+        },
+        {
+          "node": "fn",
+          "text": "1 request per copy",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -271,7 +329,25 @@
       "metrics": {
         "latency": "850",
         "fns": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "fn",
+          "text": "cold start",
+          "tone": "red"
+        },
+        {
+          "node": "fn",
+          "text": "+800 ms setup",
+          "tone": "red",
+          "at": "bottom"
+        },
+        {
+          "node": "client",
+          "text": "≈ 850 ms",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -319,7 +395,24 @@
       "metrics": {
         "latency": "30",
         "fns": "500"
-      }
+      },
+      "chips": [
+        {
+          "node": "fn",
+          "text": "warm · 30 ms",
+          "tone": "green"
+        },
+        {
+          "node": "fn",
+          "text": "500 copies",
+          "at": "bottom"
+        },
+        {
+          "node": "db",
+          "text": "conn limit hit",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -342,7 +435,19 @@
       "metrics": {
         "latency": "30",
         "fns": "5"
-      }
+      },
+      "chips": [
+        {
+          "node": "fn",
+          "text": "5 provisioned",
+          "tone": "green"
+        },
+        {
+          "node": "fn",
+          "text": "warm · 30 ms",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -365,7 +470,17 @@
           "label": "spiky events"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "pod",
+          "text": "steady, high volume"
+        },
+        {
+          "node": "fn",
+          "text": "spiky, rare"
+        }
+      ]
     }
   ],
   "quiz": [

@@ -135,7 +135,22 @@
         "cb": "0",
         "cc": "0",
         "healthy": "3"
-      }
+      },
+      "chips": [
+        {
+          "node": "clients",
+          "text": "6,000 req/s"
+        },
+        {
+          "node": "a",
+          "text": "max 2,500 req/s"
+        },
+        {
+          "node": "lb1",
+          "text": "3 of 3 healthy",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "LAYER 4",
@@ -164,7 +179,18 @@
       ],
       "metrics": {
         "ca": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "lb1",
+          "text": "L4 · TCP/UDP"
+        },
+        {
+          "node": "lb1",
+          "text": "sees ip:port only",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "LAYER 7",
@@ -206,7 +232,23 @@
       "metrics": {
         "ca": "1",
         "cb": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "lb1",
+          "text": "L7 · reads HTTP"
+        },
+        {
+          "node": "b",
+          "text": "API pool"
+        },
+        {
+          "node": "b",
+          "text": "200 OK",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "ALGORITHM",
@@ -244,7 +286,26 @@
         "ca": "10",
         "cb": "10",
         "cc": "10"
-      }
+      },
+      "chips": [
+        {
+          "node": "lb1",
+          "text": "round robin",
+          "at": "bottom"
+        },
+        {
+          "node": "a",
+          "text": "req 1"
+        },
+        {
+          "node": "b",
+          "text": "req 2"
+        },
+        {
+          "node": "c",
+          "text": "req 3"
+        }
+      ]
     },
     {
       "tag": "ALGORITHM",
@@ -270,7 +331,28 @@
         "ca": "12",
         "cb": "48",
         "cc": "10"
-      }
+      },
+      "chips": [
+        {
+          "node": "a",
+          "text": "12 conns"
+        },
+        {
+          "node": "b",
+          "text": "48 conns",
+          "tone": "red"
+        },
+        {
+          "node": "c",
+          "text": "10 conns",
+          "tone": "green"
+        },
+        {
+          "node": "lb1",
+          "text": "next → C",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "ALGORITHM",
@@ -300,7 +382,23 @@
         "ca": "12",
         "cb": "49",
         "cc": "10"
-      }
+      },
+      "chips": [
+        {
+          "node": "lb1",
+          "text": "consistent hash"
+        },
+        {
+          "node": "b",
+          "text": "user 42 → B"
+        },
+        {
+          "node": "b",
+          "text": "warm cache",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "HEALTH",
@@ -329,7 +427,29 @@
       "metrics": {
         "cc": "0",
         "healthy": "2"
-      }
+      },
+      "chips": [
+        {
+          "node": "c",
+          "text": "timeout x3",
+          "tone": "red"
+        },
+        {
+          "node": "lb1",
+          "text": "probe every 5 s"
+        },
+        {
+          "node": "lb1",
+          "text": "2 of 3 healthy",
+          "tone": "red",
+          "at": "bottom"
+        },
+        {
+          "node": "lb1",
+          "text": "out after ~15 s",
+          "at": "top"
+        }
+      ]
     },
     {
       "tag": "FAILOVER",
@@ -361,7 +481,29 @@
         "cb": "26",
         "cc": "0",
         "healthy": "2"
-      }
+      },
+      "chips": [
+        {
+          "node": "a",
+          "text": "3,000 req/s",
+          "tone": "red"
+        },
+        {
+          "node": "b",
+          "text": "3,000 req/s",
+          "tone": "red"
+        },
+        {
+          "node": "lb1",
+          "text": "N+1 = 4 servers",
+          "tone": "green",
+          "at": "bottom"
+        },
+        {
+          "node": "c",
+          "text": "still probed"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -397,7 +539,25 @@
       "metrics": {
         "ca": "21",
         "cb": "30"
-      }
+      },
+      "chips": [
+        {
+          "node": "lb1",
+          "text": "heartbeat lost",
+          "tone": "red",
+          "at": "bottom"
+        },
+        {
+          "node": "lb1",
+          "text": "down",
+          "tone": "red"
+        },
+        {
+          "node": "lb2",
+          "text": "takes over VIP",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -419,7 +579,24 @@
         "cb": "30",
         "cc": "0",
         "healthy": "2"
-      }
+      },
+      "chips": [
+        {
+          "node": "c",
+          "text": "out of rotation",
+          "tone": "red"
+        },
+        {
+          "node": "lb2",
+          "text": "standby",
+          "tone": "green"
+        },
+        {
+          "node": "lb1",
+          "text": "N+1 spare capacity",
+          "at": "bottom"
+        }
+      ]
     }
   ],
   "quiz": [

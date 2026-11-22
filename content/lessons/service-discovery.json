@@ -148,7 +148,8 @@
       "metrics": {
         "instances": "0",
         "failed": "0"
-      }
+      },
+      "chips": []
     },
     {
       "tag": "REGISTER",
@@ -184,7 +185,26 @@
       ],
       "metrics": {
         "instances": "3"
-      }
+      },
+      "chips": [
+        {
+          "node": "registry",
+          "text": "3 registered",
+          "tone": "green"
+        },
+        {
+          "node": "pay1",
+          "text": "10.0.1.4"
+        },
+        {
+          "node": "pay2",
+          "text": "10.0.1.5"
+        },
+        {
+          "node": "pay3",
+          "text": "10.0.1.6"
+        }
+      ]
     },
     {
       "tag": "HEALTH",
@@ -220,7 +240,18 @@
       ],
       "metrics": {
         "stale": "15"
-      }
+      },
+      "chips": [
+        {
+          "node": "pay1",
+          "text": "heartbeat 5 s"
+        },
+        {
+          "node": "registry",
+          "text": "drop after 15 s",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CLIENT-SIDE",
@@ -261,7 +292,28 @@
       ],
       "metrics": {
         "extra": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "orders",
+          "text": "round-robin"
+        },
+        {
+          "node": "registry",
+          "text": "3 addresses"
+        },
+        {
+          "node": "pay2",
+          "text": "200 OK",
+          "tone": "green"
+        },
+        {
+          "node": "orders",
+          "text": "no extra hop",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "SERVER-SIDE",
@@ -315,7 +367,22 @@
       ],
       "metrics": {
         "extra": "1"
-      }
+      },
+      "chips": [
+        {
+          "node": "lb",
+          "text": "+1 ms hop"
+        },
+        {
+          "node": "registry",
+          "text": "healthy list"
+        },
+        {
+          "node": "pay1",
+          "text": "200 OK",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "DNS",
@@ -356,7 +423,24 @@
       ],
       "metrics": {
         "stale": "45"
-      }
+      },
+      "chips": [
+        {
+          "node": "dns",
+          "text": "TTL 30 s"
+        },
+        {
+          "node": "dns",
+          "text": "A records",
+          "at": "bottom"
+        },
+        {
+          "node": "orders",
+          "text": "45 s stale worst case",
+          "tone": "red",
+          "at": "top"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -387,7 +471,24 @@
         "instances": "3",
         "failed": "33",
         "stale": "15"
-      }
+      },
+      "chips": [
+        {
+          "node": "pay3",
+          "text": "crashed",
+          "tone": "red"
+        },
+        {
+          "node": "registry",
+          "text": "removed after 15 s"
+        },
+        {
+          "node": "orders",
+          "text": "~33% fail",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -423,7 +524,25 @@
       "metrics": {
         "instances": "2",
         "failed": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "registry",
+          "text": "unreachable",
+          "tone": "red"
+        },
+        {
+          "node": "orders",
+          "text": "cached list",
+          "tone": "green"
+        },
+        {
+          "node": "pay2",
+          "text": "200 OK",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -446,7 +565,23 @@
         "extra": "1",
         "stale": "15",
         "failed": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "registry",
+          "text": "2 registered"
+        },
+        {
+          "node": "lb",
+          "text": "+1 ms hop"
+        },
+        {
+          "node": "orders",
+          "text": "0% failed",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     }
   ],
   "quiz": [

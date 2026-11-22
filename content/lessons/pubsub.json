@@ -153,7 +153,8 @@
         "lagA": "0",
         "lagB": "0",
         "rate": "0"
-      }
+      },
+      "chips": []
     },
     {
       "tag": "CONCEPT",
@@ -182,7 +183,18 @@
       "metrics": {
         "log": "1",
         "rate": "1200"
-      }
+      },
+      "chips": [
+        {
+          "node": "orders",
+          "text": "1,200 msg/s"
+        },
+        {
+          "node": "p1",
+          "text": "acked",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -226,7 +238,26 @@
       "metrics": {
         "log": "13100",
         "rate": "1200"
-      }
+      },
+      "chips": [
+        {
+          "node": "p0",
+          "text": "key u17"
+        },
+        {
+          "node": "p1",
+          "text": "key u42 ×2"
+        },
+        {
+          "node": "p2",
+          "text": "key u90"
+        },
+        {
+          "node": "orders",
+          "text": "3 partitions",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -240,7 +271,18 @@
       "flows": [],
       "metrics": {
         "log": "13100"
-      }
+      },
+      "chips": [
+        {
+          "node": "p1",
+          "text": "offsets 0, 1, 2…"
+        },
+        {
+          "node": "p1",
+          "text": "ordered in partition",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -283,7 +325,27 @@
       ],
       "metrics": {
         "lagA": "800"
-      }
+      },
+      "chips": [
+        {
+          "node": "b1",
+          "text": "owns p0, p1"
+        },
+        {
+          "node": "b2",
+          "text": "owns p2"
+        },
+        {
+          "node": "b1",
+          "text": "lag 800",
+          "at": "bottom"
+        },
+        {
+          "node": "p2",
+          "text": "batch of 500",
+          "at": "top"
+        }
+      ]
     },
     {
       "tag": "FLOW",
@@ -337,7 +399,22 @@
       ],
       "metrics": {
         "lagB": "12000"
-      }
+      },
+      "chips": [
+        {
+          "node": "an",
+          "text": "group B"
+        },
+        {
+          "node": "an",
+          "text": "reads all 3"
+        },
+        {
+          "node": "an",
+          "text": "lag 12,000",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -367,7 +444,28 @@
       "metrics": {
         "lagA": "800",
         "lagB": "12000"
-      }
+      },
+      "chips": [
+        {
+          "node": "b1",
+          "text": "commit 4477"
+        },
+        {
+          "node": "b2",
+          "text": "commit 4605"
+        },
+        {
+          "node": "b1",
+          "text": "lag 800",
+          "tone": "green",
+          "at": "bottom"
+        },
+        {
+          "node": "an",
+          "text": "lag 12,000",
+          "at": "top"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -402,7 +500,29 @@
       ],
       "metrics": {
         "lagA": "3000"
-      }
+      },
+      "chips": [
+        {
+          "node": "b2",
+          "text": "crashed",
+          "tone": "red"
+        },
+        {
+          "node": "b1",
+          "text": "takes p2"
+        },
+        {
+          "node": "p2",
+          "text": "resume 4605",
+          "at": "bottom"
+        },
+        {
+          "node": "b1",
+          "text": "lag ~3,000",
+          "tone": "red",
+          "at": "top"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -457,7 +577,22 @@
       "metrics": {
         "log": "726000000",
         "lagB": "311000000"
-      }
+      },
+      "chips": [
+        {
+          "node": "an",
+          "text": "seek −3 days"
+        },
+        {
+          "node": "an",
+          "text": "311 M records",
+          "at": "bottom"
+        },
+        {
+          "node": "p0",
+          "text": "7 d retention"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -481,7 +616,23 @@
         "lagA": "0",
         "lagB": "0",
         "rate": "1200"
-      }
+      },
+      "chips": [
+        {
+          "node": "orders",
+          "text": "1,200 msg/s"
+        },
+        {
+          "node": "b1",
+          "text": "lag 0",
+          "tone": "green"
+        },
+        {
+          "node": "an",
+          "text": "lag 0",
+          "tone": "green"
+        }
+      ]
     }
   ],
   "quiz": [

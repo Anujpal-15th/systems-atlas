@@ -116,6 +116,7 @@
         "b"
       ],
       "flows": [],
+      "chips": [],
       "metrics": {}
     },
     {
@@ -129,6 +130,17 @@
         "b"
       ],
       "flows": [],
+      "chips": [
+        {
+          "node": "b",
+          "text": "skew 120 ms",
+          "tone": "red"
+        },
+        {
+          "node": "a",
+          "text": "up to 8 s/day drift"
+        }
+      ],
       "metrics": {
         "skew": "120"
       }
@@ -168,6 +180,17 @@
           "to": "b",
           "kind": "response",
           "label": "time + delay"
+        }
+      ],
+      "chips": [
+        {
+          "node": "a",
+          "text": "clock nudged"
+        },
+        {
+          "node": "b",
+          "text": "skew ≈ 5 ms",
+          "tone": "green"
         }
       ],
       "metrics": {
@@ -213,6 +236,27 @@
           "label": "blue @ .030"
         }
       ],
+      "chips": [
+        {
+          "node": "a",
+          "text": "red @ .100"
+        },
+        {
+          "node": "b",
+          "text": "blue @ .030"
+        },
+        {
+          "node": "store",
+          "text": "keeps red",
+          "tone": "red"
+        },
+        {
+          "node": "store",
+          "text": "blue lost",
+          "tone": "red",
+          "at": "bottom"
+        }
+      ],
       "metrics": {
         "skew": "120",
         "kept": "1"
@@ -256,6 +300,16 @@
           "label": "write blue"
         }
       ],
+      "chips": [
+        {
+          "node": "c2",
+          "text": "read red first"
+        },
+        {
+          "node": "b",
+          "text": "red → blue (ordered)"
+        }
+      ],
       "metrics": {}
     },
     {
@@ -280,6 +334,16 @@
           "to": "a",
           "kind": "replicate",
           "label": "blue, L=6"
+        }
+      ],
+      "chips": [
+        {
+          "node": "a",
+          "text": "L = 4"
+        },
+        {
+          "node": "b",
+          "text": "L = 6"
         }
       ],
       "metrics": {
@@ -323,6 +387,20 @@
           "label": "[A1,B1]"
         }
       ],
+      "chips": [
+        {
+          "node": "a",
+          "text": "[A2,B0] write"
+        },
+        {
+          "node": "b",
+          "text": "blue [A1,B1]"
+        },
+        {
+          "node": "store",
+          "text": "2 siblings kept"
+        }
+      ],
       "metrics": {
         "kept": "2"
       }
@@ -352,6 +430,16 @@
           "label": "t=.100, c=1"
         }
       ],
+      "chips": [
+        {
+          "node": "a",
+          "text": "t=.100, c=0"
+        },
+        {
+          "node": "b",
+          "text": "t=.100, c=1"
+        }
+      ],
       "metrics": {
         "skew": "5",
         "kept": "2"
@@ -372,6 +460,21 @@
         "store"
       ],
       "flows": [],
+      "chips": [
+        {
+          "node": "store",
+          "text": "LWW can lose data",
+          "tone": "red"
+        },
+        {
+          "node": "a",
+          "text": "vector: concurrency"
+        },
+        {
+          "node": "b",
+          "text": "HLC: readable time"
+        }
+      ],
       "metrics": {
         "skew": "5",
         "lamport": "6",

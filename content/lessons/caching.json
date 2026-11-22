@@ -134,7 +134,18 @@
         "hit": "0",
         "latency": "10",
         "dbload": "10000"
-      }
+      },
+      "chips": [
+        {
+          "node": "db",
+          "text": "10,000 reads/s",
+          "tone": "red"
+        },
+        {
+          "node": "db",
+          "text": "10 ms per read"
+        }
+      ]
     },
     {
       "tag": "CACHE-ASIDE",
@@ -181,7 +192,22 @@
       ],
       "metrics": {
         "latency": "11"
-      }
+      },
+      "chips": [
+        {
+          "node": "cache",
+          "text": "miss",
+          "tone": "red"
+        },
+        {
+          "node": "cache",
+          "text": "ttl 300 s"
+        },
+        {
+          "node": "app",
+          "text": "11 ms"
+        }
+      ]
     },
     {
       "tag": "HIT RATIO",
@@ -211,7 +237,26 @@
         "hit": "90",
         "latency": "2",
         "dbload": "1000"
-      }
+      },
+      "chips": [
+        {
+          "node": "cache",
+          "text": "hit · 1 ms",
+          "tone": "green"
+        },
+        {
+          "node": "cache",
+          "text": "90%",
+          "kind": "progress",
+          "value": 90,
+          "tone": "green"
+        },
+        {
+          "node": "db",
+          "text": "1,000 reads/s",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "READ-THROUGH",
@@ -250,7 +295,17 @@
           "label": "value"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "cache",
+          "text": "loads itself"
+        },
+        {
+          "node": "db",
+          "text": "load user 7"
+        }
+      ]
     },
     {
       "tag": "WRITE-THROUGH",
@@ -289,7 +344,22 @@
           "label": "ok"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "cache",
+          "text": "updated first"
+        },
+        {
+          "node": "db",
+          "text": "committed",
+          "tone": "green"
+        },
+        {
+          "node": "app",
+          "text": "ack after both"
+        }
+      ]
     },
     {
       "tag": "WRITE-BACK",
@@ -329,7 +399,23 @@
           "label": "bulk UPDATE"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "cache",
+          "text": "ack · 1 ms",
+          "tone": "green"
+        },
+        {
+          "node": "cache",
+          "text": "dirty: not saved",
+          "tone": "red"
+        },
+        {
+          "node": "db",
+          "text": "bulk UPDATE"
+        }
+      ]
     },
     {
       "tag": "WRITE-AROUND",
@@ -355,7 +441,17 @@
           "label": "ok"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "db",
+          "text": "written directly"
+        },
+        {
+          "node": "cache",
+          "text": "untouched"
+        }
+      ]
     },
     {
       "tag": "EVICTION",
@@ -381,7 +477,18 @@
           "label": "ok, evicted 1"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "cache",
+          "text": "full",
+          "tone": "red"
+        },
+        {
+          "node": "cache",
+          "text": "evicted 1"
+        }
+      ]
     },
     {
       "tag": "WHERE",
@@ -433,7 +540,19 @@
           "label": "JSON"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "cdn",
+          "text": "edge hit",
+          "tone": "green"
+        },
+        {
+          "node": "cache",
+          "text": "hit",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -454,7 +573,21 @@
         "hit": "90",
         "latency": "2",
         "dbload": "1000"
-      }
+      },
+      "chips": [
+        {
+          "node": "cache",
+          "text": "90%",
+          "kind": "progress",
+          "value": 90,
+          "tone": "green"
+        },
+        {
+          "node": "db",
+          "text": "1,000 reads/s",
+          "tone": "green"
+        }
+      ]
     }
   ],
   "quiz": [

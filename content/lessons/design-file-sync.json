@@ -113,7 +113,13 @@
         "laptop"
       ],
       "flows": [],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "laptop",
+          "text": "100 MiB deck"
+        }
+      ]
     },
     {
       "tag": "CHUNKING",
@@ -128,7 +134,18 @@
       "metrics": {
         "blocks": "25",
         "saved": "0"
-      }
+      },
+      "chips": [
+        {
+          "node": "laptop",
+          "text": "25 blocks × 4 MiB"
+        },
+        {
+          "node": "laptop",
+          "text": "SHA-256 per block",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "DEDUP",
@@ -171,7 +188,25 @@
         "blocks": "1",
         "sent": "0",
         "saved": "96"
-      }
+      },
+      "chips": [
+        {
+          "node": "meta",
+          "text": "24 known",
+          "tone": "green"
+        },
+        {
+          "node": "api",
+          "text": "send 1 block"
+        },
+        {
+          "node": "laptop",
+          "kind": "progress",
+          "value": 96,
+          "text": "96%",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "UPLOAD",
@@ -201,7 +236,23 @@
         "blocks": "0",
         "sent": "4",
         "saved": "96"
-      }
+      },
+      "chips": [
+        {
+          "node": "blocks",
+          "text": "block 7f3a · 4 MiB"
+        },
+        {
+          "node": "blocks",
+          "text": "SHA-256 verified",
+          "at": "bottom"
+        },
+        {
+          "node": "blocks",
+          "text": "stored",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "METADATA",
@@ -240,7 +291,23 @@
           "label": "v8 saved"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "meta",
+          "text": "v8 on top of v7"
+        },
+        {
+          "node": "meta",
+          "text": "one transaction",
+          "at": "bottom"
+        },
+        {
+          "node": "laptop",
+          "text": "v8 saved",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "NOTIFY",
@@ -267,7 +334,17 @@
           "label": "ping"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "notify",
+          "text": "folder changed"
+        },
+        {
+          "node": "laptopb",
+          "text": "ping · no data"
+        }
+      ]
     },
     {
       "tag": "DELTA SYNC",
@@ -309,7 +386,28 @@
       "metrics": {
         "sent": "4",
         "saved": "96"
-      }
+      },
+      "chips": [
+        {
+          "node": "laptopb",
+          "text": "cursor 981"
+        },
+        {
+          "node": "api",
+          "text": "v8 hash list"
+        },
+        {
+          "node": "blocks",
+          "text": "1 block · 4 MB"
+        },
+        {
+          "node": "laptopb",
+          "kind": "progress",
+          "value": 96,
+          "text": "96%",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "WHAT IF",
@@ -348,7 +446,23 @@
           "label": "409 conflict"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "meta",
+          "text": "head is v8"
+        },
+        {
+          "node": "api",
+          "text": "409 conflict",
+          "tone": "red"
+        },
+        {
+          "node": "laptopb",
+          "text": "conflicted copy",
+          "tone": "red"
+        }
+      ]
     },
     {
       "tag": "TRADE-OFF",
@@ -361,7 +475,17 @@
         "blocks"
       ],
       "flows": [],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "blocks",
+          "text": "≈ 4 MiB blocks"
+        },
+        {
+          "node": "meta",
+          "text": "small = more rows"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -382,7 +506,22 @@
         "blocks": "0",
         "sent": "4",
         "saved": "96"
-      }
+      },
+      "chips": [
+        {
+          "node": "blocks",
+          "text": "1 of 25 uploaded",
+          "tone": "green"
+        },
+        {
+          "node": "meta",
+          "text": "v8 committed"
+        },
+        {
+          "node": "notify",
+          "text": "nudge only"
+        }
+      ]
     }
   ],
   "quiz": [

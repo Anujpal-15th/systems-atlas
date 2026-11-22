@@ -132,7 +132,28 @@
         "latency": "660",
         "hit": "0",
         "origin": "1000"
-      }
+      },
+      "chips": [
+        {
+          "node": "users",
+          "text": "RTT 200 ms"
+        },
+        {
+          "node": "users",
+          "text": "≈ 660 ms",
+          "tone": "red",
+          "at": "bottom"
+        },
+        {
+          "node": "origin",
+          "text": "1,000 req/s"
+        },
+        {
+          "node": "origin",
+          "text": "render 60 ms",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CONCEPT",
@@ -160,7 +181,19 @@
       ],
       "metrics": {
         "latency": "40"
-      }
+      },
+      "chips": [
+        {
+          "node": "edge",
+          "text": "RTT 20 ms"
+        },
+        {
+          "node": "edge",
+          "text": "TCP + TLS ≈ 40 ms",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "MISS",
@@ -216,7 +249,23 @@
         "latency": "320",
         "hit": "0",
         "origin": "1000"
-      }
+      },
+      "chips": [
+        {
+          "node": "edge",
+          "text": "cache miss",
+          "tone": "red"
+        },
+        {
+          "node": "edge",
+          "text": "max-age 300 s",
+          "at": "bottom"
+        },
+        {
+          "node": "users",
+          "text": "≈ 320 ms"
+        }
+      ]
     },
     {
       "tag": "HIT",
@@ -246,7 +295,29 @@
         "latency": "60",
         "hit": "95",
         "origin": "50"
-      }
+      },
+      "chips": [
+        {
+          "node": "edge",
+          "text": "cache hit",
+          "tone": "green"
+        },
+        {
+          "node": "edge",
+          "kind": "progress",
+          "value": 95,
+          "text": "95% hits"
+        },
+        {
+          "node": "origin",
+          "text": "50 req/s"
+        },
+        {
+          "node": "users",
+          "text": "≈ 60 ms",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "CACHE KEY",
@@ -278,7 +349,19 @@
           "label": "same cached copy"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "edge",
+          "text": "key = host+path+query"
+        },
+        {
+          "node": "edge",
+          "text": "utm_* ignored",
+          "tone": "green",
+          "at": "bottom"
+        }
+      ]
     },
     {
       "tag": "SHIELD",
@@ -321,7 +404,27 @@
         "latency": "210",
         "hit": "98",
         "origin": "20"
-      }
+      },
+      "chips": [
+        {
+          "node": "edge2",
+          "text": "cold · miss",
+          "tone": "red"
+        },
+        {
+          "node": "shield",
+          "text": "shield hit",
+          "tone": "green"
+        },
+        {
+          "node": "users",
+          "text": "≈ 210 ms"
+        },
+        {
+          "node": "origin",
+          "text": "20 req/s"
+        }
+      ]
     },
     {
       "tag": "PURGE",
@@ -355,7 +458,25 @@
           "label": "evict"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "origin",
+          "text": "wait ≤ 300 s"
+        },
+        {
+          "node": "shield",
+          "text": "purge API"
+        },
+        {
+          "node": "edge",
+          "text": "evicted"
+        },
+        {
+          "node": "edge2",
+          "text": "evicted"
+        }
+      ]
     },
     {
       "tag": "PUSH VS PULL",
@@ -389,7 +510,23 @@
           "label": "pre-warm"
         }
       ],
-      "metrics": {}
+      "metrics": {},
+      "chips": [
+        {
+          "node": "origin",
+          "text": "push upload"
+        },
+        {
+          "node": "edge",
+          "text": "pre-warmed",
+          "tone": "green"
+        },
+        {
+          "node": "edge2",
+          "text": "pre-warmed",
+          "tone": "green"
+        }
+      ]
     },
     {
       "tag": "EDGE COMPUTE",
@@ -430,7 +567,26 @@
       ],
       "metrics": {
         "latency": "65"
-      }
+      },
+      "chips": [
+        {
+          "node": "fn",
+          "text": "variant B"
+        },
+        {
+          "node": "fn",
+          "text": "+5 ms",
+          "at": "bottom"
+        },
+        {
+          "node": "edge2",
+          "text": "2 copies: A, B"
+        },
+        {
+          "node": "users",
+          "text": "≈ 65 ms"
+        }
+      ]
     },
     {
       "tag": "RECAP",
@@ -451,7 +607,25 @@
         "latency": "60",
         "hit": "98",
         "origin": "20"
-      }
+      },
+      "chips": [
+        {
+          "node": "users",
+          "text": "≈ 60 ms",
+          "tone": "green"
+        },
+        {
+          "node": "origin",
+          "text": "20 req/s",
+          "tone": "green"
+        },
+        {
+          "node": "shield",
+          "kind": "progress",
+          "value": 98,
+          "text": "98% hits"
+        }
+      ]
     }
   ],
   "quiz": [
