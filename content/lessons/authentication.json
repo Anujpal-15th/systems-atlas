@@ -114,9 +114,9 @@
     {
       "tag": "QUESTION",
       "title": "Who is this, really?",
-      "body": "HTTP is stateless: every request arrives with no memory of the last one. So how does the server know the person clicking Pay is the same person who logged in a minute ago, and that they are who they claim to be at all? Authentication answers 'who are you?'. This lesson follows one login from the first password to the tokens that keep you logged in.",
+      "body": "HTTP has no memory: every request arrives as if it were the first. So when someone clicks Pay, how does the server know it is the same person who logged in a minute ago, and that they really are who they claim to be? Authentication means proving who you are. This lesson follows one login, from the first password to the tokens that keep you logged in.",
       "idea": "Authentication proves identity once, then hands the client something cheaper to present on every later request.",
-      "caption": "A browser, an app, and no proof of identity yet.",
+      "caption": "A browser and an app server. Nobody has proved who they are yet.",
       "focus": [
         "browser",
         "app"
@@ -128,9 +128,9 @@
     {
       "tag": "PASSWORD",
       "title": "Check the password without keeping it",
-      "body": "The browser sends the password over TLS. The app looks up the user's row, then hashes the submitted password with that user's salt (a random value stored beside the hash, so identical passwords hash differently) and compares it to the stored hash. The hash must be deliberately slow, ideally memory-hungry too: Argon2id and scrypt are both, bcrypt is only slow. Tune it to roughly 100 ms per attempt (a rule of thumb; use your library's or OWASP's minimum parameters as a floor). A fast hash like SHA-256 lets attackers test billions of guesses per second. If the hash matches, the app continues to the next check (MFA, below) before issuing anything.",
-      "idea": "Store a per-user salted, slow hash; the server never needs the password again after checking it.",
-      "caption": "App fetches the stored salt+hash and compares.",
+      "body": "You type your password and the browser sends it to the app over TLS (an encrypted connection). The app fetches your stored salt and hash from the user database. A salt is a random value saved next to the hash, so two users with the same password get different hashes. The app hashes what you typed with that salt and compares. The hash must be deliberately slow: Argon2id and scrypt are slow and memory-hungry, bcrypt is only slow. Aim for about 100 ms per check (a rule of thumb; never go below OWASP's minimum settings). A fast hash like SHA-256 lets attackers try billions of guesses per second. A match is not the end: MFA comes next.",
+      "idea": "Store a per-user salted slow hash. The server compares hashes and never needs to keep the password itself.",
+      "caption": "The app fetches the stored salt and hash, then compares.",
       "focus": [
         "browser",
         "app",
@@ -174,9 +174,9 @@
     {
       "tag": "SESSION",
       "title": "Option A: a server-side session",
-      "body": "Once login has fully succeeded (all required factors, see the MFA step), the app creates a random 128-bit session ID, saves it in a session store such as Redis with the user ID and a 30 min idle timeout, and sends it in a cookie marked HttpOnly (scripts cannot read it), Secure (HTTPS only) and SameSite (not sent on most cross-site requests). SameSite and anti-CSRF checks matter here, because browsers attach cookies automatically. Each request costs one store lookup. Logging out or banning someone is deleting the record.",
-      "idea": "A session is an opaque ID pointing at server state, so revocation is instant but every request costs a lookup.",
-      "caption": "Session ID stored server-side, cookie sent to the browser.",
+      "body": "Once login has fully succeeded (password plus any second factor, see the MFA step), the app creates a random 128-bit session ID. It saves the ID in a session store such as Redis, with the user ID and a 30-minute idle timeout. Then it sends the ID to the browser in a cookie marked HttpOnly (scripts cannot read it), Secure (HTTPS only) and SameSite (not sent on most cross-site requests). Browsers attach cookies automatically, so add anti-CSRF checks too. Each later request carries the cookie and costs one store lookup. To log someone out or ban them, delete their record.",
+      "idea": "A session is an opaque ID that points at data on the server. Revoking is instant, but every request costs a lookup.",
+      "caption": "App saves the session and sets a cookie. Each request then looks it up.",
       "focus": [
         "app",
         "sessions",
@@ -244,9 +244,9 @@
     {
       "tag": "TRADE-OFF",
       "title": "Option B: a signed JWT",
-      "body": "Instead of storing state, the app can issue a JSON Web Token: claims (facts such as user ID and expiry), signed with a key. Any service can verify it with no database call, ideally using just the signer's public key so that verifying services cannot forge tokens. The client sends it as a Bearer token (whoever holds it is trusted). The price is that it stays valid until it expires and cannot easily be revoked, so access tokens are kept short, around 15 minutes.",
+      "body": "Instead of keeping state on the server, the app can hand out a JSON Web Token (JWT). It holds claims (facts such as user ID and expiry) plus a signature made with a secret key. Any service can check the signature without calling a database. With public-key signing, services need only the public key, so they cannot forge tokens. The client sends the JWT as a Bearer token (whoever holds it is trusted). The catch: a JWT stays valid until it expires and is hard to revoke, so keep access tokens short, around 15 minutes.",
       "idea": "JWTs trade revocability for stateless verification; keep them short-lived because you cannot take them back.",
-      "caption": "Signed token verified locally, no store lookup.",
+      "caption": "Signed token is checked locally: no store lookup.",
       "focus": [
         "app",
         "browser"
@@ -284,9 +284,9 @@
     {
       "tag": "OAUTH",
       "title": "Log in with someone else's identity",
-      "body": "With \"Sign in with Google\", your app never sees the password. Your app redirects the browser to the identity provider (IdP), sending a random state value and a PKCE challenge, which is a hash of a secret the app keeps. The user logs in at the IdP, which redirects back with a short-lived, single-use authorization code. Your server swaps the code, plus the original PKCE verifier (and its client secret, if it has one), for an ID token (OpenID Connect, OIDC: who the user is) and an access token. Only the code travels through the browser. Your app then starts its own session for the user.",
+      "body": "With \"Sign in with Google\", your app never sees the password. Your app redirects the browser to the identity provider (IdP), sending a random state value and a PKCE challenge (a hash of a secret the app keeps). The user logs in at the IdP, which redirects back with a short-lived, single-use authorization code. Your server trades the code, plus the original PKCE secret (the verifier) and its client secret if it has one, for an ID token (OpenID Connect, OIDC: who the user is) and an access token. Only the code travels through the browser. Your app then starts its own session.",
       "idea": "OAuth/OIDC delegates the password to a specialist; your app only exchanges a one-time code for tokens over a back channel.",
-      "caption": "Redirect out, code back, tokens via the back channel.",
+      "caption": "Redirect out, code comes back, tokens swap server to server.",
       "focus": [
         "browser",
         "app",
@@ -337,7 +337,10 @@
           "label": "start session"
         }
       ],
-      "metrics": {},
+      "metrics": {
+        "lookups": "1",
+        "ttl": "30"
+      },
       "chips": [
         {
           "node": "idp",
@@ -357,7 +360,7 @@
     {
       "tag": "MFA",
       "title": "Add a second factor",
-      "body": "A password alone can be phished, guessed or reused from another breach. MFA requires something else: a one-time code from an authenticator app, a push approval, or a passkey (WebAuthn) bound to a hardware key or device. Passkeys sign a challenge tied to the real website's domain, so a fake lookalike site cannot trick the user into handing over a usable code. SMS codes are better than nothing but can be SIM-swapped (an attacker moves your phone number to their SIM). Only after this passes does the app issue the session or tokens.",
+      "body": "A password alone can be phished, guessed, or reused from another breach. MFA (multi-factor authentication) asks for something more: a one-time code from an authenticator app, a push approval, or a passkey (WebAuthn: a key pair kept on your device or hardware key). A passkey signs a challenge tied to the real site's domain, so a lookalike site gets nothing usable. SMS codes beat nothing but can be SIM-swapped (an attacker moves your phone number to their SIM). Here the app pauses the login, the browser asks the authenticator, and only then does the app issue the session or tokens.",
       "idea": "Require a second, independent factor, and prefer phishing-resistant ones like passkeys over typed codes.",
       "caption": "Login pauses until the second factor checks out.",
       "focus": [
@@ -419,9 +422,9 @@
     {
       "tag": "REFRESH",
       "title": "Stay logged in without long-lived access",
-      "body": "A 15-minute access token would log users out constantly, so the login also returns a refresh token that lasts days or weeks. When the access token expires, the client sends the refresh token to get a new pair. Good practice is rotation: each refresh token works once, and if an old one is replayed the server revokes the whole chain. The refresh token lives in a server-checked store, so it can be revoked, drawn here as the session store.",
+      "body": "A 15-minute access token would log users out constantly, so login also returns a refresh token that lasts days or weeks. When the access token expires, the browser sends the refresh token and gets a fresh pair. Good practice is rotation: each refresh token works once, and if an old one is replayed the server revokes the whole chain, because replay suggests theft. The refresh token lives in a server-checked store, so it can be revoked (drawn here as the session store).",
       "idea": "Short access tokens limit exposure; a revocable, rotating refresh token provides the long session.",
-      "caption": "Expired access token swapped for a fresh pair.",
+      "caption": "Expired access token is swapped for a fresh pair.",
       "focus": [
         "browser",
         "app",
@@ -476,7 +479,7 @@
     {
       "tag": "WHAT IF",
       "title": "The user table leaks",
-      "body": "Suppose an attacker dumps the whole user database. With slow salted hashes, each password must be guessed one at a time: at 100 ms per try, that is only 10 guesses per second per CPU core (attackers with GPUs and many cores multiply that, which is why weak passwords still fall), and salts stop one guess from checking every user at once. Plain-text or unsalted MD5 would have exposed everyone immediately, and reused passwords would be tried on other sites.",
+      "body": "Suppose an attacker steals the whole user table. Because each password is a slow salted hash, they must guess one password at a time. At 100 ms per try that is only 10 guesses per second per CPU core. Attackers with GPUs and many cores multiply that, which is why weak passwords still fall. Salts stop one guess from checking every user at once. Plain text or unsalted MD5 would have exposed everyone immediately, and reused passwords would be tried on other sites.",
       "idea": "Assume the database will leak one day; slow salted hashes plus MFA turn a breach into a slow, partial problem.",
       "caption": "Attacker holds the hashes but must guess one at a time.",
       "focus": [
@@ -510,7 +513,7 @@
     {
       "tag": "RECAP",
       "title": "The whole login",
-      "body": "Check the password against a slow salted hash, or delegate to an IdP with the OAuth/OIDC code flow. Add MFA, ideally a passkey. Then issue either a server-side session cookie or a short-lived signed token with a rotating refresh token. Sessions favor easy revocation, JWTs favor stateless verification, and many real systems combine both. What a logged-in user is allowed to do is authorization, a separate lesson.",
+      "body": "Check the password against a slow salted hash, or delegate to an IdP with the OAuth/OIDC code flow. Add MFA, ideally a passkey. Then issue either a server-side session cookie, or a short-lived signed token with a rotating refresh token. Sessions make revoking easy, JWTs make verifying stateless, and many real systems combine both. What a logged-in user may do is authorization, a separate lesson.",
       "idea": "Prove identity once with strong factors, then carry it in something short-lived and revocable.",
       "caption": "Password or IdP, second factor, then tokens.",
       "focus": [

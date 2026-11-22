@@ -122,9 +122,9 @@
     {
       "tag": "QUESTION",
       "title": "One screen, many needs",
-      "body": "A mobile app shows an order screen: the order, the customer's name, and each item with its stock status. The data lives in an Orders service and an Inventory service. How should the app ask for it? The answer depends on who is calling, how far away they are, and how often the shape of the data changes. We will assume a phone on a 60 ms round-trip (RTT) mobile network.",
-      "idea": "An API style is a contract for how callers ask for data; the right one depends on the caller.",
-      "caption": "The phone needs data from two backend services.",
+      "body": "A phone app needs to draw one order screen. It shows the order, the customer's name, and each item with its stock status. That data lives in two backend services: Orders and Inventory. How should the app ask for it? The best answer depends on who is calling and how far away they are. We assume the phone has a 60 ms round trip (RTT: the time for a request to go out and the answer to come back).",
+      "idea": "An API style is the agreed way a caller asks for data. The best style depends on who is calling.",
+      "caption": "The phone needs data held by two backend services.",
       "focus": [
         "mobile",
         "gw",
@@ -138,9 +138,9 @@
     {
       "tag": "REST",
       "title": "REST: resources and verbs",
-      "body": "REST models things as resources with URLs: GET /orders/812 reads one, POST /orders creates one, PUT or PATCH changes it, DELETE removes it. Status codes carry the outcome (200, 404, 409). Because GET is safe and repeatable, browsers, CDNs, and proxies can cache it using standard headers. Assume this order response is about 18 KB of JSON. Assume about 10 ms of server time per backend call. Each service owns its own database; the Data stores node stands for those.",
-      "idea": "REST maps nouns to URLs and actions to HTTP verbs, which makes it cacheable and easy to debug with curl.",
-      "caption": "One GET returns the order resource.",
+      "body": "REST treats each thing as a resource with its own URL. Verbs say what to do: GET reads, POST creates, PUT or PATCH changes, DELETE removes. Status codes report the result (200 OK, 404 not found, 409 conflict). In the animation the phone sends one GET /orders/812 and gets the order back: one round trip. Assume an 18 KB JSON reply and 10 ms of server time per call, so 60 + 10 = 70 ms. GET is safe to repeat, so browsers and CDNs can cache it. GET, PUT and DELETE are idempotent (repeating them changes nothing more). POST is not, so payment APIs add an idempotency key.",
+      "idea": "REST maps things to URLs and actions to HTTP verbs. That makes it easy to cache and easy to test with curl.",
+      "caption": "One GET fetches one order: 1 trip, 70 ms.",
       "focus": [
         "mobile",
         "gw",
@@ -197,9 +197,9 @@
     {
       "tag": "TRADE-OFF",
       "title": "REST's chattiness problem",
-      "body": "The order JSON holds only a customer id and item ids. To draw the screen the app must also GET the customer and the stock for the items. A simple client fetches the order, then the customer, then the stock, one after another: three round trips at 60 ms plus about 10 ms of server time each, about 210 ms. Even with the last two in parallel it is two round trips. Each response also carries fields the screen never shows (over-fetching), and the total reaches about 40 KB. Under-fetching is the extra calls. Note that GET, PUT and DELETE are idempotent (repeating them changes nothing more); POST is not, so payment APIs take an idempotency key.",
-      "idea": "Fixed-shape resources force extra calls (under-fetching) or extra bytes (over-fetching) for screens that need a custom view.",
-      "caption": "Several calls to build one screen.",
+      "body": "The order reply holds only ids for the customer and items. So the phone needs more calls: the order, then the customer, then the stock. Each waits for the last, costing 60 ms of network plus 10 ms of server time. That is 3 x 70 = 210 ms. Running the last two in parallel still takes 2 round trips. Replies also carry fields the screen never shows (over-fetching), so the total reaches about 40 KB (assumed). Needing extra calls is under-fetching. Here the Orders service also serves customer data.",
+      "idea": "A fixed-shape resource forces extra calls (under-fetching) or unused bytes (over-fetching) when a screen needs a custom view.",
+      "caption": "Three calls, one after another, to build one screen.",
       "focus": [
         "mobile",
         "gw",
@@ -308,9 +308,9 @@
     {
       "tag": "RPC",
       "title": "gRPC: fast calls between services",
-      "body": "This is an internal gateway-to-Inventory hop inside the data center, so the HUD shows one fast call. The gateway calls Inventory with gRPC, a remote procedure call (RPC) framework. The contract is a .proto file that defines methods and typed messages. Protobuf encodes them as compact binary, roughly 3-10x smaller than equivalent JSON in typical cases (a rule of thumb; it depends on the payload), over HTTP/2 with many calls multiplexed on one connection. Because calls share one long-lived connection, gRPC needs L7 or client-side load balancing. Generated client code makes the call look like a local function. Browsers cannot speak it directly without a proxy.",
-      "idea": "gRPC trades human readability and browser reach for speed, strict types, and generated clients, which fits internal traffic.",
-      "caption": "The gateway calls Inventory over binary gRPC.",
+      "body": "Inside the data center, the gateway talks to Inventory with gRPC, a remote procedure call (RPC) framework. RPC means calling a function on another machine as if it were local. A .proto file defines the methods and typed messages. Protobuf packs them into compact binary, often 3-10x smaller than the same JSON (a rule of thumb). Many calls share one HTTP/2 connection. The animation shows one fast hop: 12 ms and a 5 KB reply. Two catches: browsers cannot call gRPC without a proxy, and the shared long-lived connection needs L7 or client-side load balancing.",
+      "idea": "gRPC gives up readable text and direct browser access. In return it is fast and strictly typed, which suits internal calls.",
+      "caption": "The gateway asks Inventory for stock over binary gRPC.",
       "focus": [
         "gw",
         "inv",
@@ -367,8 +367,8 @@
     {
       "tag": "GRAPHQL",
       "title": "GraphQL: ask for exactly what you need",
-      "body": "With GraphQL the phone sends one query to a single endpoint, naming the exact fields: order id, customer name, and each item's name and in-stock flag. The GraphQL server resolves each field by calling Orders and Inventory, then returns only what was asked for. One round trip carries about 6 KB, so the screen loads in roughly 90 ms instead of 210. This assumes about 30 ms for the server-side fan-out.",
-      "idea": "GraphQL moves the choice of shape to the client, collapsing many calls into one precise response.",
+      "body": "With GraphQL the phone sends one query to a single endpoint. The query names the exact fields it wants: order id, customer name, and each item's name and in-stock flag. The GraphQL server collects them from Orders and Inventory (a fan-out: one request splits into several), then returns only what was asked for. One round trip carries about 6 KB. Assume the fan-out takes 30 ms, so the screen loads in 60 + 30 = 90 ms instead of 210 ms.",
+      "idea": "GraphQL lets the client choose the response shape, so many calls collapse into one precise reply.",
       "caption": "One query in; the server fans out to Orders and Inventory.",
       "focus": [
         "mobile",
@@ -458,9 +458,9 @@
     {
       "tag": "WHAT IF",
       "title": "The hidden costs of GraphQL",
-      "body": "Flexibility moves work to the server. A client can ask for orders, each with items, each with stock, and one query fans out into hundreds of backend calls (the N+1 problem) unless you batch lookups. Because queries are usually sent as POSTs to one URL, standard HTTP caching mostly does not apply; teams cache by object id, or use persisted queries over GET. You also need depth and cost limits so one query cannot take the system down.",
-      "idea": "GraphQL needs batching, query-cost limits, and its own caching; the server pays for the client's freedom.",
-      "caption": "A deep query fans out into many backend calls.",
+      "body": "That freedom moves work onto the server. Say a client asks for 100 orders, each with 10 items, each with stock. A naive server makes 1 call for the orders, 100 for their items and 1,000 for stock: over 1,100 backend calls from one query. This is the N+1 problem (one call for the list, then one more per item). Fix it by batching lookups. Queries are usually POSTs to one URL, so normal HTTP caching mostly does not apply. Teams cache by object id, or use persisted queries over GET. Add depth and cost limits so one query cannot overload the system.",
+      "idea": "GraphQL needs batching, query-cost limits and its own caching. The server pays for the client's freedom.",
+      "caption": "One deep query turns into over a thousand backend calls.",
       "focus": [
         "gql",
         "orders",
@@ -507,7 +507,12 @@
         },
         {
           "node": "orders",
-          "text": "100s of calls",
+          "text": "100 calls",
+          "tone": "red"
+        },
+        {
+          "node": "inv",
+          "text": "1,000 calls",
           "tone": "red"
         },
         {
@@ -520,9 +525,9 @@
     {
       "tag": "PAGINATION",
       "title": "Listing without loading everything",
-      "body": "Any list endpoint needs pagination. Offset style (?limit=50&offset=100000) is simple but makes the database skip 100,000 rows each time, and rows inserted meanwhile shift pages so items repeat or vanish. Cursor style (?limit=50&after=ord_7f3a) resumes from an opaque cursor encoding the last row's sort key (for example created_at plus id), using an index, so cost stays flat and pages stay stable. GraphQL conventionally exposes the same idea as cursor-based connections. The trade-off: you can go next or previous, but not jump to page 40.",
-      "idea": "Prefer cursor pagination for large or changing lists; reserve offset for small, stable data.",
-      "caption": "The Orders service pages with a cursor.",
+      "body": "Any list endpoint needs pagination, or it would return every row at once. Offset style (?limit=50&offset=100000) is simple, but the database must skip 100,000 rows each time. If rows are inserted meanwhile, pages shift and items repeat or vanish. Cursor style (?limit=50&after=ord_7f3a) resumes after the last row you saw. The cursor is an opaque token holding that row's sort key (for example created_at plus id), so the database jumps straight there using an index. Cost stays flat and pages stay stable. The trade-off: you can go next or previous, but not jump to page 40.",
+      "idea": "Use cursor pagination for large or changing lists. Keep offset for small, stable data.",
+      "caption": "Orders returns 50 rows plus a cursor for the next page.",
       "focus": [
         "web",
         "gw",
@@ -588,9 +593,9 @@
     {
       "tag": "VERSIONING",
       "title": "Changing an API without breaking callers",
-      "body": "Old app versions stay in the wild for years, so you cannot change a response and hope. Safe changes are additive: new optional fields, new endpoints. Breaking changes (rename, remove, retype) need a new version, such as /v2/orders or a header, with the old one kept until usage drops. Protobuf allows adding fields but never reusing a field number. GraphQL marks fields deprecated and removes them later.",
-      "idea": "Make changes additive, and run old and new versions side by side when a break is unavoidable.",
-      "caption": "Old and new clients hit different versions.",
+      "body": "Old app versions stay installed for years, so you cannot just change a response. Safe changes are additive: new optional fields or new endpoints. Breaking changes (rename, remove, change a type) need a new version, such as /v2/orders or a version header. Keep the old one until few people use it. The animation shows the old phone app on v1 and the web app on v2, both served at once. Protobuf lets you add fields but never reuse a field number. GraphQL marks fields deprecated, then removes them later.",
+      "idea": "Change APIs by adding, not breaking. When a break is unavoidable, run old and new versions side by side.",
+      "caption": "Old and new clients call different versions at the same time.",
       "focus": [
         "web",
         "mobile",
@@ -637,9 +642,9 @@
     {
       "tag": "RECAP",
       "title": "Choosing a style",
-      "body": "Use REST for public, cacheable, resource-shaped APIs that many unknown clients will call. Use gRPC between your own services where speed and strict contracts matter. Use GraphQL when many client types need different views of connected data, such as phones and web. Many systems mix all three behind a gateway. Paginate lists with cursors and evolve additively. A purpose-built endpoint or backend-for-frontend can give the same one-trip result without GraphQL.",
+      "body": "Use REST for public, cacheable APIs that many unknown clients call. Use gRPC between your own services, where speed and strict contracts matter. Use GraphQL when several client types (phone, web) need different views of connected data. Many systems mix all three behind a gateway. Page lists with cursors and change APIs additively. A purpose-built endpoint (a backend-for-frontend) can also give a one-trip result without GraphQL.",
       "idea": "Pick by caller: REST for the public, gRPC for internal hops, GraphQL for flexible client views.",
-      "caption": "Each style serves a different caller.",
+      "caption": "Each style fits a different caller.",
       "focus": [
         "web",
         "mobile",

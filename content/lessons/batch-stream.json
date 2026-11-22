@@ -113,9 +113,9 @@
     {
       "tag": "QUESTION",
       "title": "Same events, two ways to answer",
-      "body": "A shop's site and apps emit about 5,000 events per second (clicks, carts, orders). That is roughly 430 million a day, or about 215 GB at 500 bytes each. The business wants revenue per hour on a dashboard. Do you let data pile up and crunch it in big jobs, or process each event the moment it arrives?",
-      "idea": "Batch processes a finished pile of data; stream processes data that never finishes.",
-      "caption": "Events flow from sources into a durable log.",
+      "body": "A shop's site and apps send about 5,000 events per second (clicks, carts, orders). That is roughly 430 million a day, or about 215 GB at 500 bytes each. The business wants revenue per hour on a dashboard. There are two ways to get it. You can let data pile up and crunch it in big jobs (batch). Or you can process each event the moment it arrives (stream). Either way, events first land in a durable event log.",
+      "idea": "Batch processes a finished pile of data. Stream processes data that never finishes.",
+      "caption": "Events flow from the sources into a durable log.",
       "focus": [
         "src",
         "log"
@@ -145,7 +145,7 @@
     {
       "tag": "BATCH",
       "title": "Batch: collect, then compute",
-      "body": "Batch works on a bounded dataset: a fixed set of files with a known start and end. Here the log is copied into a data lake as hourly files. Nothing is computed yet, the data just accumulates. Because the input is complete and unchanging, a failed job can simply be rerun on the same files and give the same answer.",
+      "body": "Batch works on a bounded dataset: a fixed set of files with a known start and end. In the animation the log is copied into a data lake (cheap storage for raw files) as hourly files. Nothing is computed yet; the data just piles up. Because the input is complete and never changes, a failed job can simply be rerun on the same files and give the same answer.",
       "idea": "A bounded input is finished and repeatable, so reruns are safe and simple.",
       "caption": "Events are archived as hourly files.",
       "focus": [
@@ -177,8 +177,8 @@
     {
       "tag": "MAPREDUCE",
       "title": "MapReduce: split, shuffle, reduce",
-      "body": "Once an hour closes, the batch job reads that hour's files, about 9 GB at 500 bytes an event, and cuts them into 128 MB splits, roughly 70 pieces. Map tasks run in parallel on those splits and emit (hour, amount) pairs. The shuffle moves all pairs with the same key to one reducer, and each reducer sums its keys. Results land in the serving store. Modern engines such as Spark use the same split, shuffle, aggregate model. The job starts only after the hour closes, so the dashboard runs over an hour behind.",
-      "idea": "Batch scales by running many independent map tasks, then grouping by key; its cost is waiting.",
+      "body": "When an hour closes, the batch job reads that hour's files: about 9 GB (5,000 x 3,600 x 500 bytes). It cuts them into 128 MB splits, roughly 70 pieces. Map tasks run in parallel on the splits and emit (hour, amount) pairs. The shuffle sends all pairs with the same key to one reducer, and each reducer adds them up. Totals land in the serving store, the database the dashboard reads. Spark and similar engines use the same split, shuffle, aggregate idea. The job starts only after the hour ends, so the dashboard is over an hour behind (HUD: 4,200 s, about 70 min).",
+      "idea": "Batch scales by running many independent map tasks, then grouping by key. Its cost is waiting.",
       "caption": "Parallel map and reduce tasks write hourly totals.",
       "focus": [
         "lake",
@@ -228,9 +228,9 @@
     {
       "tag": "STREAM",
       "title": "Stream: compute as events arrive",
-      "body": "A stream processor reads the log continuously and treats the input as unbounded: it never ends, so there is no final answer, only a running one. It keeps state in memory, such as a running sum per hour, updates it on every event, and pushes fresh totals to the serving store. The dashboard is now a couple of seconds behind instead of an hour.",
-      "idea": "Streaming trades the simplicity of finished input for results that are seconds old.",
-      "caption": "Each event updates running totals immediately.",
+      "body": "A stream processor reads the log continuously. Its input is unbounded: it never ends, so there is no final answer, only a running one. It keeps state in memory, such as a running revenue sum per hour. It updates that sum on every event and pushes fresh totals to the serving store. In the animation the dashboard asks for revenue and gets numbers about 2 seconds old, instead of over an hour old.",
+      "idea": "Streaming gives up the simplicity of finished input in return for results that are only seconds old.",
+      "caption": "Each event updates the running totals immediately.",
       "focus": [
         "log",
         "stream",
@@ -287,9 +287,9 @@
     {
       "tag": "WINDOWS",
       "title": "Windows: cutting an endless stream",
-      "body": "To get an hourly number from a stream you group events into windows. A tumbling window is fixed and non-overlapping, like each clock hour. A sliding window overlaps, such as the last hour recomputed every 5 minutes, so each event lands in 12 windows. A session window groups one user's activity and closes after a gap, say 30 quiet minutes.",
-      "idea": "Pick the window shape from the question: fixed buckets, rolling view, or per-user activity.",
-      "caption": "The processor groups events into windows by time.",
+      "body": "To get an hourly number from a never-ending stream, you cut it into windows. A tumbling window is fixed and does not overlap, like each clock hour. A sliding window overlaps: for example, the last hour recomputed every 5 minutes, so each event falls into 12 windows. A session window groups one user's activity and closes after a quiet gap, say 30 minutes.",
+      "idea": "Pick the window shape from the question: fixed buckets, a rolling view, or per-user activity.",
+      "caption": "The processor groups events into time windows.",
       "focus": [
         "log",
         "stream"
@@ -323,9 +323,9 @@
     {
       "tag": "LATE EVENTS",
       "title": "Late events and watermarks",
-      "body": "A phone loses signal and sends an order stamped 10:58 only at 11:03. Windows should use event time (when it happened), not processing time (when it arrived), or this order lands in the wrong hour. But the processor needs a rule for when a window is done. A watermark says 'I assume no event older than this is still coming', often the newest event time minus a fixed delay, such as 2 minutes. Anything later is dropped, sent to a side output, or used to correct the result.",
-      "idea": "A watermark is a guess about completeness: shorter waits give faster results but more late drops.",
-      "caption": "The order arrives after the 10:00-11:00 window closed.",
+      "body": "A phone loses signal and sends an order stamped 10:58 only at 11:03. Windows should use event time (when it happened), not processing time (when it arrived), or this order lands in the wrong hour. But the processor must decide when a window is finished. A watermark says 'I assume no event older than this is still coming'. It is often the newest event time minus a fixed wait, such as 2 minutes. This order is 5 minutes late, past that wait, so it counts as late. The processor can drop it, send it aside, or use it to correct the result. The 0.2% late rate is an assumed example.",
+      "idea": "A watermark is a guess about completeness. A shorter wait gives faster results but more late drops.",
+      "caption": "The order arrives after the 10:00-11:00 window has closed.",
       "focus": [
         "src",
         "log",
@@ -378,8 +378,8 @@
     {
       "tag": "LAMBDA",
       "title": "Lambda: run both side by side",
-      "body": "Early on, stream results were approximate and could be lost, so teams ran two paths over the same events. A speed layer (stream) gives quick but rough numbers. A batch layer recomputes accurate numbers later and overwrites them. The serving store merges the two. It works, but you now write, test and debug the same business logic twice, in two systems, and the results must agree.",
-      "idea": "Lambda buys accuracy plus speed at the price of maintaining two codebases that must match.",
+      "body": "Early stream engines gave approximate results and could lose data. So teams ran two paths over the same events. A speed layer (stream) gives quick but rough numbers. A batch layer recomputes accurate numbers later and overwrites them. The serving store merges the two. This works, but you write, test and debug the same business logic twice, in two systems, and the results must agree.",
+      "idea": "Lambda buys speed plus accuracy, at the price of two codebases that must match.",
       "caption": "Batch and stream both write into one serving store.",
       "focus": [
         "log",
@@ -436,7 +436,7 @@
     {
       "tag": "KAPPA",
       "title": "Kappa: one stream, replay for fixes",
-      "body": "Modern stream engines handle state, checkpoints and event time well, so kappa drops the batch path. The log is the source of truth and keeps data for days or months. To fix a bug or change logic, deploy the new version, replay the log from the earliest offset (the start of the log) into a new output table, then switch readers to it. A batch is just a stream that ends. The catch is retention: replay only works if the log still holds the history.",
+      "body": "Modern stream engines handle state, checkpoints and event time well, so kappa drops the batch path. The log is the source of truth and keeps data for days or months. To fix a bug or change logic, deploy the new version and replay the log from the start (offset 0) into a new output table. Then switch readers to it. A batch is just a stream that happens to end. The catch is retention: replay only works if the log still holds the history.",
       "idea": "Kappa keeps one codebase by treating reprocessing as a replay of the log.",
       "caption": "New code replays the log from offset 0.",
       "focus": [
@@ -479,8 +479,8 @@
     {
       "tag": "WHAT IF",
       "title": "The stream job crashes",
-      "body": "The processor dies at 11:20 with 20 minutes of running totals in memory. A batch task would just rerun. A stream job instead takes periodic checkpoints: a snapshot of its state plus the log offset (position) it had reached, say every minute. On restart it reloads the last checkpoint and re-reads from that offset. Some events are processed twice, so the output write must be idempotent (safe to repeat) or transactional to avoid double counting.",
-      "idea": "Checkpoint plus replay recovers a stream job; idempotent output keeps the replay from double counting.",
+      "body": "The processor dies at 11:20 and loses 20 minutes of running totals held in memory. A batch task would simply rerun. A stream job instead takes periodic checkpoints: a snapshot of its state plus the log position (offset) it had reached, say every minute. On restart it reloads the last checkpoint and re-reads from that offset. We assume restart and catch-up take about 70 s, so the result lag spikes to 70 s. Some events are processed twice, so output writes must be idempotent (safe to repeat) or transactional, or totals would double count.",
+      "idea": "Checkpoint plus replay recovers a stream job. Idempotent output keeps the replay from double counting.",
       "caption": "The job restores a checkpoint and re-reads the log.",
       "focus": [
         "log",
@@ -530,8 +530,8 @@
     {
       "tag": "RECAP",
       "title": "Choosing between them",
-      "body": "Use batch when freshness of hours is fine and you need cheap, repeatable crunching of huge history, such as nightly reports or model training. Use stream when decisions need seconds, such as fraud checks or live dashboards. Streams need windows, event time and watermarks to cope with endless, out-of-order input. As a rule of thumb, prefer one codebase over lambda when your engine can replay the log or run the same code in batch mode.",
-      "idea": "Choose by how stale an answer you can tolerate, then pay for the extra machinery only if you need it.",
+      "body": "Use batch when hours of delay are fine and you need cheap, repeatable crunching of huge history, such as nightly reports or model training. Use stream when decisions need seconds, such as fraud checks or live dashboards. Streams need windows, event time and watermarks to cope with endless, out-of-order input. As a rule of thumb, prefer one codebase over lambda when your engine can replay the log or run the same code in batch mode.",
+      "idea": "Choose by how stale an answer you can accept, and pay for extra machinery only if you need it.",
       "caption": "Batch is simple and hours old; stream is seconds old and needs more care.",
       "focus": [
         "src",

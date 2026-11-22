@@ -109,9 +109,9 @@
     {
       "tag": "QUESTION",
       "title": "The same row, ten thousand times",
-      "body": "Your product page reads the same few popular rows again and again. Assume 10,000 reads per second, a database read that takes about 10 ms, and a cache read that takes about 1 ms. With no cache, every read hits the database, so it carries all 10,000 queries per second. Most of that work is repeated answers, and a cache is a small fast store that remembers them.",
-      "idea": "A cache trades a little memory and some freshness risk for far fewer slow reads.",
-      "caption": "Every read goes to the database.",
+      "body": "Imagine a product page that keeps asking for the same few popular rows. Say 10,000 reads arrive every second, and each database read takes about 10 ms. With no cache, the database answers all 10,000 every second, even though most answers are identical repeats. A cache is a small, fast store (usually in memory) that remembers answers so the database does not repeat the work. We assume a cache read takes about 1 ms.",
+      "idea": "A cache spends a little memory, and risks slightly old data, to avoid many slow repeated reads.",
+      "caption": "No cache yet: every read goes to the database.",
       "focus": [
         "app",
         "db"
@@ -150,9 +150,9 @@
     {
       "tag": "CACHE-ASIDE",
       "title": "Cache-aside: the app does the work",
-      "body": "In cache-aside (also called lazy loading) the application code owns the logic. It asks the cache first. On a miss it reads the database, then stores the result in the cache with a time limit (TTL) for next time. This first read is slower, about 11 ms, because it pays for both lookups.",
-      "idea": "Cache-aside fills the cache on demand, so only data that is actually read gets cached.",
-      "caption": "Miss: the app falls back to the database, then fills the cache.",
+      "body": "Cache-aside (also called lazy loading) means the app does the work itself. It asks the cache first. On a miss, meaning the cache does not have the answer, the app reads the database and then saves the result in the cache with a time limit (TTL, time to live) of 300 seconds. This first read costs about 11 ms, because it pays for both the cache check and the database read. Later reads of the same key can use the saved copy.",
+      "idea": "In cache-aside the app fills the cache on demand, so only data that is really read gets cached.",
+      "caption": "Miss: the app asks the cache, falls back to the database, then fills the cache.",
       "focus": [
         "app",
         "cache",
@@ -212,9 +212,9 @@
     {
       "tag": "HIT RATIO",
       "title": "A hit, and why the ratio matters",
-      "body": "The next read finds the key in the cache and returns in about 1 ms with no database work. Hit ratio is hits divided by total reads. At 90% with 1 ms hits and 11 ms misses, average latency is 0.9 x 1 + 0.1 x 11 = 2 ms, and the database sees only 1,000 reads per second instead of 10,000. Going from 90% to 99% cuts database reads by another 10 times.",
-      "idea": "Small gains in hit ratio near the top cut database load sharply, because misses are what you pay for.",
-      "caption": "Hit: served from memory, database untouched.",
+      "body": "Now the same key is requested again. The cache has it, so this is a hit: the answer returns in about 1 ms and the database does no work. Hit ratio is hits divided by total reads. At 90%, with 1 ms hits and 11 ms misses, average latency is 0.9 x 1 + 0.1 x 11 = 2 ms. Only the 10% of reads that miss reach the database, so it sees 1,000 reads per second instead of 10,000. Going from 90% to 99% cuts that by another 10 times, to 100 per second.",
+      "idea": "Misses are what you pay for, so even a small hit-ratio gain near the top removes a lot of database load.",
+      "caption": "Hit: answered from the cache, the database is not touched.",
       "focus": [
         "app",
         "cache"
@@ -261,9 +261,9 @@
     {
       "tag": "READ-THROUGH",
       "title": "Read-through: the cache loads itself",
-      "body": "Read-through hides the miss logic. The app only ever talks to the cache. If the key is absent, the cache itself fetches from the database, stores the value, and returns it. The behavior matches cache-aside, but the loading code lives in one place (the cache layer or library) instead of in every caller. Plain Redis does not do this itself; a library or caching layer sits in front and does the loading.",
-      "idea": "Read-through and cache-aside differ in who loads on a miss: the cache or the application.",
-      "caption": "The cache fetches from the database on a miss.",
+      "body": "Read-through hides the miss logic from the app. The app only ever talks to the cache. If the key is missing, the cache itself fetches it from the database, saves it, and returns it. The result is the same as cache-aside, but the loading code lives in one place (the cache layer or a library) instead of in every caller. Plain Redis does not do this by itself; a library or caching layer in front of it does the loading.",
+      "idea": "Read-through and cache-aside differ only in who loads on a miss: the cache or the application.",
+      "caption": "On a miss, the cache (not the app) fetches from the database.",
       "focus": [
         "app",
         "cache",
@@ -310,9 +310,9 @@
     {
       "tag": "WRITE-THROUGH",
       "title": "Write-through: update both, then confirm",
-      "body": "On a write, write-through updates the cache and then the database in one operation, and only acknowledges once both succeed. Reads that go through the cache stay in step with committed data, and nothing is lost on a cache crash. A failed database write must also fail or undo the cache update. The price is that every write waits for the slower database, and you may cache values nobody reads again.",
-      "idea": "Write-through buys consistency and durability by making each write as slow as the database.",
-      "caption": "The write reaches the database before the app is told it worked.",
+      "body": "Now writes. In write-through, the app sends the update to the cache, which writes it to the database too, and the app hears 'ok' only after both succeed. So cached data always matches saved data, and a cache crash loses nothing. If the database write fails, the cache update must fail or be undone as well. The price: every write waits for the slower database, and you may cache values nobody reads again.",
+      "idea": "Write-through keeps cache and database in step, but each write is only as fast as the database.",
+      "caption": "The database confirms the write before the app hears 'ok'.",
       "focus": [
         "app",
         "cache",
@@ -364,9 +364,9 @@
     {
       "tag": "WRITE-BACK",
       "title": "Write-back: acknowledge now, save later",
-      "body": "Write-back (write-behind) updates only the cache, acknowledges immediately, and flushes dirty entries (values changed in the cache but not yet saved to the database) to the database later in batches. Writes become very fast and many updates to one key collapse into a single database write. The danger is that if the cache node dies before a flush, those acknowledged writes are gone, unless the cache persists or replicates them.",
+      "body": "Write-back (also called write-behind) is the opposite bet. The cache saves the write, answers 'ok' right away, and copies it to the database later in batches. Entries changed in the cache but not yet saved are called dirty. Writes become very fast, and many updates to one key can collapse into a single database write. The danger: if the cache dies before a flush, those acknowledged writes are lost, unless the cache persists or replicates them.",
       "idea": "Write-back is the fastest write path, and the only one that can lose data you already acknowledged.",
-      "caption": "Fast ack from the cache; the database catches up asynchronously.",
+      "caption": "The cache says 'ok' fast; the worker saves to the database later.",
       "focus": [
         "app",
         "cache",
@@ -420,9 +420,9 @@
     {
       "tag": "WRITE-AROUND",
       "title": "Write-around: skip the cache on writes",
-      "body": "Write-around sends writes straight to the database and leaves the cache alone. It suits data that is written once and rarely read soon after, such as uploaded logs or a bulk import, because it keeps them from filling the cache. The catch is that the first read after a write is a miss, and an old cached copy of that key is stale until it expires or is removed.",
-      "idea": "Write-around protects the cache from write-heavy, read-light data at the cost of a cold first read.",
-      "caption": "The write goes to the database only.",
+      "body": "Write-around sends writes straight to the database and skips the cache. It suits data that is written once and rarely read soon after, such as uploaded logs or a bulk import, because it keeps that data from filling the cache. The catch: the first read after a write is a miss, and any older cached copy of that key stays stale until it expires or is removed.",
+      "idea": "Write-around protects the cache from write-heavy, rarely read data, at the cost of a cold first read.",
+      "caption": "The write goes to the database only; the cache is untouched.",
       "focus": [
         "app",
         "db"
@@ -456,9 +456,9 @@
     {
       "tag": "EVICTION",
       "title": "The cache is full: who goes?",
-      "body": "Memory is limited, so a full cache must evict something to admit a new key. LRU (least recently used) removes the key untouched the longest, betting that recent use predicts future use. LFU (least frequently used) removes the key with the fewest accesses, which protects long-term favorites. LRU is simple and widely used (Redis offers it as allkeys-lru, but it must be configured); a one-time bulk scan can flush hot keys out of it, which LFU resists. LFU can keep once-popular keys too long unless counts decay.",
+      "body": "Memory is limited, so a full cache must evict (throw out) something to make room for a new key. LRU (least recently used) removes the key untouched for the longest time, betting that recent use predicts future use. LFU (least frequently used) removes the key with the fewest accesses, which protects long-term favorites. LRU is simple and common (Redis offers it as allkeys-lru, but you must turn it on), yet a one-time bulk scan can push hot keys out. LFU resists that, but once-popular keys can linger unless counts decay.",
       "idea": "Eviction is a bet about the future: LRU bets on recency, LFU bets on popularity.",
-      "caption": "Cache is full: SET new key evicts an old one.",
+      "caption": "The cache is full, so storing a new key throws out an old one.",
       "focus": [
         "app",
         "cache"
@@ -493,9 +493,9 @@
     {
       "tag": "WHERE",
       "title": "Caches live in layers",
-      "body": "A request can be answered at many points. The browser caches files and responses, a CDN (content delivery network) edge serves popular content near the user and forwards misses to the app, its origin server, the app may hold a small in-process cache, a shared cache like Redis (an in-memory key-value store) serves all app servers, and the database keeps hot pages in its own memory. Closer to the user is faster, but harder to keep consistent and to clear.",
+      "body": "A request can be answered at several layers. The browser caches files and responses. A CDN (content delivery network) edge serves popular content from a server near the user, and on a miss forwards to the app (its origin). The app may keep a small in-process cache, a shared cache such as Redis (an in-memory key-value store) serves all app servers, and the database keeps hot pages in its own memory. Here the logo is answered by the CDN and the user data by the shared cache, so the database is never reached. Closer to the user is faster, but harder to keep fresh.",
       "idea": "Put each cache as close to the user as the data's freshness rules allow.",
-      "caption": "The CDN and the shared cache answer before the database; the browser cache is checked first.",
+      "caption": "Logo: CDN hit. User data: shared-cache hit. The database is never reached.",
       "focus": [
         "browser",
         "cdn",
@@ -557,7 +557,7 @@
     {
       "tag": "RECAP",
       "title": "Pick the policy by the data",
-      "body": "Read side: cache-aside keeps logic in the app, read-through moves it into the cache. Write side: write-through is safe and slower, write-back is fast and risky, write-around keeps the cache clean of write-only data. Track hit ratio, since it sets both latency and database load, and pick an eviction policy that matches your access pattern. Common pairings: cache-aside + write-around (delete the key on update), read-through + write-through. Keeping cached copies correct over time is covered in the invalidation lesson.",
+      "body": "Reads: cache-aside keeps the loading logic in the app; read-through moves it into the cache. Writes: write-through is safe but slower, write-back is fast but risky, and write-around keeps write-only data out of the cache. Watch hit ratio, because it sets both latency and database load, and choose an eviction policy that fits how your data is accessed. Common pairings: read-through with write-through, or cache-aside where writes go to the database and then delete the cached key. Keeping cached copies correct over time is the next lesson, on invalidation.",
       "idea": "Choose read and write policies per data type, then watch the hit ratio.",
       "caption": "Five policies, one goal: fewer slow reads.",
       "focus": [

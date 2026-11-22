@@ -148,7 +148,7 @@
     {
       "tag": "QUESTION",
       "title": "One event, three channels",
-      "body": "A user's order ships. The shipping service wants them told: a push to their phone, an email with the tracking link, maybe an SMS. Assume 10 million users and about 50 million notifications a day, which is roughly 600 a second on average and 10 times that in a burst. How do you deliver all of it once, on the right channel, without melting a provider or spamming anyone?",
+      "body": "A user's order ships. The shipping service wants to tell them: a push notification to their phone, an email with the tracking link, maybe an SMS. Assume 10 million users and about 50 million notifications a day, which is roughly 600 a second on average and about 10 times that in a burst. How do you deliver all of it once, on the right channel, without overloading a provider or spamming anyone?",
       "idea": "A notification system is a pipeline that decides whether, where, and when to send, then sends reliably.",
       "caption": "An upstream service has something to tell a user.",
       "focus": [
@@ -168,9 +168,9 @@
     {
       "tag": "FLOW",
       "title": "Accept fast, send later",
-      "body": "The shipping service calls the Notification API with an event: a user id, a template, and data. The API validates the request and will later answer 202 Accepted (accepted for processing, not yet sent), but only after the event is safely queued. That takes tens of milliseconds. It never waits for the provider, because sending is slow and flaky (providers take 100 ms to seconds) and must never sit on the caller's request path.",
+      "body": "The shipping service calls the Notification API with an event: a user id, a template, and some data. The API validates it, runs the checks in the next steps (preferences and duplicates), saves the messages safely in queues (waiting lines for messages), and only then answers 202 Accepted, meaning \"received, not yet sent\". This takes tens of milliseconds. The API never waits for the provider, because sending is slow and flaky (100 ms to several seconds) and must not hold up the caller.",
       "idea": "Decouple the caller from delivery: acknowledge once the event is durably stored, never after the slow send.",
-      "caption": "Event reaches the API, which validates it.",
+      "caption": "The event reaches the API, which validates it before doing anything else.",
       "focus": [
         "events",
         "api"
@@ -201,9 +201,9 @@
     {
       "tag": "CONCEPT",
       "title": "Ask the preference service",
-      "body": "Before queuing anything the API asks the preference service what this user wants. Does she allow push for shipping updates? Has she unsubscribed from email? Is it 3 a.m. in her time zone, so non-urgent sends should wait until quiet hours end? Those sends go to a delay queue and are released when quiet hours end. Legal opt-outs and consent also live here. Checking first means we avoid queuing what we are not allowed to send, and for marketing messages workers re-check the opt-out flag just before sending, so an unsubscribe or SMS STOP takes effect immediately.",
+      "body": "Before queuing anything, the API asks the preference service what this user wants. Is push allowed for shipping updates? Did she unsubscribe from email? Is it 3 a.m. in her time zone? If so, non-urgent sends go to a delay queue until quiet hours end. Opt-outs and legal consent live here too. Checking first avoids queuing what we may not send. For marketing messages, workers re-check the opt-out flag just before sending, so an unsubscribe or an SMS \"STOP\" takes effect at once.",
       "idea": "Preferences are a gate in front of the queues: opt-outs, channel choice, and quiet hours are decided before any work is queued.",
-      "caption": "Preferences say push and email yes, SMS no.",
+      "caption": "The preference service answers: push and email yes, SMS no.",
       "focus": [
         "api",
         "pref"
@@ -238,9 +238,9 @@
     {
       "tag": "CONCEPT",
       "title": "Dedup with an idempotency key",
-      "body": "Upstream services retry, and message brokers redeliver, so the same event can arrive twice. The API builds a key from user, template, and event id, then runs a single atomic SET ... NX in Redis that stores 'in progress' with a short expiry. Once the enqueue succeeds, it marks the key 'done' with a 24-hour expiry. A retry that finds 'done' is dropped. If the API died mid-way, the short expiry lapses and the retry resumes instead of being lost. Without this, a retried order event means two emails.",
+      "body": "Upstream services retry, and message brokers redeliver, so the same event can arrive twice. To catch repeats, the API builds a key from user, template and event id, then runs one atomic Redis command, SET ... NX (set only if the key does not exist). It stores \"in progress\" with a short expiry. Once the message is queued, the key becomes \"done\" for 24 hours. A retry that finds \"done\" is dropped. If the API crashed midway, the short expiry lapses and the retry resumes. Without this, one retried order event means two emails.",
       "idea": "A two-state idempotency key makes a repeated request harmless without ever losing the first one.",
-      "caption": "Key not seen before, so the event continues.",
+      "caption": "The key has not been seen before, so the event continues.",
       "focus": [
         "api",
         "redis"
@@ -282,9 +282,9 @@
     {
       "tag": "FLOW",
       "title": "One queue per channel",
-      "body": "The API renders a small message for each allowed channel and puts it on that channel's queue: push and email here. Once the messages are durably queued, it marks the dedup key done and answers the caller with 202 Accepted. Separate queues matter because channels behave differently. Push is fast and bulk, email is slower, and SMS is costly and tightly rate limited. If the SMS provider stalls, its queue grows while push and email keep flowing.",
+      "body": "The API renders a small message for each allowed channel and puts it on that channel's own queue: push and email here. Once they are safely queued, it marks the dedup key done and answers the caller with 202 Accepted. Separate queues matter because channels behave differently: push is fast and bulk, email is slower, and SMS is costly and tightly limited. If the SMS provider stalls, only its queue grows while push and email keep flowing.",
       "idea": "Per-channel queues isolate failures and let each channel scale and throttle on its own.",
-      "caption": "Messages fan out into queues, then the caller gets its 202.",
+      "caption": "Messages split into one queue per channel, then the caller gets its 202.",
       "focus": [
         "events",
         "api",
@@ -344,9 +344,9 @@
     {
       "tag": "FLOW",
       "title": "Workers send, within limits",
-      "body": "Channel workers pull messages from a queue and call the provider: APNs and FCM (Apple's and Google's push services) for push, an email service, an SMS gateway. Before each call a worker takes a token from a token bucket in Redis: it refills at a steady rate and each send spends one token. Providers throttle you and SMS can cost real money per message, so if the bucket is empty the worker waits instead of firing. Per-user frequency caps (for example at most 3 marketing pushes per user per day) stop one person being flooded. The provider then returns an accepted response.",
+      "body": "Channel workers take messages from a queue and call the provider: APNs and FCM (Apple's and Google's push services), an email service, or an SMS gateway. Before each call, a worker takes a token from a token bucket in Redis. The bucket refills at a steady rate and each send spends one token. If it is empty, the worker waits. This keeps us under provider limits and SMS costs. Per-user caps (for example 3 marketing pushes a day) stop one person being flooded. The provider then replies that it accepted the message.",
       "idea": "Rate limits protect the provider relationship, the budget, and each user; workers pull at the speed the limits allow.",
-      "caption": "Workers check limits, then call the provider.",
+      "caption": "Workers take a token to stay within limits, then call the provider.",
       "focus": [
         "emailq",
         "workers",
@@ -416,9 +416,9 @@
     {
       "tag": "WHAT IF",
       "title": "The provider fails",
-      "body": "Now the email provider returns 503 errors. Only transient errors are retried (5xx, 429 honoring Retry-After, timeouts); permanent 4xx errors such as an invalid token or bad address are not. A worker keeps the message and re-queues it with a delay that doubles from 1 s up to a ceiling of about 5 minutes, with random jitter so thousands of messages do not return at once. A circuit breaker pauses the workers while the provider is down. Each message carries an expiry by type: an OTP is stale after a few minutes, a shipping notice can wait hours. Past the expiry or the attempt cap it goes to a dead-letter queue, which is replayed once the provider recovers, never silently lost.",
+      "body": "Now the email provider returns 503 errors. Only temporary errors are retried (5xx, 429 with Retry-After, timeouts); permanent 4xx errors like a bad address are not. The worker puts the message back on the queue with a delay that doubles from 1 s up to about 5 minutes, plus random jitter so thousands of retries do not arrive at once. A circuit breaker pauses workers while the provider is down. Messages expire by type: an OTP (one-time code) is stale in minutes, a shipping notice can wait hours. Past expiry or the attempt cap, a message goes to a dead-letter queue, a holding area to replay after recovery, so nothing is silently lost.",
       "idea": "Retry transient errors with capped backoff and jitter, expire stale messages, and park the rest in a dead-letter queue.",
-      "caption": "Failed sends return to the queue with a delay.",
+      "caption": "Failed sends go back on the queue with a growing delay.",
       "focus": [
         "workers",
         "provider",
@@ -475,9 +475,9 @@
     {
       "tag": "TRADE-OFF",
       "title": "At-least-once means duplicates",
-      "body": "A worker sends the email, then crashes before it acknowledges the queue message. The queue redelivers it, and a second email could go out. True exactly-once delivery across a network is not achievable here, so we choose at-least-once and shrink the duplicates. Before the call the worker claims the notification id in Redis as 'sending' with a short lease, and sets 'sent' after the provider accepts. A redelivery that finds 'sent' skips. One that finds only an expired 'sending' retries, using the provider's idempotency key where one exists, and accepts a rare duplicate rather than a loss.",
+      "body": "A worker sends the email, then crashes before telling the queue it finished. The queue redelivers the message, so a second email could go out. Exactly-once delivery over a network is not achievable here, so we choose at-least-once and shrink duplicates. Before sending, the worker marks the notification id \"sending\" in Redis with a short lease, and \"sent\" once the provider accepts. A redelivery that finds \"sent\" skips. One that finds only an expired \"sending\" tries again, using the provider's idempotency key if it has one. A rare duplicate beats a lost message.",
       "idea": "Pick at-least-once delivery and make sending idempotent; a rare duplicate beats a lost notification.",
-      "caption": "A redelivered message finds 'sent' and is skipped.",
+      "caption": "The redelivered message finds \"sent\" in Redis and is skipped.",
       "focus": [
         "workers",
         "redis",
@@ -528,9 +528,9 @@
     {
       "tag": "WHAT IF",
       "title": "A flash sale spike",
-      "body": "Marketing launches a promo to 5 million users: a campaign job expands the audience into per-user events at a controlled rate, about 8,000 push messages per second against a 600 per second average. The queues absorb the burst, so the API stays fast. Workers drain the push queue at their rate limit, and you add workers per channel when the backlog age grows. Priority matters too: put password resets and payment alerts on a high-priority queue so a promo never delays them.",
+      "body": "Marketing launches a promo to 5 million users. A campaign job turns it into per-user events at a controlled rate, about 8,000 pushes per second against a 600 per second average. The queues absorb the burst, so the API stays fast. Workers drain the push queue at their rate limit, and you add workers when the oldest message gets too old. Priority matters too: password resets and payment alerts go on a high-priority queue, so a promo never delays them.",
       "idea": "Queues turn a spike into a backlog; separate priorities keep urgent messages ahead of bulk ones.",
-      "caption": "Backlog builds, drains at the allowed rate.",
+      "caption": "A backlog builds in the queue, then drains at the allowed rate.",
       "focus": [
         "events",
         "api",
@@ -587,9 +587,9 @@
     {
       "tag": "RECAP",
       "title": "The whole pipeline",
-      "body": "Accept the event fast, check preferences, dedup with an idempotency key, then queue per channel. Workers send within rate limits, retry with backoff, park failures in a dead-letter queue, and guard against duplicates at send time. Track queue age, delivery rate, and provider errors per channel, because those tell you which stage is hurting. Provider callbacks (bounces, complaints, unregistered tokens) feed back into preferences so dead addresses and tokens stop being targeted.",
+      "body": "Accept the event fast, check preferences, dedup with an idempotency key, then queue per channel. Workers send within rate limits, retry with backoff, park failures in a dead-letter queue, and guard against duplicates at send time. Watch queue age, delivery rate and provider errors per channel to see which stage is hurting. Provider feedback (bounces, complaints, dead push tokens) flows back into preferences so bad addresses stop being targeted.",
       "idea": "Gate, dedup, queue per channel, send within limits, retry safely: each stage removes one failure mode.",
-      "caption": "Each stage guards against one failure.",
+      "caption": "Each stage guards against one kind of failure.",
       "focus": [
         "events",
         "api",

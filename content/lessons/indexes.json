@@ -99,9 +99,9 @@
     {
       "tag": "QUESTION",
       "title": "One query, ten million rows",
-      "body": "An orders table holds 10 million rows, about 100 bytes each, stored in 8 KB pages. That is roughly 1 GB across 125,000 pages. A user opens their order history, which runs: SELECT * FROM orders WHERE customer_id = 42. The customer has about 50 orders. How should the database find those 50 rows?",
+      "body": "An orders table holds 10 million rows of about 100 bytes each. The database stores them in 8 KB chunks called pages, about 125,000 pages or 1 GB in total. A user opens their order history, which runs SELECT * FROM orders WHERE customer_id = 42. That customer has about 50 orders. How can the database find those 50 rows among 10 million?",
       "idea": "Finding a few rows among millions is the problem an index exists to solve.",
-      "caption": "A query arrives for one customer's orders.",
+      "caption": "A query arrives asking for one customer's orders.",
       "focus": [
         "client",
         "app"
@@ -124,9 +124,9 @@
     {
       "tag": "FULL SCAN",
       "title": "Without an index: read everything",
-      "body": "With no index on customer_id, the engine must read every page of the table and test every row. Pages pass through the buffer pool, the database's RAM cache of recently used pages. That is 125,000 pages and 10 million row checks to return 50 rows. Sequential reads are fast, but about 1 GB of work still takes on the order of a second, and it grows linearly with the table.",
+      "body": "Watch the animation: with no index on customer_id, the engine has no shortcut. It reads every page of the table and checks every row. Pages pass through the buffer pool, the database's RAM cache of recently used pages. That is 125,000 pages and 10 million row checks to return just 50 rows. Sequential reads are fast, but 1 GB of work still takes about 800 ms here, and it grows in step with the table.",
       "idea": "A full scan costs time proportional to table size, no matter how few rows match.",
-      "caption": "Every table page is read to find 50 rows.",
+      "caption": "Every table page is read and every row checked to find 50 rows.",
       "focus": [
         "app",
         "table",
@@ -179,9 +179,9 @@
     {
       "tag": "CONCEPT",
       "title": "A B-tree is a sorted map of pages",
-      "body": "An index is a separate structure holding the indexed column's values in sorted order, each with a pointer to its table row. Most databases use a B-tree (strictly a B+tree: data pointers live only in the leaves): a shallow tree where each page holds hundreds of keys. Internal pages guide you down, and leaf pages hold the entries in order. Leaf pages are linked in sorted order, so a range or ORDER BY just walks along the leaves. With about 300 keys per page, three levels cover roughly 27 million entries.",
+      "body": "An index is a separate structure that keeps one column's values in sorted order, each with a pointer to its table row. Think of the index at the back of a book. Most databases use a B-tree (strictly a B+tree, where row pointers live only in the bottom 'leaf' pages). It is a shallow tree whose pages each hold hundreds of keys. Upper pages work like signposts and leaf pages hold the sorted entries. With about 300 keys per page, three levels cover roughly 27 million entries. Leaves are linked in order, so a range or ORDER BY just walks along them.",
       "idea": "A wide, shallow tree means any key is only a few page reads away, even in a huge table.",
-      "caption": "The index is a small sorted structure beside the table.",
+      "caption": "The index is a small sorted structure beside the table, pointing at rows.",
       "focus": [
         "index",
         "table"
@@ -218,9 +218,9 @@
     {
       "tag": "SEEK",
       "title": "With an index: seek, then fetch",
-      "body": "Now the engine walks the tree: root page, one internal page, then a leaf page, which lists the 50 entries for customer 42 side by side. For each entry it follows the pointer to the table page holding the full row. Upper levels are hot and stay in RAM, so the cost is about 3 index pages plus up to one table page per row. Here that is roughly 53 pages instead of 125,000.",
+      "body": "Now the engine walks the tree: the root page, one middle page, then a leaf page. The leaf lists the 50 entries for customer 42 side by side. For each entry the engine follows the pointer to the table page holding the full row. The top levels are used constantly, so they stay in RAM. The total is about 3 index pages plus up to one table page per row: roughly 53 pages instead of 125,000, and about 3 ms.",
       "idea": "An index seek reads a handful of pages instead of the whole table; cost grows with tree depth, not table size.",
-      "caption": "Tree walk to the leaf, then fetch matching rows.",
+      "caption": "The engine walks the tree to the leaf, then fetches the 50 matching rows.",
       "focus": [
         "client",
         "app",
@@ -278,7 +278,7 @@
         },
         {
           "node": "table",
-          "text": "53 pages",
+          "text": "+50 row fetches",
           "tone": "green"
         },
         {
@@ -292,9 +292,9 @@
     {
       "tag": "COMPOSITE",
       "title": "Column order in a composite index",
-      "body": "The page needs the latest 20 orders (WHERE customer_id = 42 ORDER BY created_at DESC LIMIT 20), so you create an index on (customer_id, created_at). Entries are sorted by customer_id, then created_at within each customer. The engine jumps to customer 42's block, already in date order, and reads the last 20 entries with no separate sort. A query filtering only on created_at cannot seek into it, because dates are scattered across all customers. This is the leftmost-prefix rule.",
+      "body": "The page really needs only the latest 20 orders: WHERE customer_id = 42 ORDER BY created_at DESC LIMIT 20. So you build one index on two columns, (customer_id, created_at). Entries are sorted by customer first, then by date inside each customer. The engine jumps to customer 42's block, already in date order, and reads the last 20 entries with no separate sorting. That is 23 pages (3 index + 20 rows) in about 1 ms. A query filtering only on created_at cannot seek here, because dates are scattered across all customers. This is the leftmost-prefix rule.",
       "idea": "A composite index serves queries that use its leading columns; put equality columns first, then the range or sort column.",
-      "caption": "Entries sorted by customer, then date: 20 rows read.",
+      "caption": "Entries sorted by customer, then date: the engine reads just the newest 20.",
       "focus": [
         "client",
         "app",
@@ -359,9 +359,9 @@
     {
       "tag": "COVERING",
       "title": "Covering index: skip the table",
-      "body": "Suppose the page only shows order date and total. If the index also stores total (for example (customer_id, created_at) INCLUDE (total), or the equivalent in your database), the leaf entries already hold every column the query needs. The engine answers from the index alone, skipping the scattered row fetches that are often the most expensive part of a seek. (In PostgreSQL this relies on VACUUM keeping the visibility map current; otherwise some table visits remain.)",
+      "body": "Suppose the page shows only the order date and total. If the index also stores total, as in (customer_id, created_at) INCLUDE (total), each index entry already holds every column the query needs. The engine answers from the index alone and skips the row fetches, which are often the costliest part of a seek. Pages drop from 23 to about 3. (In PostgreSQL this relies on VACUUM keeping the visibility map current; otherwise some table visits remain.)",
       "idea": "A covering index answers a query entirely from the index, trading a larger index for fewer reads.",
-      "caption": "The index alone answers the query.",
+      "caption": "The index alone answers the query, so the table is never touched.",
       "focus": [
         "app",
         "index",
@@ -413,9 +413,9 @@
     {
       "tag": "TRADE-OFF",
       "title": "Every index taxes every write",
-      "body": "Now an order is inserted. The row goes into a table page, and a matching entry must go into each index, in its sorted position. With five indexes that is six places to write, and a full leaf page may split in two, touching its parent as well. The 6 shown are pages written, not counting the tree walks (reads) needed to locate each position. Updates to indexed columns move entries, and deletes remove them. Indexes buy read speed with write cost.",
+      "body": "Indexes are not free. Watch an order being inserted: the row goes into a table page, and a matching entry must go into every index, at its sorted position. With five indexes that is six pages written. A full leaf page may also split in two, which touches its parent too. The 6 counts pages written, not the tree walks (reads) needed to find each position. Updates to indexed columns move entries, and deletes remove them. Indexes buy read speed with write cost.",
       "idea": "Write cost grows with the number of indexes, so add them for real query patterns, not by habit.",
-      "caption": "One insert updates the table and five indexes.",
+      "caption": "One insert writes the table row plus an entry in each of five indexes.",
       "focus": [
         "client",
         "app",
@@ -466,9 +466,9 @@
     {
       "tag": "WHAT IF",
       "title": "When a scan is the right answer",
-      "body": "Suppose a query asks for orders with status = 'shipped', and 90 percent of rows match. Following the index would mean 9 million random row fetches, far worse than reading the table once in order. The query planner estimates this from statistics and chooses the full scan. A scan can also be forced when the index cannot be used: wrapping a column in a function, such as WHERE lower(email) = ..., usually bypasses a plain index on email, and an expression index on lower(email) fixes that.",
+      "body": "Suppose a query asks for orders with status = 'shipped', and 90 percent of rows match. Following the index would mean about 9 million random row fetches, far worse than reading the table once in order. The query planner (the part that picks a strategy) estimates this from statistics and chooses the full scan. A scan can also happen when the index cannot be used. Wrapping a column in a function, like WHERE lower(email) = ..., usually bypasses a plain index on email. An expression index on lower(email) fixes that.",
       "idea": "Indexes help selective queries; when most rows match, a sequential scan is cheaper and the planner knows it.",
-      "caption": "Index skipped: the scan is cheaper for 90 percent of rows.",
+      "caption": "The planner skips the index and scans the table because 90 percent of rows match.",
       "focus": [
         "app",
         "table"
@@ -506,7 +506,7 @@
     {
       "tag": "RECAP",
       "title": "Index for the queries you run",
-      "body": "A B-tree turns a search over millions of rows into a few page reads. Composite indexes follow the leftmost-prefix rule, so column order matters. Covering indexes skip the table. Each index slows writes and uses space, and queries that match most of the table are better served by scans. Look at real slow queries and their query plans, then add the smallest index that fixes them.",
+      "body": "A B-tree turns a search over millions of rows into a few page reads. Composite indexes follow the leftmost-prefix rule, so column order matters. Covering indexes skip the table. Every index slows writes and uses space, and queries that match most of the table are better served by scans. So look at your real slow queries and their query plans, then add the smallest index that fixes them.",
       "idea": "Design indexes from your actual queries, check the query plan, and keep only the ones that earn their write cost.",
       "caption": "Fast reads, paid for on every write.",
       "focus": [

@@ -122,8 +122,8 @@
   "metrics": [
     {
       "id": "hops",
-      "label": "Internal calls",
-      "unit": "calls"
+      "label": "Internal hops",
+      "unit": "hops"
     },
     {
       "id": "latency",
@@ -140,9 +140,9 @@
     {
       "tag": "QUESTION",
       "title": "One app does everything",
-      "body": "A small shop runs as a single deployable program, a monolith. Checkout touches orders, payments, and inventory, but they all live in one process and share one database. Calling another part of the code is an ordinary function call. As the team grows from 5 to 50 people, should this one program be broken up, and what would that cost?",
-      "idea": "A monolith is one deployable unit; its internal calls are cheap and its transactions are simple.",
-      "caption": "Checkout runs entirely inside one process.",
+      "body": "Picture a small online shop built as one program, called a monolith. Checkout, orders, payments and stock all live inside it and share one database. When one part needs another, it just calls a function, which is fast and simple. The animation shows one checkout request saved in a single transaction, a group of database changes that all succeed or all fail together. Now the team grows from 5 to 50 people. Should we break this program up, and what would it cost?",
+      "idea": "A monolith is one program deployed as a unit: its internal calls are cheap and one transaction covers everything.",
+      "caption": "The whole checkout runs inside one program and one database.",
       "focus": [
         "client",
         "gw",
@@ -190,9 +190,9 @@
     {
       "tag": "CONCEPT",
       "title": "Modular monolith first",
-      "body": "Before splitting anything, split the code. A modular monolith keeps one deployment but divides it into modules such as orders, payments, and inventory. Each module exposes a small interface and keeps its own tables; other modules may not reach into them. Enforce this with build-time checks or package visibility rules, otherwise boundaries erode. Calls stay in-process, so there is no network and one transaction still works, though it still deploys and scales as one unit.",
-      "idea": "Clear module boundaries inside one deployable give most of the design benefit of microservices without the network cost.",
-      "caption": "One process, but each module owns its own tables.",
+      "body": "Before splitting anything over the network, split the code. A modular monolith is still one program, but it is divided into modules such as orders and payments. Each module offers a small public interface and keeps its own tables, and other modules must not read those tables directly. The animation shows both modules saving data in one transaction. Calls stay in one process, so there is no network cost, but it still deploys and scales as one unit. Enforce the rules with build checks, or the boundaries slowly fade.",
+      "idea": "Clean module boundaries inside one program give much of the design benefit of microservices without the network cost.",
+      "caption": "One program, one database, but each module uses only its own tables.",
       "focus": [
         "mono",
         "shared"
@@ -237,9 +237,9 @@
     {
       "tag": "CONCEPT",
       "title": "Draw boundaries by capability",
-      "body": "When one team or one module truly needs to ship on its own, extract it. Cut along business capabilities (orders, payments, catalog), not technical layers like 'all the controllers'. A good service boundary changes for one reason and is owned by one team. Here Orders and Payments become separate services behind an API gateway, the single front door that routes each request to the right service.",
-      "idea": "A good service matches a business capability and one team, so most changes touch only one service.",
-      "caption": "The gateway now routes to the Orders service.",
+      "body": "When one team or module really needs to ship on its own, pull it out as a separate service. Cut along business capabilities such as orders, payments or catalog, not technical layers like 'all the controllers'. A good boundary changes for one reason and belongs to one team. The animation sends checkout through the API gateway (the single front door that routes each request to the right service) to a new Orders service, which saves order 4821 in its own database. There is still one internal hop, so checkout stays at about 30 ms.",
+      "idea": "A good service matches one business capability and one team, so most changes touch only one service.",
+      "caption": "The gateway now sends checkout to the Orders service, which saves order 4821.",
       "focus": [
         "client",
         "gw",
@@ -275,7 +275,7 @@
       ],
       "metrics": {
         "hops": "1",
-        "latency": "32",
+        "latency": "30",
         "avail": "99.8"
       },
       "chips": [
@@ -289,16 +289,16 @@
         },
         {
           "node": "client",
-          "text": "32 ms"
+          "text": "still 30 ms"
         }
       ]
     },
     {
       "tag": "DATA",
       "title": "Each service owns its data",
-      "body": "Payments has its own database, and only the Payments service may read or write it. Everyone else must ask through its API. This lets Payments change its schema or even its database engine without breaking others. The price is that you can no longer join orders to payments in one SQL query or wrap both in one transaction. Sharing a database between services quietly rebuilds the monolith. Checkout now spans three boxes, so latency and availability worsen; the next step explains by how much.",
-      "idea": "Owning data is what makes services independent; a shared database ties them back together.",
-      "caption": "Orders asks Payments by API; reaching into its DB is forbidden.",
+      "body": "Each service owns its data. Payments has its own database, and only the Payments service may read or write it. Everyone else must ask through its API. In the animation, Orders asks Payments to charge order 4821 and Payments saves it in its own database, but Orders reading that database directly is blocked. This lets Payments change its tables freely. The price: you can no longer join orders to payments in one SQL query or wrap both writes in one transaction. Sharing a database would quietly rebuild the monolith. Checkout now spans three boxes, so it gets slower and less available (next step).",
+      "idea": "Owning its data is what makes a service independent; a shared database ties services back together.",
+      "caption": "Orders must ask Payments through its API; reading Payments' database directly is blocked.",
       "focus": [
         "orders",
         "pay",
@@ -356,9 +356,9 @@
     {
       "tag": "COST",
       "title": "A function call became a network call",
-      "body": "An in-process call takes well under a microsecond. A network round trip in one data center takes about 0.5 to 2 ms with warm connections, plus serializing (turning data into bytes to send), TLS and routing, so two extra hops move checkout from about 30 to 36 ms. Count each box in the path as 99.9% available, its database included: gateway plus app gives about 99.8% (17.5 h down a year); gateway, Orders and Payments give about 99.7% (0.999 cubed, 26 h), assuming independent failures. Partial failure means some services fail while others work, and one checkout spans three logs, so pass a trace ID along every call.",
-      "idea": "Every network hop adds latency and a new way to fail, and chained availabilities multiply.",
-      "caption": "Latency and failure risk rise with each hop.",
+      "body": "A function call inside one program takes well under a microsecond. A network round trip in one data center takes about 0.5 to 2 ms, plus serializing (turning data into bytes), TLS encryption and routing. Checkout gains one hop, and Payments writes to its own database, so it grows from about 30 to 36 ms here. Availability falls too. Say each box, database included, is up 99.9% of the time. Gateway plus one app gives about 99.8% (17.5 hours down a year). Gateway, Orders and Payments give 0.999 x 0.999 x 0.999, about 99.7% (26 hours), if failures are independent. Pass a trace ID along every call, since one checkout now logs in three places.",
+      "idea": "Every network hop adds delay and a new way to fail, and the availability of chained services multiplies.",
+      "caption": "Checkout now crosses three boxes, so it is slower and less available.",
       "focus": [
         "gw",
         "orders",
@@ -414,9 +414,9 @@
     {
       "tag": "TRADE-OFF",
       "title": "No cross-service transaction",
-      "body": "The monolith placed the order and the payment in one database transaction. Now they are in two databases. Orders can publish an OrderPlaced event to a queue and let Payments handle it later. That decouples them, but data is only eventually consistent: an order exists that is not yet paid. The client gets its answer once the event is queued, so checkout looks faster, but the payment result arrives later, and accepting an order no longer fails just because Payments is down (the queue is now a dependency). Keeping the order write and the publish in step, and charging once if a message is redelivered, are covered in the Outbox and Idempotency lessons.",
-      "idea": "Splitting data trades one atomic transaction for eventual consistency you must design around.",
-      "caption": "Orders publishes an event; Payments consumes it later.",
+      "body": "In the monolith, the order and the payment were saved in one transaction. Now they sit in two databases, so one transaction cannot cover both. One fix: Orders saves the order, publishes an OrderPlaced event to a queue (a waiting line for messages) and replies 202 Accepted at once. Payments picks the event up later and charges. Checkout answers faster (about 32 ms) and does not fail just because Payments is down, but the queue is now a dependency, and the data is only eventually consistent: for a while the order exists but is unpaid. The Outbox and Idempotency lessons cover keeping save and publish in step, and charging once.",
+      "idea": "Splitting data trades one all-or-nothing transaction for eventual consistency, which you must design around.",
+      "caption": "Orders queues OrderPlaced and answers; Payments handles it a moment later.",
       "focus": [
         "gw",
         "orders",
@@ -474,9 +474,9 @@
     {
       "tag": "WHAT IF",
       "title": "Payments gets slow",
-      "body": "Suppose Payments starts taking 3 seconds per call because its provider is struggling, and Orders has no timeout set. Orders keeps waiting, each waiting request holds a thread, and soon Orders has no free threads either. A fault in one service has spread to its callers, a cascading failure. Short timeouts, limited retries, and circuit breakers are the defence; the Timeouts and Retries lesson covers them in detail.",
-      "idea": "In a distributed system a slow dependency is as dangerous as a dead one, because callers pile up waiting.",
-      "caption": "Orders is stuck waiting on a slow Payments.",
+      "body": "Now suppose Payments gets slow, taking 3 seconds per call because its card provider is struggling, and Orders has set no timeout (a limit on how long to wait). Orders keeps waiting. Each waiting request holds a thread, a worker that handles one job at a time, so Orders soon runs out of free threads and stops serving anyone. One slow service has dragged down its caller: a cascading failure. The defences are short timeouts, limited retries and circuit breakers (which pause calls to a failing service). The Timeouts and Retries lesson covers them.",
+      "idea": "In a distributed system a slow dependency can be as dangerous as a dead one, because callers pile up waiting.",
+      "caption": "Orders is stuck waiting on a slow Payments and runs out of threads.",
       "focus": [
         "orders",
         "pay"
@@ -492,7 +492,7 @@
           "from": "pay",
           "to": "orders",
           "kind": "fail",
-          "label": "no reply (3 s)"
+          "label": "slow reply (3 s)"
         }
       ],
       "metrics": {
@@ -522,9 +522,9 @@
     {
       "tag": "TRADE-OFF",
       "title": "When splitting pays off",
-      "body": "Microservices buy independent deploys, independent scaling, and team autonomy, which matter once many teams collide in one codebase or one module needs very different scaling. They cost you distributed debugging, versioned APIs, many pipelines, and on-call for more moving parts. As a rough rule of thumb, a single team or a handful of engineers is usually faster with a well-structured modular monolith; consider splitting when several teams keep blocking each other or one part needs very different scaling.",
+      "body": "Microservices give you independent deploys, independent scaling and team autonomy. These matter when many teams keep colliding in one codebase, or when one part has very different load from the rest. The cost is harder debugging across services, versioned APIs, many build pipelines and on-call duty for more moving parts. As a rough rule of thumb, one team or a handful of engineers is usually faster with a well-structured modular monolith. The highlighted boxes show the two shapes of the same checkout.",
       "idea": "Split because of a specific pain, such as team contention or scaling, not because microservices sound modern.",
-      "caption": "Same checkout, two shapes: one process or separate services.",
+      "caption": "Same checkout, two shapes: one program, or separate services.",
       "focus": [
         "mono",
         "orders",
@@ -555,9 +555,9 @@
     {
       "tag": "RECAP",
       "title": "Monolith, modular, or micro",
-      "body": "A monolith is simple and fast inside; a modular monolith keeps that while enforcing boundaries. Microservices cut along business capabilities and each owns its data, giving independent deploys and scaling. The price is network latency, partial failures, multiplied availability, no easy cross-service transaction, and harder debugging. Start modular, and split deliberately.",
+      "body": "A monolith is simple and fast inside. A modular monolith keeps that speed while enforcing clean boundaries. Microservices cut along business capabilities and give each service its own data, which allows independent deploys and scaling. The price is network delay, partial failures, lower combined availability, no easy cross-service transaction and harder debugging. So start modular, and split only on purpose.",
       "idea": "Boundaries first, network second: make the modules clean before you make them remote.",
-      "caption": "Orders and Payments run separately, each with its own DB.",
+      "caption": "Orders and Payments run separately, each with its own database.",
       "focus": [
         "client",
         "gw",

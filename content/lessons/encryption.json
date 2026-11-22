@@ -101,7 +101,7 @@
     {
       "tag": "QUESTION",
       "title": "Who can read this card number?",
-      "body": "A customer types a card number into the browser. It must cross the internet, pass through our servers, and sit in a database and in nightly backups. Anyone who can watch the network, steal a disk, or copy a backup could read it if it is plain text. We need protection in two places: while it moves (in transit) and while it sits (at rest).",
+      "body": "A customer types a card number into the browser. It must cross the internet, pass through our servers, and then sit in a database and in nightly backups. If it is plain text, anyone who can watch the network, steal a disk, or copy a backup can read it. So we need protection in two places: while it moves (in transit) and while it sits (at rest).",
       "idea": "Data is exposed in two states, moving and stored, and each needs its own protection.",
       "caption": "A card number must travel and then be stored.",
       "focus": [
@@ -118,9 +118,9 @@
     {
       "tag": "CONCEPT",
       "title": "Two kinds of keys",
-      "body": "Symmetric encryption (like AES-256-GCM) uses one shared secret key to lock and unlock. It is very fast, often several GB/s per core with hardware support. Asymmetric encryption uses a key pair: a public key anyone may have and a private key kept secret. It lets two strangers agree on a secret, but it is orders of magnitude slower (a rule of thumb, often around a thousand times), so it is never used for bulk data.",
+      "body": "Encryption scrambles data with a key. Symmetric encryption (like AES-256-GCM) uses one shared secret key to lock and unlock. It is very fast: often several GB/s per core with hardware support. Asymmetric encryption uses a key pair: a public key anyone may have and a private key kept secret. It lets two strangers agree on a secret over an open network, but it is far slower (a rule of thumb: around a thousand times), so it is never used for bulk data.",
       "idea": "Use asymmetric crypto to agree on a secret, then symmetric crypto to move the data.",
-      "caption": "Both sides need the same fast key, safely.",
+      "caption": "Both sides need the same fast key, shared safely.",
       "focus": [
         "browser",
         "edge"
@@ -146,9 +146,9 @@
     {
       "tag": "FLOW",
       "title": "TLS 1.3 handshake",
-      "body": "The browser sends a hello with a fresh ephemeral public value (generated for this one connection and thrown away afterwards). The server replies with its own value plus a certificate, and signs the exchange with its private key. The browser checks that the certificate chains to a trusted authority and matches the hostname. Both sides now compute the same session key without ever sending it. TLS 1.3 itself needs one round trip (on top of the TCP connect), so on a 50 ms path the handshake adds about 50 ms before encrypted data flows.",
+      "body": "TLS is the encryption behind HTTPS. In the TLS 1.3 handshake, the browser sends a hello with a fresh ephemeral public value (made for this one connection, then thrown away). The server replies with its own value and a certificate, and signs the exchange with its private key. The browser checks that the certificate chains to a trusted authority and matches the hostname. Both sides then compute the same session key without ever sending it. This takes one round trip, so on a path with a 50 ms round trip it adds about 50 ms (on top of the TCP connect) before encrypted data flows.",
       "idea": "The handshake proves the server's identity and derives a shared key that never crosses the wire.",
-      "caption": "Handshake completes in one round trip.",
+      "caption": "Handshake finishes in one round trip.",
       "focus": [
         "browser",
         "edge"
@@ -172,7 +172,7 @@
       },
       "chips": [
         {
-          "node": "edge",
+          "node": "browser",
           "text": "cert ok",
           "tone": "green"
         },
@@ -183,14 +183,15 @@
         {
           "node": "browser",
           "text": "session key",
-          "tone": "green"
+          "tone": "green",
+          "at": "bottom"
         }
       ]
     },
     {
       "tag": "FLOW",
       "title": "Data moves under the session key",
-      "body": "Now the card number is encrypted with the symmetric session key, using an authenticated mode such as AES-GCM or ChaCha20-Poly1305. Authenticated means tampering is detected, not just hidden. A network observer sees only random-looking bytes for the payload (plus who is talking to whom and how much). Forward secrecy comes from the ephemeral values: stealing the server's long-term key later does not unlock recorded traffic.",
+      "body": "Now the card number is encrypted with the symmetric session key, using an authenticated mode such as AES-GCM or ChaCha20-Poly1305. \"Authenticated\" means any tampering is detected, not just hidden. Someone watching the network sees only random-looking bytes (plus who is talking to whom and how much). Forward secrecy comes from the throwaway ephemeral values: if the server's long-term key is stolen later, recorded traffic still cannot be decrypted.",
       "idea": "Encryption in transit hides data and protects integrity; ephemeral keys give forward secrecy.",
       "caption": "Only ciphertext crosses the internet.",
       "focus": [
@@ -226,9 +227,9 @@
     {
       "tag": "TRADE-OFF",
       "title": "Where TLS ends",
-      "body": "The terminator decrypts the traffic so it can route and inspect it. If it then forwards plain HTTP, anyone inside the network can read the card number. Many teams re-encrypt each hop with mutual TLS, where both sides present certificates, at the cost of extra CPU and certificate management. TLS protects a connection, not the data after it is received.",
+      "body": "The TLS terminator (the server that ends the TLS connection) decrypts the traffic so it can route and inspect it. If it then forwards plain HTTP, anyone inside the network can read the card number. Many teams re-encrypt that hop with mutual TLS (mTLS), where both sides present certificates. The cost is extra CPU and certificate management. TLS protects one connection, not the data after it is received.",
       "idea": "TLS covers one hop; decide deliberately whether internal hops get encrypted too.",
-      "caption": "Internal hop re-encrypted with mutual TLS.",
+      "caption": "The internal hop is re-encrypted with mutual TLS.",
       "focus": [
         "edge",
         "app"
@@ -263,9 +264,9 @@
     {
       "tag": "CONCEPT",
       "title": "At rest: envelope encryption",
-      "body": "Disk encryption protects a stolen drive, but not a stolen database login. For field-level protection, the service asks the KMS (key management service) for a data key. The KMS returns it twice: plain, and wrapped (encrypted) by a master key that never leaves the KMS. The service encrypts the card number with the plain key, stores the wrapped key beside the ciphertext, and discards the plain key from memory.",
+      "body": "Disk encryption protects a stolen drive, but not someone who steals a database login. To protect the field itself, use envelope encryption. The service asks the KMS (key management service, a hardened vault for keys) for a data key. The KMS returns it twice: plain, and wrapped (encrypted) by a master key that never leaves the KMS. The service encrypts the card number with the plain key, stores the wrapped key beside the ciphertext in the database, and discards the plain key from memory.",
       "idea": "A master key in the KMS wraps many small data keys; only wrapped keys sit next to the data.",
-      "caption": "KMS issues a data key, plain and wrapped.",
+      "caption": "KMS issues a data key, plain and wrapped. Only the wrapped copy is stored.",
       "focus": [
         "app",
         "kms",
@@ -315,7 +316,7 @@
     {
       "tag": "FLOW",
       "title": "Reading it back",
-      "body": "To read the record, the service loads the ciphertext and the wrapped data key, then asks the KMS to unwrap the key. The KMS checks the caller's permissions and logs the call, so every decrypt is auditable. The service decrypts locally. Because the KMS only handles tiny keys, not the data itself, a single master key can protect terabytes. Many services cache unwrapped keys briefly to cut KMS calls.",
+      "body": "To read the record, the service loads the ciphertext and the wrapped data key, then asks the KMS to unwrap the key. The KMS checks the caller's permissions and logs the call, so every decrypt is auditable. The service then decrypts locally. The KMS only handles tiny keys, never the data, so a single master key can protect terabytes. Many services cache unwrapped keys briefly to cut KMS calls.",
       "idea": "The KMS gates and audits access to keys; the bulk data never travels to it.",
       "caption": "KMS unwraps the key; decryption is local.",
       "focus": [
@@ -367,7 +368,7 @@
     {
       "tag": "WHAT IF",
       "title": "Rotating the master key",
-      "body": "Policy says rotate the master key yearly, or on demand. Re-encrypting every record would be slow and risky. Instead the KMS creates a new master key version for all new wraps and keeps old versions to unwrap old keys. Old data keys keep working because the KMS can still unwrap them. Re-wrapping the small wrapped keys under the new version is optional and can run in the background. The bulk ciphertext is untouched. If a key was actually exposed, re-encrypt the data it protected; rotation alone does not undo a copy.",
+      "body": "Policy says rotate the master key yearly, or on demand. Re-encrypting every record would be slow and risky. Instead the KMS creates a new master key version for all new wraps and keeps old versions to unwrap old keys, so old data keys keep working. Re-wrapping the small wrapped keys under the new version is optional and can run in the background. The bulk ciphertext is untouched. If a key was actually exposed, re-encrypt the data it protected, because rotation alone does not undo a copy.",
       "idea": "Envelope encryption makes rotation cheap: re-wrap small keys, not big data.",
       "caption": "Wrapped key in the DB re-wrapped under master key v2.",
       "focus": [
@@ -430,7 +431,7 @@
     {
       "tag": "CONCEPT",
       "title": "Hashing is not encryption",
-      "body": "Encryption is reversible with the key. A hash function such as SHA-256 is one-way: it turns any input into a fixed 32-byte fingerprint that cannot be undone. Use hashes to detect corruption (did this backup change?); to resist tampering, keep the hash somewhere the attacker cannot write, or use a keyed MAC or signature. Hashes also store passwords, but only with a slow salted algorithm. Never hash a card number if you need it back later, and a small input space can be guessed by brute force anyway.",
+      "body": "Encryption can be reversed with the key. A hash function such as SHA-256 is one-way: it turns any input into a fixed 32-byte fingerprint that cannot be undone. Use hashes to detect corruption (did this backup change?). To resist tampering, keep the hash where an attacker cannot write, or use a keyed MAC or signature. Hashes also store passwords, but only with a slow salted algorithm. Never hash a card number you need back later, and a small input space can be brute-forced anyway.",
       "idea": "Encrypt when you must read the data back; hash when you only need to compare or verify.",
       "caption": "Encrypted backup goes to object storage; its checksum is kept elsewhere.",
       "focus": [
@@ -467,7 +468,7 @@
     {
       "tag": "RECAP",
       "title": "Layers, not one lock",
-      "body": "TLS uses asymmetric crypto once to derive a symmetric session key, protecting data on each hop. At rest, envelope encryption keeps data keys beside the data and master keys in a KMS that checks and logs every use. Rotation re-wraps small keys instead of re-encrypting everything. Hashes verify, encryption conceals. Managing the keys, not the algorithms, is the hard part.",
+      "body": "TLS uses asymmetric crypto once to derive a symmetric session key, which protects data on each hop. At rest, envelope encryption keeps data keys beside the data and master keys in a KMS that checks and logs every use. Rotation re-wraps small keys instead of re-encrypting everything. Hashes verify, encryption conceals. Managing the keys, not choosing the algorithms, is the hard part.",
       "idea": "Pick the right tool per state, and protect the keys more carefully than the data.",
       "caption": "Every hop and every stored copy is covered.",
       "focus": [

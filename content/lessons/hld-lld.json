@@ -113,9 +113,9 @@
     {
       "tag": "QUESTION",
       "title": "\"Design a link shortener\"",
-      "body": "You are handed one sentence: build something like a short-link service. That is not yet a design, because it does not say how big it is, who uses it, or what matters most. A good process turns the vague sentence into decisions in a fixed order, starting wide (high-level design, HLD) and ending narrow (low-level design, LLD). We will follow that order.",
-      "idea": "Design is narrowing: broad shape first, details only after the shape is agreed.",
-      "caption": "One vague sentence, no boxes yet.",
+      "body": "You are handed one sentence: build something like a short-link service. That is not yet a design. It does not say how big it is, who uses it, or what matters most. A good process turns the vague sentence into decisions in a fixed order. It starts wide (high-level design, HLD: the big boxes) and ends narrow (low-level design, LLD: the inside of one box). We follow that order.",
+      "idea": "Design is narrowing: the broad shape first, details only after the shape is agreed.",
+      "caption": "One vague sentence and no boxes yet.",
       "focus": [
         "user"
       ],
@@ -126,8 +126,8 @@
     {
       "tag": "REQUIREMENTS",
       "title": "Ask before you draw",
-      "body": "Start by asking questions. Functional requirements say what it does: create a short link, redirect when someone visits it. Non-functional requirements say how well: redirects must feel instant, links must not break, the service should survive a server failure. Also agree on what is out of scope, such as custom domains or accounts, so you do not design forever.",
-      "idea": "Requirements decide the design; unstated requirements become surprises later.",
+      "body": "Start by asking questions. Functional requirements say what the system does: create a short link, and redirect when someone visits it. Non-functional requirements say how well it must do it: redirects should feel instant, links must not break, and one server failing must not take the service down. Also agree on what is out of scope, such as custom domains or user accounts, so you do not design forever.",
+      "idea": "Requirements decide the design. Unstated requirements become surprises later.",
       "caption": "Scope agreed with the person asking.",
       "focus": [
         "user"
@@ -153,9 +153,9 @@
     {
       "tag": "ESTIMATES",
       "title": "Size it with napkin math",
-      "body": "Assume 100 million new links a month and 100 redirects for every link created. That is about 40 writes per second and about 4,000 reads per second on average, perhaps 12,000 at peak. Over five years that is about 6 billion links (100M x 60 months); at roughly 500 bytes each, about 3 TB. These are rule-of-thumb numbers, but they already tell you the system is read-heavy and fits on a small database cluster.",
-      "idea": "A few minutes of arithmetic tells you what to optimize: here, reads, not storage.",
-      "caption": "Read-heavy, modest storage.",
+      "body": "Assume 100 million new links a month, and 100 redirects for every link created. That is about 40 writes per second and 4,000 reads per second on average, perhaps 12,000 at peak. Over five years that is about 6 billion links (100M × 60 months). At roughly 500 bytes each, that is about 3 TB. These are rules of thumb, but they already show that the system is read-heavy and fits on a small database cluster.",
+      "idea": "A few minutes of arithmetic tell you what to optimize: here, reads, not storage.",
+      "caption": "Read-heavy, with modest storage.",
       "focus": [
         "svc",
         "db"
@@ -185,7 +185,7 @@
     {
       "tag": "HLD",
       "title": "Draw the boxes",
-      "body": "Now sketch the high-level design: clients talk to an API gateway, which forwards to a stateless link service, which stores links in a database. Keep it to boxes and arrows. HLD answers which major components exist and how they talk, not how any one of them works inside. You can add boxes later when the numbers demand it.",
+      "body": "Now sketch the high-level design. Users talk to an API gateway, a single front door that checks and routes requests. The gateway forwards to a stateless link service (stateless means it keeps nothing between requests, so you can add or remove copies freely). The service stores links in a database. Keep it to boxes and arrows. HLD answers which major parts exist and how they talk, not how each works inside. Add more boxes only when the numbers demand it.",
       "idea": "HLD is the map: components and connections, with no internals yet.",
       "caption": "Minimum viable architecture: gateway, service, database.",
       "focus": [
@@ -229,8 +229,8 @@
     {
       "tag": "API",
       "title": "Define the contract",
-      "body": "Next, write the API, because it is the contract between boxes. POST /links takes a long URL and returns a short code. GET /{code} looks the code up and answers 301 or 302 with the long URL in the Location header. Choosing 302 keeps every click visible to you, while 301 lets browsers cache the redirect and skip you next time.",
-      "idea": "Fix the interfaces early; they are hard to change once clients depend on them.",
+      "body": "Next, write the API, the contract between the boxes. POST /links takes a long URL and returns a short code. GET /{code} looks the code up and answers 301 or 302 with the long URL in the Location header, and the browser then goes there. A 302 keeps every click visible to you. A 301 lets browsers cache the redirect and skip you next time, so you would miss those clicks.",
+      "idea": "Fix the interfaces early. They are hard to change once clients depend on them.",
       "caption": "Create a link, then follow it.",
       "focus": [
         "user",
@@ -308,7 +308,7 @@
     {
       "tag": "DATA MODEL",
       "title": "Decide what is stored",
-      "body": "The data model lists what you store and how you look it up. Here a link has a code, a long URL, a creation time and an owner. Every read asks one question, give me the URL for this code, so the code is the primary key and a simple key-value lookup is enough. Knowing the access pattern first is what lets you pick a sensible database.",
+      "body": "The data model says what you store and how you look it up. A link has a code, a long URL, a creation time and an owner. Every read asks one question: give me the URL for this code. So the code is the primary key (the unique lookup field), and a simple key-value lookup is enough. Knowing the access pattern first is what lets you pick a sensible database.",
       "idea": "Choose storage from the access pattern, not from habit.",
       "caption": "Single-key lookups: code to long URL.",
       "focus": [
@@ -345,9 +345,9 @@
     {
       "tag": "LLD",
       "title": "Zoom into one component",
-      "body": "Low-level design opens one box. Take code generation inside the link service. Seven characters from a 62-letter alphabet give about 3.5 trillion codes, far more than 6 billion links. If the service picks random codes, two links can collide, so it inserts only if the code is absent and retries on a collision. LLD is classes, algorithms and edge cases like this.",
+      "body": "Low-level design opens one box. Take code generation inside the link service. Seven characters from a 62-symbol alphabet (letters and digits) give about 3.5 trillion codes, far more than 6 billion links. But if the service picks random codes, two links can still get the same code (a collision). So it inserts only if the code is absent, and retries with a new code on a collision. LLD is classes, algorithms and edge cases like this.",
       "idea": "LLD is the inside of a box: algorithms, data structures and the awkward edge cases.",
-      "caption": "Collision detected, retry with a new code.",
+      "caption": "Collision detected, so the service retries with a new code.",
       "focus": [
         "svc",
         "db"
@@ -393,9 +393,9 @@
     {
       "tag": "TRADE-OFF",
       "title": "Add a cache, pay for it",
-      "body": "At 4,000 reads per second, most traffic hits the same popular links, so a cache in front of the database absorbs most of it and makes redirects faster. The price is complexity: cached data can be stale, and you must decide what happens when a link is deleted. Say that aloud. A box without a stated cost is a guess, not a design.",
-      "idea": "Every added component buys something and costs something; name both.",
-      "caption": "Hot links served from the cache.",
+      "body": "At 4,000 reads per second, most traffic hits the same popular links. A cache (fast memory that holds recent answers) in front of the database absorbs most of that and makes redirects faster. The price is complexity. Cached data can be stale (out of date), and you must decide what happens when a link is deleted. Say that out loud. A box without a stated cost is a guess, not a design.",
+      "idea": "Every added component buys something and costs something. Name both.",
+      "caption": "Hot links are served from the cache.",
       "focus": [
         "svc",
         "cache",
@@ -439,7 +439,7 @@
     {
       "tag": "TRADE-OFF",
       "title": "Count clicks off the hot path",
-      "body": "Owners want click counts. Writing a counter to the database on every redirect would slow the fast path and add 4,000 writes per second. Instead the service drops an event on a queue and returns the redirect immediately. A worker reads the queue and updates counts in batches. The cost is that counts are a few seconds behind, which the requirements allow.",
+      "body": "Owners want click counts. Writing a counter to the database on every redirect would slow the fast path and add up to 4,000 writes per second. Instead, the service puts a click event on a queue (a waiting line of messages) and returns the redirect immediately. A worker reads the queue and updates the counts in batches. The cost: counts run a few seconds behind, which our requirements allow.",
       "idea": "Move non-urgent work to a queue so the user-facing path stays fast.",
       "caption": "Redirect first, count later.",
       "focus": [
@@ -480,7 +480,7 @@
         },
         {
           "node": "db",
-          "text": "4k writes/s avoided",
+          "text": "batched, not per click",
           "tone": "green"
         }
       ]
@@ -488,7 +488,7 @@
     {
       "tag": "RECAP",
       "title": "Wide first, then deep",
-      "body": "The order was requirements, estimates, HLD boxes, API, data model, a deep dive into one component, then trade-offs. HLD decides what the parts are and how they connect. LLD decides how one part works inside. Later lessons cover numbers, caching and queues in depth; here the point is the sequence and defending each choice with a reason.",
+      "body": "The order was: requirements, estimates, HLD boxes, API, data model, a deep dive into one component, then trade-offs. HLD decides what the parts are and how they connect. LLD decides how one part works inside. Later lessons cover numbers, caching and queues in depth. Here the point is the sequence, and defending each choice with a reason.",
       "idea": "Decide the shape first, the details second, and justify every box.",
       "caption": "The finished design, built in layers.",
       "focus": [

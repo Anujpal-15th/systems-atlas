@@ -119,8 +119,8 @@
     {
       "tag": "QUESTION",
       "title": "Who decides what is true?",
-      "body": "You keep a cluster's critical settings, such as which node owns which job, on one server. That server dies and everything stops. So you keep copies on five servers. Now a harder problem appears: if two clients write different values at the same moment, or a server crashes mid-write, how do all five end up agreeing on one history? Making machines agree despite crashes and lost messages is called consensus.",
-      "idea": "Replication gives availability; consensus is what keeps the copies from disagreeing.",
+      "body": "Say you keep a cluster's critical settings, such as which node owns which job, on one server. That server dies and everything stops. So you keep copies on five servers. Now a harder problem appears. If two clients write different values at the same moment, or a server crashes mid-write, how do all five end up agreeing on one history? Making machines agree despite crashes and lost messages is called consensus.",
+      "idea": "Copies give you availability. Consensus keeps those copies from disagreeing.",
       "caption": "Five servers must act like one reliable machine.",
       "focus": [
         "s1",
@@ -145,9 +145,9 @@
     {
       "tag": "CONCEPT",
       "title": "One leader, many followers",
-      "body": "Raft simplifies the problem by electing a single leader. Only the leader accepts writes. Followers copy what the leader sends and reply. Time is cut into numbered terms; each term has at most one leader, and the term number acts as a logical clock. Here S1 leads term 1 and sends tiny heartbeats, every 100 ms or so, to prove it is alive.",
-      "idea": "One leader per term means writes are ordered in one place, so there is nothing to argue about.",
-      "caption": "S1 leads term 1 and sends heartbeats.",
+      "body": "Raft is a popular consensus algorithm. It makes the problem simple by electing one leader. Only the leader accepts writes. Followers copy what the leader sends. Time is cut into numbered terms, like presidential terms: each term has at most one leader. Here S1 leads term 1. Every 100 ms or so it sends tiny heartbeat messages (\"I'm still alive\") to all followers, as the animation shows.",
+      "idea": "One leader per term means all writes are ordered in one place, so there is nothing to argue about.",
+      "caption": "S1 leads term 1 and sends heartbeats to every follower.",
       "focus": [
         "s1",
         "s2",
@@ -204,9 +204,9 @@
     {
       "tag": "REPLICATE",
       "title": "A write enters the log",
-      "body": "A client sends set x=5. The leader appends it to its own log, an ordered list of commands, and sends an AppendEntries message to every follower with the entry and its position. Each follower writes the entry to disk before answering. At this point the entry exists but is not yet committed, so the leader has not told the client anything.",
-      "idea": "A log entry is just a proposal until enough servers have stored it.",
-      "caption": "Leader appends x=5 and sends it to all followers.",
+      "body": "A client sends set x=5. The leader adds it to its own log, which is an ordered list of commands. It then sends an AppendEntries message to every follower, carrying the entry and its position in the log. Each follower writes the entry to disk before replying. Right now the entry exists but is not committed (not yet safe), so the leader has told the client nothing. Only the leader's own copy exists so far: 1 of the 3 needed.",
+      "idea": "A log entry is only a proposal until enough servers have stored it.",
+      "caption": "The leader appends x=5 and sends it to all followers.",
       "focus": [
         "client",
         "s1",
@@ -270,8 +270,8 @@
     {
       "tag": "COMMIT",
       "title": "Majority means committed",
-      "body": "Followers reply as they finish their disk writes. The moment the leader plus two followers hold the entry, three of five, a majority has it. The entry is now committed: it will survive any failure the cluster is allowed to survive. The leader applies it, answers the client, and tells followers to apply it on the next message. In one data center this takes a few milliseconds, mostly the disk flush.",
-      "idea": "Commit means a majority has it on disk, so any future leader's majority must overlap and include it.",
+      "body": "Followers reply as they finish their disk writes. The moment the leader plus two followers hold the entry, that is 3 of 5, a majority has it. The entry is now committed: it will survive any failure the cluster is built to survive. The leader applies it, tells the client \"ok\", and lets followers know on its next message. In one data center this takes a few milliseconds, mostly the disk flush.",
+      "idea": "Committed means a majority has it on disk. Any future leader needs a majority too, so the two groups must overlap and include it.",
       "caption": "Three of five have it, so x=5 is committed.",
       "focus": [
         "s1",
@@ -326,9 +326,9 @@
     {
       "tag": "WHAT IF",
       "title": "The leader dies",
-      "body": "Next S1 goes silent, whether from a crash or a long pause. Followers expect a heartbeat every 100 ms or so. When none arrives within the election timeout, each follower's election timer runs down and it becomes a candidate. The timeout is randomized per server (etcd defaults: 100 ms heartbeat, 1000 ms election timeout) so they do not all fire at the same instant. Until a new leader exists, the cluster accepts no writes: a write sent during this gap waits at least one election timeout, about a second with etcd defaults, before it can commit.",
-      "idea": "Followers detect a dead leader by silence; random timeouts make simultaneous candidates unlikely.",
-      "caption": "Heartbeats stop; S3's timer fires first.",
+      "body": "Now S1 goes silent, from a crash or a long pause. Followers expect a heartbeat every 100 ms or so. If none arrives within the election timeout, a follower assumes the leader is gone and runs for leader, becoming a candidate. The timeout is random for each server, so they do not all fire at the same instant. (etcd defaults: 100 ms heartbeat, 1000 ms election timeout.) Until a new leader exists the cluster accepts no writes. A write sent now waits about a second with etcd defaults.",
+      "idea": "Followers detect a dead leader by silence. Random timeouts make simultaneous candidates unlikely.",
+      "caption": "Heartbeats stop. S3's timer runs out first.",
       "focus": [
         "s1",
         "s3",
@@ -372,8 +372,8 @@
     {
       "tag": "ELECTION",
       "title": "S3 asks for votes",
-      "body": "S3's timer fires first. It increments the term to 2, votes for itself, and sends RequestVote to the others. Each server grants at most one vote per term, and only to a candidate whose log is at least as up to date as its own. S2 and S4 say yes. With its own vote that makes three of five, a majority, so S3 becomes leader of term 2 and immediately sends heartbeats.",
-      "idea": "One vote per server per term guarantees at most one leader per term.",
+      "body": "S3's timer fires first. It raises the term to 2, votes for itself, and sends RequestVote messages to the others. Each server gives at most one vote per term, and only to a candidate whose log is at least as up to date as its own. S2 and S4 say yes. With S3's own vote that is 3 of 5, a majority, so S3 becomes leader of term 2 and starts sending heartbeats at once.",
+      "idea": "One vote per server per term means there can be at most one leader per term.",
       "caption": "S3 wins term 2 with votes from S2 and S4.",
       "focus": [
         "s3",
@@ -438,8 +438,8 @@
     {
       "tag": "SAFETY",
       "title": "Committed entries survive",
-      "body": "Why is x=5 not lost? It sits on a majority, and any winning candidate also needs a majority of votes. Two majorities of five must share at least one server, and that server refuses to vote for a candidate missing x=5. So the new leader always holds every committed entry. If S1 had only been cut off or frozen (a long pause or a network blip) rather than crashed, it would still believe it leads term 1. Its first message from S3 carries term 2, so it steps down and its uncommitted entries are overwritten. A server that truly crashed simply restarts as a follower.",
-      "idea": "Quorum overlap plus the up-to-date vote rule means a committed entry can never be elected away.",
+      "body": "Why is x=5 not lost? It sits on a majority, and a winning candidate also needs a majority of votes. Any two majorities of five share at least one server, and that server refuses to vote for a candidate missing x=5. So the new leader always holds every committed entry. What if S1 was only frozen or cut off, not crashed? It still thinks it leads term 1. Its first message from S3 carries term 2, so S1 steps down and becomes a follower; any uncommitted entries it had are overwritten.",
+      "idea": "Overlapping majorities plus the \"log must be up to date\" vote rule mean a committed entry can never be voted away.",
       "caption": "Stale S1 sees term 2 and becomes a follower.",
       "focus": [
         "s3",
@@ -477,8 +477,8 @@
     {
       "tag": "WHAT IF",
       "title": "A network partition",
-      "body": "Suppose a network split leaves S4 and S5 alone, cut off from the other three. S1 has rejoined as a follower, so S1, S2 and S3 form a majority of three and keep working with S3 as leader. S4 and S5 can reach only 2 of the 3 votes they would need, so they cannot elect a leader or commit anything. S4 may bump its own term to 3, but that term can never win. Real implementations add a pre-vote check so an isolated server does not inflate its term and disrupt the leader when the network heals. The minority refuses to answer rather than risk two conflicting histories, which is the consistency choice from the CAP lesson.",
-      "idea": "Only the side holding a majority may make progress, so a partition can never produce two committed histories.",
+      "body": "Now suppose a network split cuts S4 and S5 off from the other three. S1 has rejoined as a follower, so S1, S2 and S3 are a majority of 3 and keep working with S3 as leader. S4 and S5 can gather only 2 votes (their own two) but need 3, so they cannot elect a leader or commit anything. S4 may bump its term to 3, but it can never win with it. Real systems add a pre-vote check so an isolated server does not inflate its term and disturb the leader when the network heals. The minority refuses to answer rather than risk two conflicting histories. That is the consistency choice from the CAP lesson.",
+      "idea": "Only the side with a majority can make progress, so a partition can never produce two committed histories.",
       "caption": "S4 and S5 are isolated and cannot commit.",
       "focus": [
         "s3",
@@ -513,7 +513,7 @@
         },
         {
           "node": "s4",
-          "text": "2 of 3 votes",
+          "text": "2 votes, needs 3",
           "tone": "red"
         },
         {
@@ -529,8 +529,8 @@
     {
       "tag": "IN PRACTICE",
       "title": "What etcd and ZooKeeper do",
-      "body": "You rarely write Raft yourself. etcd (Raft) and ZooKeeper (a similar protocol called Zab) run a small cluster of 3 or 5 servers that stores a small, critical amount of data: configuration, who is leader of a service, cluster membership, locks. Kubernetes keeps all its state in etcd. These stores are slow for bulk data because every write pays a quorum round trip, so keep them for coordination, not for your application's rows.",
-      "idea": "Use consensus stores for small, high-value coordination state, and never as your main database.",
+      "body": "You rarely write Raft yourself. etcd (which uses Raft) and ZooKeeper (which uses a similar protocol called Zab) run a small cluster of 3 or 5 servers holding a small amount of critical data: configuration, who is the leader of a service, cluster membership, locks. Kubernetes keeps all of its state in etcd. These stores are slow for bulk data, because every write pays a round trip to a majority. Use them for coordination, not for your application's rows.",
+      "idea": "Use consensus stores for small, high-value coordination data, never as your main database.",
       "caption": "A client reads and writes small coordination data.",
       "focus": [
         "client",
@@ -578,8 +578,8 @@
     {
       "tag": "RECAP",
       "title": "Agreement by majority",
-      "body": "Raft elects one leader per numbered term, replicates a log entry to followers, and commits it once a majority has stored it. A new leader needs a majority of votes, and those voters must hold every committed entry, so committed data survives leader crashes. Minorities stall instead of diverging. Pay for it with a quorum round trip per write, and use it for small coordination data.",
-      "idea": "Majority plus terms gives one history, at the cost of a quorum round trip per write and no progress without a majority.",
+      "body": "Raft elects one leader per numbered term. The leader copies each log entry to followers and commits it once a majority has stored it. A new leader needs a majority of votes, and those voters must hold every committed entry, so committed data survives leader crashes. A minority side stalls instead of diverging. The price is a majority round trip on every write, so use it for small coordination data.",
+      "idea": "Majority plus terms gives one history. The costs are a round trip per write and no progress without a majority.",
       "caption": "Leader, terms, majority commit, safe failover.",
       "focus": [
         "client",

@@ -107,9 +107,9 @@
     {
       "tag": "QUESTION",
       "title": "Don't make checkout wait",
-      "body": "After a purchase, the checkout service must email a receipt. If it calls the email provider directly, the customer waits for that call (often 300 ms to 2 s), and if the provider is down, the order fails just because of an email. Sending a receipt can happen a few seconds later, so why should checkout depend on it right now?",
-      "idea": "Work that does not need to finish before you reply should not block the reply.",
-      "caption": "Checkout and email are tied together.",
+      "body": "After a purchase, the checkout service must email a receipt. If checkout calls the email provider directly, the customer waits for that call (often 300 ms to 2 s). Worse, if the provider is down, the order fails just because of an email. But a receipt can arrive a few seconds later. So why should checkout wait for it?",
+      "idea": "Work that does not need to finish before you reply should not hold up the reply.",
+      "caption": "Checkout is tied to the slow email provider.",
       "focus": [
         "producer",
         "mail"
@@ -126,9 +126,9 @@
     {
       "tag": "CONCEPT",
       "title": "Hand the job to a queue",
-      "body": "Instead, checkout writes a small message such as 'send receipt for order 81' to a queue and gets a confirmation that the queue stored it, usually within a few milliseconds. The service that writes is the producer. Checkout can now finish immediately, even if no email worker is running at that moment.",
-      "idea": "A queue stores messages durably (when configured to persist them) until someone is ready to handle them.",
-      "caption": "Producer enqueues; queue confirms it is stored.",
+      "body": "Instead, checkout writes a small message such as 'send receipt for order 81' to a queue. The queue confirms it has stored the message, usually within a few milliseconds. The service that writes the message is the producer. Checkout can now reply to the customer right away, even if no email worker is running. Think of the queue as a to-do tray: the producer drops a note in, and workers pick notes up when they are free.",
+      "idea": "A queue keeps messages (durably, if set to persist) until a worker is ready to handle them.",
+      "caption": "Checkout drops a message in the queue and gets 'stored'.",
       "focus": [
         "producer",
         "queue"
@@ -165,8 +165,8 @@
     {
       "tag": "BUFFER",
       "title": "Absorb a spike",
-      "body": "A flash sale sends 300 orders per second for 10 seconds, so 3,000 messages arrive. Assume each worker can send about 40 emails per second using concurrent calls, so two workers handle 80 per second. The queue holds the difference: after the burst about 2,200 messages are waiting, and the backlog drains in roughly half a minute. Without the queue, checkout would have to wait on, or fail against, an email path sized for 300 per second.",
-      "idea": "A queue turns a short burst into a longer, steady flow the consumers can handle.",
+      "body": "A flash sale sends 300 orders per second for 10 seconds: 3,000 messages. Assume each worker sends about 40 emails per second, so two workers manage 80 per second. In 10 seconds they send 800, so about 2,200 messages are left waiting. At 80 per second the backlog drains in about 27 s, roughly half a minute. Without the queue, checkout would have to wait on, or fail against, an email system sized for 300 per second.",
+      "idea": "A queue turns a short burst into a longer, steady flow that the workers can handle.",
       "caption": "Depth climbs during the burst, then drains.",
       "focus": [
         "producer",
@@ -209,9 +209,9 @@
     {
       "tag": "DELIVER",
       "title": "Receive hides the message",
-      "body": "Worker A asks the queue for a message. The queue does not delete it. It makes it invisible to other workers for a set period called the visibility timeout (30 seconds here) and counts one delivery attempt. The message is lent to Worker A, not given away. Meanwhile Worker B receives different messages, so work is shared.",
-      "idea": "Receiving only leases a message; it stays in the queue until acknowledged.",
-      "caption": "Worker A holds a lease on one message.",
+      "body": "Worker A asks the queue for a message. The queue does not delete it. It hides it from other workers for a set time, called the visibility timeout (30 seconds here), and counts one delivery attempt. The message is lent to Worker A, not given away. Meanwhile Worker B receives different messages, so the work is shared. In the HUD, one message moves from waiting to in flight.",
+      "idea": "Receiving only lends a message. It stays in the queue until a worker acknowledges it.",
+      "caption": "Worker A holds a 30-second lease on one message.",
       "focus": [
         "queue",
         "w1",
@@ -255,9 +255,9 @@
     {
       "tag": "ACK",
       "title": "Acknowledge on success",
-      "body": "Worker A calls the email provider, gets a success reply, and only then sends an acknowledgement (ack) to the queue. The ack deletes the message for good. The order matters: ack after the work is done, never before. Acking early would lose the email if the worker died a moment later.",
-      "idea": "Ack means 'done, delete it', so send it only after the work has really succeeded.",
-      "caption": "Email sent, then the message is deleted.",
+      "body": "Worker A calls the email provider and gets a success reply. Only then does it send an acknowledgement (ack) to the queue, and the ack deletes the message for good. The order matters: ack after the work is done, never before. If the worker acked first and died a moment later, the email would be lost, with no copy left to retry.",
+      "idea": "An ack means 'done, delete it'. Send it only after the work really succeeded.",
+      "caption": "Email sent first, then the message is deleted.",
       "focus": [
         "w1",
         "mail",
@@ -308,9 +308,9 @@
     {
       "tag": "WHAT IF",
       "title": "A worker crashes mid-job",
-      "body": "Now Worker A sends the email but crashes before it can ack. The queue never hears back. After the 30 second visibility timeout expires, the message becomes visible again and Worker B receives it. Nothing is lost, which is the good news. The bad news is that Worker B's retry sends it again, so the customer may get two emails.",
-      "idea": "At-least-once delivery means no loss but possible duplicates.",
-      "caption": "No ack arrives, so the message is redelivered.",
+      "body": "Now Worker A sends an email but crashes before it can ack. The queue never hears back. After the 30 second visibility timeout, the message becomes visible again and Worker B receives it as attempt 2. Nothing is lost, which is the good news. The bad news: Worker B sends the email again, so the customer gets two. The sent counter shows it: 801, then 802 (A), then 803 (B's duplicate).",
+      "idea": "At-least-once delivery means no message is lost, but a message may be handled twice.",
+      "caption": "No ack arrives, so the message is delivered again.",
       "focus": [
         "w1",
         "queue",
@@ -350,8 +350,9 @@
         }
       ],
       "metrics": {
+        "depth": "2198",
         "inflight": "1",
-        "sent": "802"
+        "sent": "803"
       },
       "chips": [
         {
@@ -378,9 +379,9 @@
     {
       "tag": "TRADE-OFF",
       "title": "Make consumers idempotent",
-      "body": "Exactly-once delivery across a network is not something a plain queue can promise, so the safe design is to make handling a message twice harmless. This property is called idempotency. Worker B includes a key such as 'receipt-order-81' with the call, or first checks a table of processed keys, so the repeat becomes a no-op. A provider-side idempotency key closes the gap if the provider supports it; a processed-keys table narrows it but cannot be atomic with an external call, so the leftover risk is a rare duplicate, which is acceptable for a receipt. Also set the visibility timeout longer than your slowest normal job, or a slow worker will cause duplicates by itself.",
-      "idea": "Pair at-least-once delivery with idempotent consumers to get an effectively-once result.",
-      "caption": "Second send suppressed.",
+      "body": "A plain queue cannot promise exactly-once handling, so make handling twice harmless. This is called idempotency. Replay the same crash with a fix: Worker B sends the email with a key such as 'receipt-order-81', and the provider ignores the repeat, so the count stays at 802. If the provider has no such key, check a table of processed keys first. That narrows the gap but cannot be perfectly atomic, so a rare duplicate remains, which is fine for a receipt. Also set the visibility timeout above your slowest normal job.",
+      "idea": "Pair at-least-once delivery with idempotent workers, and the result is effectively once.",
+      "caption": "Same crash, but the repeat is ignored.",
       "focus": [
         "w2",
         "mail"
@@ -430,9 +431,9 @@
     {
       "tag": "WHAT IF",
       "title": "A poison message",
-      "body": "One message has a malformed address, so every attempt fails. Without a limit it would be retried forever, wasting capacity and hiding real problems. (A malformed address is a permanent error, so a real consumer should fail it fast instead of retrying five times.) So the queue is configured with a maximum receive count, say 5. After the maximum number of failed deliveries (5 here; exact semantics vary by broker), the queue moves the message to a dead-letter queue (DLQ), where it waits for a human or a repair job. Redrive means moving parked messages back to the main queue after the bug is fixed.",
-      "idea": "A dead-letter queue parks messages that keep failing so they stop wasting retries and can be inspected.",
-      "caption": "After the max failed tries the message is parked.",
+      "body": "One message has a malformed email address, so every attempt fails. Retried forever, it would waste capacity and hide real problems. So the queue has a maximum receive count, here 5. After 5 failed deliveries (exact rules vary by broker), the queue moves the message to a dead-letter queue (DLQ), where it waits for a person or a repair job. Redrive means moving parked messages back to the main queue once the bug is fixed. A truly malformed address is a permanent error, so a real worker should fail it fast.",
+      "idea": "A dead-letter queue parks messages that keep failing, so they stop wasting retries and can be inspected.",
+      "caption": "After 5 failed tries the message is parked in the DLQ.",
       "focus": [
         "queue",
         "dlq",
@@ -482,7 +483,7 @@
     {
       "tag": "RECAP",
       "title": "What the queue bought us",
-      "body": "Producers write and move on, consumers pull at their own pace, and the queue buffers any gap between them. Receive leases a message, ack deletes it, and the visibility timeout brings back work from dead workers. That gives at-least-once delivery, so consumers must be idempotent. A DLQ catches messages that never succeed, and a growing DLQ or queue depth is your alarm. A queue gives each message to one worker; if several services each need every message, that is pub/sub, covered in the next lesson.",
+      "body": "Producers write and move on. Workers pull at their own pace, and the queue buffers any gap. Receive lends a message, ack deletes it, and the visibility timeout brings back work from dead workers. That gives at-least-once delivery, so workers must be idempotent. A DLQ catches messages that never succeed, and a growing DLQ or queue depth is your alarm. The 3,000 burst messages end as 2,999 emails sent plus 1 dead letter. A queue gives each message to one worker. If several services each need every message, that is pub/sub, covered next.",
       "idea": "Decouple with a queue, ack after success, expect duplicates, and watch the DLQ.",
       "caption": "The full path, with a safety net.",
       "focus": [
@@ -497,7 +498,7 @@
       "metrics": {
         "depth": "0",
         "inflight": "0",
-        "sent": "3000",
+        "sent": "2999",
         "dead": "1"
       },
       "chips": [
@@ -508,7 +509,7 @@
         },
         {
           "node": "mail",
-          "text": "3,000 sent"
+          "text": "2,999 sent"
         },
         {
           "node": "dlq",

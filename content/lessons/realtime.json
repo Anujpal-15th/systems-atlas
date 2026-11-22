@@ -117,9 +117,9 @@
     {
       "tag": "QUESTION",
       "title": "The server has news, the client is silent",
-      "body": "Alice sends Bob a chat message. The server now holds something Bob wants, but HTTP only works one way: a client asks, the server answers. A server cannot start a conversation on its own. So how does Bob's screen update without him refreshing? Throughout this lesson we assume 100,000 connected users.",
-      "idea": "Plain HTTP is request/response, so real-time needs a trick or a different protocol.",
-      "caption": "Bob is idle; the news is on the server.",
+      "body": "Alice sends Bob a chat message. The server now has news for Bob, but Bob's app has not asked for anything. Plain HTTP only works one way: the client asks and the server answers. A server cannot start the conversation. So how does Bob's screen update without him refreshing? In this lesson we assume 100,000 connected users.",
+      "idea": "Plain HTTP is ask-then-answer, so real-time needs a trick or a different protocol.",
+      "caption": "Bob is idle; the news is waiting on the server.",
       "focus": [
         "alice",
         "bob"
@@ -134,8 +134,8 @@
     {
       "tag": "SHORT POLL",
       "title": "Ask again every few seconds",
-      "body": "The simplest fix: Bob's app asks \"anything new?\" every 5 seconds. It works with any server and cache. But 100,000 users polling every 5 s is 20,000 requests per second, almost all returning nothing. And a message waits on average half the interval, about 2.5 s, before Bob sees it. Each poll is a short-lived HTTP request, not a held-open socket.",
-      "idea": "Short polling is trivially simple but wastes requests and adds delay equal to half the poll interval.",
+      "body": "The simplest fix is short polling: Bob's app asks 'anything new?' every 5 seconds. It works with any server and cache. The cost is waste. 100,000 users polling every 5 s is 20,000 requests per second, and almost all come back empty. A new message also waits half the interval on average, about 2.5 s, before Bob sees it. Each poll is a short-lived HTTP request, not a held-open connection.",
+      "idea": "Short polling is very simple, but it wastes requests and delays messages by half the poll interval on average.",
       "caption": "Most polls come back empty.",
       "focus": [
         "bob",
@@ -193,9 +193,9 @@
     {
       "tag": "LONG POLL",
       "title": "Ask, and the server waits",
-      "body": "With long polling the server does not answer an empty poll. It holds the request open, often up to 30 seconds, and replies when something arrives. Bob's app then asks again. Between replies there is a gap, so each poll carries a last-seen id and the server replays anything missed. Delay is about a network trip; idle traffic falls to roughly 100,000 / 30 = 3,300 requests per second, though each message pays for a new request.",
-      "idea": "Long polling gives near-instant delivery over plain HTTP by parking the request until there is news.",
-      "caption": "The request is held, then answered at once.",
+      "body": "Long polling cuts the waste. If there is nothing new, the server does not answer. It holds the request open, often up to 30 seconds, and replies the moment a message arrives. Then Bob's app asks again. A message could slip through the gap between requests, so each request carries the id of the last message seen and the server replays anything newer. Delivery takes about one network trip (we assume 10 ms). Idle traffic drops to about 100,000 / 30 = 3,300 requests per second, but each message still costs a fresh request.",
+      "idea": "Long polling delivers almost instantly over plain HTTP, by parking the request until there is news.",
+      "caption": "The request is held, then answered the moment news arrives.",
       "focus": [
         "bob",
         "lb",
@@ -252,8 +252,8 @@
     {
       "tag": "SSE",
       "title": "Server-Sent Events: one long download",
-      "body": "Server-Sent Events (SSE) make that held response permanent. Bob opens one GET with Accept: text/event-stream, and the server keeps writing small text events into it. EventSource reconnects on its own and sends Last-Event-ID so the server can resume. It is one-way and text-only, which fits feeds and notifications. EventSource cannot set headers, so authenticate with a cookie or short-lived token. The client can still send data with normal POSTs. Use HTTP/2, since HTTP/1.1 browsers allow only about 6 connections per origin, and make sure proxies do not buffer the stream.",
-      "idea": "SSE is a one-way push stream over ordinary HTTP with built-in reconnect and resume.",
+      "body": "Server-Sent Events (SSE) make that held response permanent. Bob opens one GET with Accept: text/event-stream. The server never finishes the reply and keeps writing small text events into it. The browser's EventSource reconnects by itself and sends Last-Event-ID so the server can resume. SSE is one-way (server to client) and text-only, which suits feeds and notifications. Bob can still send data with normal POSTs. Notes: EventSource cannot set headers, so authenticate with a cookie or short-lived token. Use HTTP/2, since HTTP/1.1 browsers allow only about 6 connections per site. Make sure proxies do not buffer the stream.",
+      "idea": "SSE is a one-way push stream over ordinary HTTP, with automatic reconnect and resume built in.",
       "caption": "One open response; events flow down it.",
       "focus": [
         "bob",
@@ -298,7 +298,7 @@
         },
         {
           "node": "gw2",
-          "text": "100,000 conns"
+          "text": "~50,000 conns"
         },
         {
           "node": "bob",
@@ -311,9 +311,9 @@
     {
       "tag": "WEBSOCKET",
       "title": "WebSockets: a two-way pipe",
-      "body": "A WebSocket starts as an HTTP request with an Upgrade header. The server answers 101 Switching Protocols and the same TCP connection becomes a full-duplex channel. Both sides now send small frames at any time, each with only 2 to 14 bytes of header. Delivery is as fast as SSE, about one network trip; the gain is two-way traffic. Unlike EventSource, the browser WebSocket API does not reconnect or resume for you, so your code must. That suits chat input, games and collaborative editing, where the client talks as much as the server does.",
-      "idea": "WebSockets upgrade one HTTP connection into a bidirectional message channel with tiny per-message overhead.",
-      "caption": "Upgrade handshake, then frames both ways.",
+      "body": "A WebSocket starts as a normal HTTP request with an Upgrade header. The server answers 101 Switching Protocols, and the same TCP connection becomes a two-way channel (full-duplex). Either side can now send small frames at any time, each with only a 2 to 14 byte header. In the animation Bob sends a 'typing' frame up and a 'new msg' frame comes down. Delivery is as fast as SSE, about one network trip. The gain is two-way traffic. Unlike EventSource, the browser WebSocket API does not reconnect or resume for you, so your code must. It suits chat, games and shared editing.",
+      "idea": "A WebSocket upgrades one HTTP connection into a two-way message channel with tiny per-message overhead.",
+      "caption": "Upgrade handshake first, then frames flow both ways.",
       "focus": [
         "bob",
         "lb",
@@ -395,8 +395,8 @@
     {
       "tag": "CONCEPT",
       "title": "The gateway remembers who is connected",
-      "body": "Open connections make servers stateful. Gateway B holds Bob's socket in memory, and a request cannot reach Bob except through that process. Each idle connection costs roughly 10 to 50 KB of memory (a rule of thumb), so 100,000 connections is a few GB, and a tuned box can hold far more. Scaling means adding gateways and spreading connections across them. A load balancer only places new connections, so use least-connections routing and expect a freshly added gateway to start empty.",
-      "idea": "A connection lives on one specific gateway, so you cannot simply send Bob's message from any server.",
+      "body": "Open connections make servers stateful. In the animation, Bob's socket lives in the memory of one process, Gateway B, and a message can reach Bob only through it. Each idle connection costs roughly 10 to 50 KB of memory (a rule of thumb), so 50,000 connections on one gateway is only 0.5 to 2.5 GB. We assume the 100,000 users are split over two gateways, about 50,000 each. To scale, add gateways. A load balancer only picks a gateway when a connection first opens, so use least-connections routing, and expect a new gateway to start empty.",
+      "idea": "A connection lives on one specific gateway, so a message cannot be sent from just any server.",
       "caption": "Bob is attached to Gateway B only.",
       "focus": [
         "bob",
@@ -419,9 +419,9 @@
     {
       "tag": "FAN-OUT",
       "title": "Delivering across gateways",
-      "body": "Alice is on Gateway A, Bob on Gateway B. A gateway is the server process that terminates client connections. The chat service first saves the message to a durable store. Gateway A then publishes it to a pub/sub bus, because simple buses (for example Redis Pub/Sub) are often at-most-once and offer no replay. Every subscriber of the channel gets a copy, so Gateway B, which holds Bob's socket, writes the message down it. A reconnecting client catches up from the store.",
-      "idea": "Persist first, then publish: gateways share messages through a pub/sub bus and a durable store backs up the lossy fast path.",
-      "caption": "Save first, then A to bus to B to Bob.",
+      "body": "Alice is on Gateway A and Bob on Gateway B. A gateway is the server process that holds client connections. In the animation Alice's message reaches Gateway A, which has the chat service save it first. Then Gateway A publishes it to a pub/sub bus, a shared channel every gateway listens to. The bus gives Gateway B a copy, and B writes it down Bob's socket. Why save first? Simple buses such as Redis Pub/Sub are often at-most-once (a missed message is gone) and keep no replay. A client that reconnects catches up from the saved store.",
+      "idea": "Save first, then publish. The bus is the fast path, and the store covers anything the bus loses.",
+      "caption": "Save first, then Gateway A to bus to Gateway B to Bob.",
       "focus": [
         "alice",
         "gw1",
@@ -501,9 +501,9 @@
     {
       "tag": "WHAT IF",
       "title": "A gateway dies",
-      "body": "Gateway B crashes, or is redeployed. Its 50,000 sockets drop at the same instant. If all reconnect within about a second, that is a 50,000 req/s burst, a thundering herd that queues on the survivors and pushes delay toward a second. Clients should wait a random, growing delay (exponential backoff with jitter) and send their last seen message id to resume. Planned deploys should drain: stop accepting, then close sockets gradually.",
-      "idea": "Connections are fragile, so clients must reconnect with jitter and resume from a message id.",
-      "caption": "Gateway B fails; clients rush to reconnect.",
+      "body": "Gateway B crashes or is redeployed, and its 50,000 sockets drop at the same instant. If they all reconnect within about a second, that is a burst of 50,000 requests per second. This is a thundering herd: the surviving gateway queues them and delay climbs toward a second. The fix is on the client. Wait a random, growing delay before each retry (exponential backoff with jitter), then send the last message id seen so the server can resume. For planned deploys, drain first: stop accepting new connections, then close old ones gradually.",
+      "idea": "Connections are fragile. Clients must reconnect after random delays and resume from the last message id.",
+      "caption": "Gateway B fails and every client rushes to reconnect.",
       "focus": [
         "gw2",
         "lb",
@@ -562,8 +562,8 @@
     {
       "tag": "TRADE-OFF",
       "title": "Choosing the tool",
-      "body": "Use short polling when updates are rare and caching matters, such as a job status check. Use SSE for one-way streams like notifications, prices or live logs. Use WebSockets when the client sends often and latency matters, such as chat, games or shared cursors. Whatever you pick, send a heartbeat every 20 to 30 seconds, because proxies and load balancers cut idle connections, often after 60 s.",
-      "idea": "Pick the simplest option that matches your direction of traffic, and always heartbeat.",
+      "body": "Pick the simplest tool that fits the direction of traffic. Short polling suits rare updates where caching helps, such as a job-status check. SSE suits one-way streams: notifications, prices, live logs. WebSockets suit cases where the client sends often and speed matters: chat, games, shared cursors. Whatever you pick, send a heartbeat (a tiny 'still here' message) every 20 to 30 seconds. Proxies and load balancers cut quiet connections, often after 60 s.",
+      "idea": "Choose by direction of traffic, and always send heartbeats.",
       "caption": "Match the transport to the direction of traffic.",
       "focus": [
         "bob",
@@ -593,8 +593,8 @@
     {
       "tag": "RECAP",
       "title": "From asking to being told",
-      "body": "HTTP cannot push, so short polling asks often and long polling parks the question. SSE keeps a one-way stream, and WebSockets give a two-way channel. Open connections pin users to a gateway, so messages cross gateways through a pub/sub bus, and clients must reconnect with backoff and resume. Durable queues and event logs, which can back this bus, have their own lessons.",
-      "idea": "Real-time is a held-open connection plus a way to route messages to the gateway that owns it.",
+      "body": "HTTP cannot push, so short polling asks often and long polling parks the question. SSE keeps a one-way stream open, and WebSockets give a two-way channel. Open connections pin each user to one gateway, so messages cross gateways through a pub/sub bus, and clients must reconnect with backoff and resume. Durable queues and event logs, which can back this bus, have their own lessons.",
+      "idea": "Real-time is a held-open connection plus a way to route each message to the gateway that owns it.",
       "caption": "Connections at the edge, a bus in the middle.",
       "focus": [
         "alice",
@@ -619,7 +619,7 @@
         },
         {
           "node": "gw2",
-          "text": "100,000 conns"
+          "text": "~50,000 conns"
         },
         {
           "node": "bus",

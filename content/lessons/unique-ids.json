@@ -117,7 +117,7 @@
     {
       "tag": "QUESTION",
       "title": "Every row needs a name",
-      "body": "Each new order, message or user needs an ID that no other row will ever have. With one server, a counter is enough. With many servers creating rows at the same moment, who decides the next number? The answer must be unique, cheap to produce, and ideally not a bottleneck or a single point of failure.",
+      "body": "Every new order, message or user needs an ID that no other row will ever have, like a serial number. With one server, a simple counter is enough. But when many servers create rows at the same moment, who decides the next number? A good answer is unique, cheap to produce, and not a bottleneck or a single point of failure. The animation shows two servers that both need IDs right now.",
       "idea": "An ID scheme is judged on uniqueness, speed, size, sortability, and whether it needs coordination.",
       "caption": "Two servers both need IDs right now.",
       "focus": [
@@ -145,7 +145,7 @@
     {
       "tag": "AUTO-INC",
       "title": "Let the database count",
-      "body": "The simplest scheme is a database auto-increment column (a sequence). The app inserts a row and the database returns 1001, then 1002, and so on. IDs are small (8 bytes), increasing (with occasional gaps), and never collide. Use a 64-bit column; a 32-bit INT overflows at about 2.1 billion rows. The catch: every insert goes through one writer, so the extra call just to learn the ID is the hop, and one primary caps throughput (rule of thumb: about 10,000 inserts per second).",
+      "body": "The simplest scheme is a database auto-increment column (a sequence). The app inserts a row and the database hands back 1001, then 1002, and so on. IDs are small (8 bytes), keep increasing (with occasional gaps), and never collide. Use a 64-bit column, because a 32-bit INT overflows at about 2.1 billion rows. The catch: every insert goes through one database, which is one hop for every ID. A single primary can only take so many writes (rule of thumb: about 10,000 inserts per second).",
       "idea": "Auto-increment is correct and compact, but one counter means one choke point.",
       "caption": "The single database hands out the next number.",
       "focus": [
@@ -189,8 +189,8 @@
     {
       "tag": "WHAT IF",
       "title": "Add a second writer",
-      "body": "Traffic grows, so you split the data across two databases, and each keeps its own counter. Both now hand out 1001, and the moment you merge, export, or reference rows across shards the IDs collide. You can patch it by giving shard 1 odd numbers and shard 2 even numbers, but adding a third shard means changing the scheme. The database box is drawn once, but it stands for two shards.",
-      "idea": "A counter only works while exactly one thing owns it; sharding breaks that ownership.",
+      "body": "Traffic grows, so you split the data across two databases (shards), and each keeps its own counter. Now both hand out 1001. The moment you merge, export, or reference rows across shards, the IDs collide. You can patch it by giving shard 1 the odd numbers and shard 2 the even ones, but a third shard means changing the scheme. (The database box is drawn once but stands for two shards.)",
+      "idea": "A counter only works while exactly one thing owns it. Sharding breaks that ownership.",
       "caption": "Two shards, two counters: both issue 1001, so merged rows clash.",
       "focus": [
         "appa",
@@ -234,9 +234,9 @@
     {
       "tag": "UUID V4",
       "title": "Roll the dice locally",
-      "body": "A UUIDv4 is 128 bits with 122 of them random. Each server makes one on its own with zero coordination, millions per second. Collisions are possible in theory but absurdly unlikely: after a billion IDs the chance of any duplicate is around 1 in 10 quintillion. The price is size (16 bytes) and randomness: inserting random keys scatters writes across the whole primary-key index instead of one hot spot.",
-      "idea": "UUIDv4 trades coordination for size and index-unfriendly randomness.",
-      "caption": "Each server mints its own ID, no network call.",
+      "body": "A UUIDv4 is a 128-bit ID in which 122 bits are random. Each server makes one on its own, with no coordination, millions per second. A collision is possible in theory but absurdly unlikely: after a billion IDs, the chance of any duplicate is around 1 in 10 quintillion. The price is size (16 bytes) and randomness. Random keys land all over the primary-key index (the sorted lookup structure for the table) instead of at one spot, so writes are scattered and slow.",
+      "idea": "UUIDv4 trades coordination for bigger size and index-unfriendly randomness.",
+      "caption": "Each server mints its own ID with no network call.",
       "focus": [
         "appa",
         "appb",
@@ -275,9 +275,9 @@
     {
       "tag": "UUID V7",
       "title": "Put time at the front",
-      "body": "UUIDv7 (standardized in RFC 9562, 2024) keeps the 128-bit shape but starts with a 48-bit Unix timestamp in milliseconds, followed by about 74 bits of random and counter data. Still no coordination, and IDs created later sort later. In a B-tree index new keys land at the right edge, so pages stay hot in memory and splits are rare. Ordering is only millisecond-accurate, and the timestamp is readable by anyone who sees the ID.",
-      "idea": "UUIDv7 keeps UUID's no-coordination property and adds time ordering that indexes love.",
-      "caption": "Time-prefixed keys append at the index edge.",
+      "body": "UUIDv7 (standardized in RFC 9562, 2024) keeps the 128-bit shape but starts with a 48-bit Unix timestamp in milliseconds, followed by about 74 bits of random and counter data. There is still no coordination, and IDs created later sort later. In a B-tree index (the usual sorted index), new keys land at the right edge, so the busy pages stay in memory and page splits are rare. Ordering is only millisecond-accurate, and anyone who sees the ID can read the timestamp.",
+      "idea": "UUIDv7 keeps UUID's no-coordination property and adds time ordering, which indexes love.",
+      "caption": "Time-prefixed keys append at the edge of the index.",
       "focus": [
         "appa",
         "db",
@@ -316,8 +316,8 @@
     {
       "tag": "SNOWFLAKE",
       "title": "Time + machine + sequence",
-      "body": "A Snowflake-style ID fits in 64 bits: 1 unused sign bit, 41 bits of milliseconds since a custom epoch (about 69 years), 10 bits of worker number (1,024 workers), and a 12-bit sequence. Within one millisecond a worker counts 0 to 4095, so one worker can issue 4,096,000 IDs per second. Because the worker number differs per machine, no two machines can ever produce the same ID, and no network call is needed. In the diagram the generator is one box, but in practice it is a small library inside each app server with its own worker number (run as a separate service it would add one hop).",
-      "idea": "Snowflake splits the ID into fields so uniqueness comes from who and when, not from a shared counter.",
+      "body": "A Snowflake-style ID fits in 64 bits: 1 unused sign bit, 41 bits of milliseconds since a custom start date (about 69 years), 10 bits for the worker number (1,024 workers), and a 12-bit sequence. Within one millisecond a worker counts 0 to 4095, so one worker can issue 4,096,000 IDs per second. As long as each worker has a unique number, no two machines can make the same ID, and no network call is needed. In the diagram the generator is one box, but in practice it is a small library inside each app server with its own worker number. (Run as a separate service, it would add one hop.)",
+      "idea": "Snowflake splits the ID into fields, so uniqueness comes from who and when, not from a shared counter.",
       "caption": "Each app's local generator (drawn once) builds a sortable 64-bit ID.",
       "focus": [
         "appa",
@@ -360,9 +360,9 @@
     {
       "tag": "WHAT IF",
       "title": "The clock goes backward",
-      "body": "Snowflake depends on the wall clock. If a clock correction (an NTP step, a leap second or a VM resume) moves time back, even by 20 ms, the generator may repeat a timestamp it already used and issue a duplicate ID. A safe generator remembers the last timestamp it used, and after a restart must not start before it, so persist it or wait out the skew. When the clock is behind, it waits or refuses rather than guess. Worker numbers must also be unique: assign them by coordinator or config, never randomly.",
+      "body": "Snowflake depends on the wall clock. If a clock correction (an NTP step, a leap second or a VM resume) moves time backward, even by 20 ms, the generator may repeat a timestamp it already used and issue a duplicate ID. A safe generator remembers the last timestamp it used, and after a restart must not start before it, so persist it or wait out the difference. If the clock is behind, it waits or refuses instead of guessing. Worker numbers must also be unique: assign them by a coordinator or config, never randomly.",
       "idea": "Time-based IDs are only as safe as the clock and the uniqueness of worker numbers.",
-      "caption": "Generator refuses IDs until the clock recovers.",
+      "caption": "The generator refuses to issue IDs until the clock recovers.",
       "focus": [
         "appa",
         "idgen"
@@ -395,7 +395,7 @@
     {
       "tag": "TICKET SERVER",
       "title": "Lease ranges of IDs",
-      "body": "A ticket server is a small dedicated service, historically a database with an auto-increment table, that hands out numbers. Asking it for every ID would repeat the bottleneck, so apps request a block, say 1,000 IDs, and spend them locally. That is one hop per 1,000 IDs. Run two ticket servers, one issuing odd blocks and one even, so one can fail. IDs are small and mostly increasing, but a crashed app loses its unused block, leaving harmless gaps.",
+      "body": "A ticket server is a small dedicated service, historically a database table with auto-increment, that hands out numbers. Asking it for every ID would bring back the bottleneck. So each app asks for a block, say 1,000 IDs, and spends them locally. That is one hop per 1,000 IDs (0.001 per ID). Run two ticket servers, one issuing odd blocks and one even, so one can fail. IDs are small and mostly increasing. A crashed app loses its unused block, leaving harmless gaps.",
       "idea": "Handing out ranges turns one coordination call into thousands of free local IDs.",
       "caption": "App A leases a block of 1,000 IDs.",
       "focus": [
@@ -434,9 +434,9 @@
     {
       "tag": "TRADE-OFF",
       "title": "Why sortable matters",
-      "body": "Time-ordered IDs (v7, Snowflake, ticket blocks) allow cursor paging such as WHERE id < last_seen ORDER BY id DESC LIMIT 50, and keep inserts append-like. Order across machines is only approximate (same-millisecond ties, clock skew), so never treat it as true event order. IDs also leak creation time and volume. Counters and time-based IDs are guessable, so do not use them as secrets; check access on every request or expose a random public ID.",
-      "idea": "Sortable IDs make queries and indexes faster, but order is approximate and time becomes visible.",
-      "caption": "Both servers append to the same index edge.",
+      "body": "Sortable IDs (UUIDv7, Snowflake, and to a lesser extent ticket blocks) allow cursor paging, such as WHERE id < last_seen ORDER BY id DESC LIMIT 50, and keep inserts append-like. But order across machines is only approximate (same-millisecond ties, clock skew), so never treat it as true event order. IDs also leak creation time and volume. Counters and time-based IDs are guessable, so do not use them as secrets. Check access on every request, or expose a random public ID.",
+      "idea": "Sortable IDs make queries and indexes faster, but their order is approximate and creation time becomes visible.",
+      "caption": "Both servers append to the same edge of the index.",
       "focus": [
         "appa",
         "appb",
@@ -486,8 +486,8 @@
     {
       "tag": "RECAP",
       "title": "Pick by constraint",
-      "body": "Use auto-increment for a single database where simplicity wins. Use UUIDv7 when you want no coordination and standard tooling. Use Snowflake-style 64-bit IDs when size and throughput matter and you can manage worker numbers and clocks. Use ticket servers or ID blocks when you want small numeric IDs with rare coordination. Prefer UUIDv7 over UUIDv4 as a primary key on large indexed tables unless you need order-free values.",
-      "idea": "Every scheme trades coordination, size, ordering, and clock trust; choose the one whose weakness you can live with.",
+      "body": "Use auto-increment for a single database where simplicity wins. Use UUIDv7 when you want no coordination and standard tooling. Use Snowflake-style 64-bit IDs when size and throughput matter and you can manage worker numbers and clocks. Use ticket servers (ID blocks) when you want small numeric IDs with rare coordination. On large indexed tables, prefer UUIDv7 over UUIDv4 as a primary key, unless you need order-free values.",
+      "idea": "Every scheme trades coordination, size, ordering and clock trust. Choose the one whose weakness you can live with.",
       "caption": "Five schemes, one trade-off each.",
       "focus": [
         "client",

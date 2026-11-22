@@ -141,9 +141,9 @@
     {
       "tag": "QUESTION",
       "title": "One event, many readers",
-      "body": "When an order is placed, billing must charge it, analytics must count it, and a search index might want it too. If the Orders service called each of them directly, it would need to know every consumer and wait on the slowest one. Pub/sub flips this: the producer announces the event once and does not care who listens.",
-      "idea": "Publish-subscribe decouples who produces an event from who consumes it.",
-      "caption": "Orders service has one event and several unknown readers.",
+      "body": "When an order is placed, billing must charge it, analytics must count it, and a search index may want it too. If the Orders service called each of them directly, it would need to know every listener and wait for the slowest one. Pub/sub (publish-subscribe) flips this. The producer announces the event once and does not care who listens.",
+      "idea": "Pub/sub separates who produces an event from who consumes it.",
+      "caption": "Orders has one event and several unknown readers.",
       "focus": [
         "orders"
       ],
@@ -159,8 +159,8 @@
     {
       "tag": "CONCEPT",
       "title": "Publish to a topic",
-      "body": "A topic is a named stream, such as order-events. The producer sends an OrderPlaced event to the topic and gets an acknowledgement; it never learns who reads it. Every subscribed group reads the full stream independently from the same stored log. Adding a new reader later needs no change to the producer.",
-      "idea": "A topic is a named channel; fan-out means every subscriber group sees every event.",
+      "body": "A topic is a named stream of events, such as order-events. In the animation Orders publishes an OrderPlaced event to the topic and gets an acknowledgement. It never learns who reads it. The events are kept in a stored log, and every consumer group reads the full stream on its own. Adding a new reader later needs no change to the producer. Here the topic carries 1,200 messages per second.",
+      "idea": "A topic is a named channel. Fan-out means every subscriber group sees every event.",
       "caption": "The event is appended to the order-events topic.",
       "focus": [
         "orders",
@@ -199,7 +199,7 @@
     {
       "tag": "CONCEPT",
       "title": "Partitions split the topic",
-      "body": "One machine cannot absorb a busy topic, so the topic is cut into partitions, here three. The producer sets a key, for example the customer id, and hashes it to pick a partition. The same key always lands in the same partition, so one customer's events stay together. Different keys spread across partitions for parallel throughput. Here two services, Orders and Payments, publish order-related events to the same topic, which holds about 13,000 records so far at 1,200 messages a second. Adding partitions later changes where keys land, so pick the count with headroom. A very busy key can create a hot partition.",
+      "body": "One machine cannot absorb a busy topic, so it is cut into partitions (here 3). The producer sets a key, such as the customer id, and a hash of the key picks the partition. The same key always lands in the same partition, so one customer's events stay together. Different keys spread out for parallel work. Orders and Payments both publish here, and the topic holds about 13,000 records so far at 1,200 per second. Adding partitions later changes where keys land, so leave headroom. A very busy key can overload one partition (a hot partition).",
       "idea": "The key decides the partition: same key, same partition; many keys, spread load.",
       "caption": "Two producers write to three partitions by key hash.",
       "focus": [
@@ -262,9 +262,9 @@
     {
       "tag": "CONCEPT",
       "title": "A log with offsets",
-      "body": "Each partition is an append-only log. Every record gets the next offset: 0, 1, 2, and so on. Reading does not remove a record; the broker simply keeps it until retention expires. Order is guaranteed inside a partition only. Records on different partitions have no defined order relative to each other.",
-      "idea": "Ordering is per partition, so put events that must stay ordered under one key.",
-      "caption": "Partition 1 holds u42's events in the order they were written.",
+      "body": "Each partition is an append-only log: new records go on the end, and each gets the next number, called its offset (0, 1, 2, and so on). Reading does not remove a record. The broker keeps it until the retention time runs out. Order is guaranteed inside one partition only. Records on different partitions have no defined order relative to each other. That is why events that must stay in order share a key.",
+      "idea": "Ordering holds per partition, so put events that must stay ordered under one key.",
+      "caption": "Partition 1 holds customer u42's events in write order.",
       "focus": [
         "p1"
       ],
@@ -287,8 +287,8 @@
     {
       "tag": "FLOW",
       "title": "Consumer groups share work",
-      "body": "Billing runs two workers in one consumer group named billing (group A in the metrics). The group coordinator assigns each partition to exactly one worker at a time, so two workers in the group never read the same partition at once. Worker 1 owns partitions 0 and 1; worker 2 owns partition 2. Consumers pull records by offset at their own speed.",
-      "idea": "Within a group each partition has one owner, so partitions cap the group's parallelism.",
+      "body": "Billing runs two workers in one consumer group named billing (group A in the HUD). A consumer group is a team that shares the work. The group coordinator gives each partition to exactly one worker, so two workers never read the same partition at once. Worker 1 owns partitions 0 and 1, and worker 2 owns partition 2. Each worker pulls records from its own offset, at its own speed. The group is 800 records behind the newest data (its lag).",
+      "idea": "In a group, each partition has one owner, so the number of partitions caps the group's parallelism.",
       "caption": "Group A splits the three partitions between two workers.",
       "focus": [
         "p0",
@@ -337,7 +337,7 @@
         },
         {
           "node": "b1",
-          "text": "lag 800",
+          "text": "group lag 800",
           "at": "bottom"
         },
         {
@@ -350,9 +350,9 @@
     {
       "tag": "FLOW",
       "title": "Another group, same log",
-      "body": "Analytics reads the same topic in a different group. Groups are independent: each tracks its own offsets, so analytics sees all three partitions in full without affecting billing, though there is still only one stored log. This is the fan-out. A slow analytics job cannot slow billing, because neither group removes data for the other.",
-      "idea": "Each consumer group has its own position, so groups never compete for the same records.",
-      "caption": "Group B reads every partition independently of group A.",
+      "body": "Analytics reads the same topic as a different group (group B). Groups are independent: each keeps its own offsets, so analytics reads all three partitions in full without affecting billing. There is still only one stored log. This is the fan-out. Unlike a queue, where a message goes to one worker, reading here removes nothing, so a slow analytics job cannot slow billing.",
+      "idea": "Each group has its own position in the log, so groups never compete for records.",
+      "caption": "Group B reads every partition on its own.",
       "focus": [
         "p0",
         "p1",
@@ -411,7 +411,7 @@
         },
         {
           "node": "an",
-          "text": "lag 12,000",
+          "text": "group lag 12,000",
           "at": "bottom"
         }
       ]
@@ -419,9 +419,9 @@
     {
       "tag": "CONCEPT",
       "title": "Offsets and lag",
-      "body": "After processing a batch a consumer commits its offset, saying everything before this point is done. Lag is the log end minus the committed offset. Billing at 800 messages behind is normal, since at 1,200 messages a second that is under a second of delay; analytics at 12,000 behind is catching up from a slower batch job. Rising lag that never falls means consumers are too slow for the publish rate.",
-      "idea": "Lag is the key health signal: it shows how far each group is behind the newest record.",
-      "caption": "Workers commit offsets; the gap to the log end is lag.",
+      "body": "After processing a batch, a worker commits its offset: a note saying 'everything before this point is done'. Lag is the log's newest offset minus the committed offset, so it shows how far behind a group is. Billing at 800 behind is normal: at 1,200 messages per second that is under a second of delay. Analytics at 12,000 behind is about 10 seconds, fine for a slower batch-style job. Lag that keeps rising means the workers cannot keep up with publishing.",
+      "idea": "Lag is the key health signal. It shows how far each group is behind the newest record.",
+      "caption": "Workers commit offsets; the gap to the log's end is lag.",
       "focus": [
         "b1",
         "b2",
@@ -456,13 +456,13 @@
         },
         {
           "node": "b1",
-          "text": "lag 800",
+          "text": "group lag 800",
           "tone": "green",
           "at": "bottom"
         },
         {
           "node": "an",
-          "text": "lag 12,000",
+          "text": "group lag 12,000",
           "at": "top"
         }
       ]
@@ -470,8 +470,8 @@
     {
       "tag": "WHAT IF",
       "title": "A worker crashes",
-      "body": "Worker 2 dies after processing some records but before committing. The group notices missing heartbeats and rebalances: worker 1 takes over partition 2 and resumes from the last committed offset. Records handled after that commit, beyond 4605 here, are processed and delivered again. This is at-least-once delivery, so handlers should be idempotent, meaning a repeat does no extra harm. While partition 2 has no owner its records pile up, so group A lag climbs to about 3,000 until worker 1 catches up.",
-      "idea": "Crashes cause replays from the last commit, so consumers must tolerate duplicates.",
+      "body": "Worker 2 dies after processing some records but before committing. The group notices its missing heartbeats and rebalances: worker 1 takes over partition 2 and resumes from the last committed offset, 4605. Records worker 2 handled after that commit are processed again. This is at-least-once delivery, so handlers should be idempotent (a repeat does no extra harm). While partition 2 has no owner its records pile up, so group A lag climbs (to about 3,000 here, an illustrative figure) until worker 1 catches up.",
+      "idea": "A crash causes a replay from the last commit, so consumers must tolerate duplicates.",
       "caption": "Partition 2 moves to worker 1 after worker 2 fails.",
       "focus": [
         "p2",
@@ -527,8 +527,8 @@
     {
       "tag": "WHAT IF",
       "title": "Replay the past",
-      "body": "Suppose analytics shipped a bug and miscounted for three days. At 1,200 messages a second, three days is about 311 million records. Because the broker retains records for a set time, say seven days (about 726 million records), you stop group B, fix the code and move its offsets back to three days ago. It re-reads and rebuilds its results. Unlike simple pub/sub that drops events for absent subscribers, and unlike a queue that deletes messages once handled, a log keeps them.",
-      "idea": "Retention turns the topic into a replayable history, bounded by the retention window.",
+      "body": "Suppose analytics shipped a bug and miscounted for three days. At 1,200 messages per second, three days is about 311 million records. The broker keeps records for a set time, say 7 days (about 726 million records). So you stop group B, fix the code and move its offsets back three days. It re-reads the old records and rebuilds its results. Plain pub/sub drops events for absent subscribers, and a queue deletes messages once handled. A log keeps them.",
+      "idea": "Retention turns the topic into a replayable history, limited by the retention window.",
       "caption": "Group B rewinds its offsets and reads old records again.",
       "focus": [
         "p0",
@@ -597,8 +597,8 @@
     {
       "tag": "RECAP",
       "title": "The log is the contract",
-      "body": "Producers append keyed events to a topic. Partitions give scale, and order holds only within one partition. Each consumer group owns partitions, tracks offsets, and moves at its own speed, so many groups can read the same data. Retention makes replay possible, but plan for duplicates and watch lag.",
-      "idea": "Topic plus partitions plus offsets gives fan-out, scale, and replay with one stored log.",
+      "body": "Producers append keyed events to a topic. Partitions give scale, and order holds only inside one partition. Each consumer group owns partitions, tracks its own offsets and moves at its own speed, so many groups can read the same data. Retention makes replay possible. Plan for duplicates, and watch lag.",
+      "idea": "Topic plus partitions plus offsets gives fan-out, scale and replay from one stored log.",
       "caption": "One retained log feeds many independent groups.",
       "focus": [
         "orders",

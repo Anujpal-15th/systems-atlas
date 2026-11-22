@@ -106,7 +106,7 @@
     {
       "tag": "QUESTION",
       "title": "Why does checkout slow down at 9am?",
-      "body": "A shop keeps 500 million orders in one Postgres-style database. Checkout is fast: p99 latency is about 8 ms. Every morning an analyst opens a dashboard titled revenue by day, and suddenly shoppers see slow or timing-out checkouts. Same database, same data. What changed? The kind of question being asked, not the amount of traffic.",
+      "body": "A shop keeps 500 million orders in one Postgres-style database. Checkout is fast: p99 latency (the time that 99 percent of requests beat) is about 8 ms. Every morning an analyst opens a dashboard titled revenue by day, and suddenly shoppers see slow or timing-out checkouts. Same database, same data. What changed? The kind of question being asked, not the amount of traffic.",
       "idea": "Two workloads can be harmless alone and destructive together on the same database.",
       "caption": "Healthy checkout, one analyst about to ask a big question.",
       "focus": [
@@ -125,7 +125,7 @@
     {
       "tag": "OLTP",
       "title": "Transactions: many tiny operations",
-      "body": "OLTP (online transaction processing) means thousands of small operations per second, each touching one or a few rows: insert this order, read this user's cart, update this stock count. Each must be fast and correct. Databases built for this store each row's fields together on disk, so one row is one cheap read or write, usually found through an index.",
+      "body": "OLTP (online transaction processing) means thousands of small operations per second, each touching one or a few rows: insert this order, read this user's cart, update this stock count. Each must be fast and correct. Databases built for this store each row's fields together on disk, so one row is one cheap read or write, usually found through an index. In the animation a shopper inserts an order and gets 'committed' back in about 8 ms.",
       "idea": "OLTP is point reads and writes by key, optimized for latency and correctness.",
       "caption": "Shoppers write and read single rows in milliseconds.",
       "focus": [
@@ -169,7 +169,7 @@
     {
       "tag": "WHAT IF",
       "title": "Analytics hits the live database",
-      "body": "Now the analyst runs SELECT day, SUM(amount) FROM orders GROUP BY day. It must read every one of the 500 million rows. At roughly 200 bytes per row that is about 100 GB. Even at an optimistic 2 GB/s that is around 50 seconds of heavy disk and CPU use, and it can push the pages checkout keeps in memory out of cache (the buffer cache holds recently used disk pages). Checkout queries now wait behind it.",
+      "body": "Now the analyst runs SELECT day, SUM(amount) FROM orders GROUP BY day. It must read every one of the 500 million rows. At roughly 200 bytes per row that is about 100 GB. Even at an optimistic 2 GB/s that is around 50 seconds of heavy disk and CPU use. It can also push the pages checkout keeps in memory out of the buffer cache (the RAM that holds recently used disk pages). Checkout queries now wait behind it, and p99 jumps from 8 ms to 900 ms.",
       "idea": "A full-table scan competes for the same disk, cache and CPU that transactions need.",
       "caption": "The big scan starves checkout of cache and I/O.",
       "focus": [
@@ -222,9 +222,9 @@
     {
       "tag": "CONCEPT",
       "title": "Row store vs column store",
-      "body": "A row store keeps all fields of one order side by side, which is perfect for fetching a whole order. A column store keeps all values of one column together, so the revenue query reads only the date and amount columns, about 16 bytes per row instead of 200. Similar values sit together too, so they compress very well, often 3 to 10 times. That is roughly 8 GB shrunk to 1 to 3 GB. (Illustrative: what the same report would cost on a column layout.)",
+      "body": "A row store keeps all fields of one order side by side, which is perfect for fetching a whole order. A column store keeps all values of one column together, so the revenue query reads only the date and amount columns: about 16 bytes per row instead of 200, or 8 GB instead of 100 GB. Similar values sit together too, so they compress very well, often 3 to 10 times. That shrinks 8 GB to roughly 1 to 3 GB (2 GB here). This is an illustration of what the same report would cost on a column layout.",
       "idea": "Columns let analytics read only what it needs, and compress better; rows make single-record access cheap.",
-      "caption": "Same data laid out by column: far fewer bytes to scan.",
+      "caption": "The same data laid out by column: far fewer bytes to scan.",
       "focus": [
         "oltp",
         "wh"
@@ -255,9 +255,9 @@
     {
       "tag": "ETL",
       "title": "Copy data out: ETL",
-      "body": "We cannot just move everything to a column store, because checkout still needs fast row writes. So we keep both and copy. In classic ETL (extract, transform, load) a pipeline pulls changes from the OLTP database, cleans and reshapes them on its own workers, then loads finished tables into the warehouse. Reading changes from the database log (change data capture) puts far less load on it than rescanning tables.",
+      "body": "We cannot just move everything to a column store, because checkout still needs fast row writes. So we keep both and copy. In classic ETL (extract, transform, load) a pipeline pulls changes from the OLTP database, cleans and reshapes them on its own workers, then loads finished tables into the warehouse. Reading changes from the database log (change data capture) puts far less load on the database than rescanning tables.",
       "idea": "The OLTP database stays the source of truth; analytics works on a copy.",
-      "caption": "Pipeline extracts changes and loads the warehouse.",
+      "caption": "The pipeline extracts changes and loads the warehouse.",
       "focus": [
         "oltp",
         "etl",
@@ -300,7 +300,7 @@
     {
       "tag": "ELT + LAKE",
       "title": "Dump first, transform later: ELT",
-      "body": "Modern warehouses scale compute elastically, so many teams flip the order: ELT (extract, load, transform). Raw data lands first, either straight into the warehouse or in a data lake, which is cheap object storage holding files such as Parquet or JSON in any shape. Transformations then run as SQL inside the warehouse. The lake also feeds machine learning and data nobody has modeled yet. Many teams add table formats like Iceberg or Delta on top of lake files so one copy can be queried like a warehouse (a lakehouse).",
+      "body": "Modern warehouses scale compute elastically, so many teams flip the order: ELT (extract, load, transform). Raw data lands first, either straight in the warehouse or in a data lake, which is cheap object storage holding files such as Parquet or JSON in any shape. Transformations then run as SQL inside the warehouse. The lake also feeds machine learning and data nobody has modeled yet. Table formats like Iceberg or Delta on top of lake files let one copy be queried like a warehouse (a lakehouse).",
       "idea": "A lake stores raw data cheaply and flexibly; a warehouse stores modeled data for fast SQL.",
       "caption": "Raw files land in the lake, then the warehouse transforms them.",
       "focus": [
@@ -342,9 +342,9 @@
     {
       "tag": "OLAP",
       "title": "The same report, off the hot path",
-      "body": "OLAP (online analytical processing) means few queries that each scan huge amounts of data and aggregate it. Run the revenue report on the warehouse and it reads two compressed columns, spread across many nodes in parallel, in about a second. Checkout never notices, because the OLTP database is not queried for it (only the light change feed still reads from it).",
+      "body": "OLAP (online analytical processing) means few queries that each scan huge amounts of data and aggregate it. The analyst now runs the revenue report on the warehouse. It reads two compressed columns (2 GB), spread across many nodes in parallel, and answers in about a second. Checkout never notices, and p99 stays at 8 ms, because the OLTP database is not queried for the report (only the light change feed still reads from it).",
       "idea": "OLAP is built for big scans and aggregates; isolating it protects transactions.",
-      "caption": "Report answered by the warehouse; checkout is untouched.",
+      "caption": "The warehouse answers the report; checkout is untouched.",
       "focus": [
         "analyst",
         "wh"

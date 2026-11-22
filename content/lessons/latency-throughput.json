@@ -102,9 +102,9 @@
     {
       "tag": "QUESTION",
       "title": "Fast, or fast enough?",
-      "body": "Your service feels quick when you test it alone. Then launch day comes, thousands of users arrive, and some of them wait several seconds. Nothing is broken. You are simply measuring the wrong thing, or only one of the several things that make a system feel fast.",
-      "idea": "Speed is not one number: how long one request takes and how many you can handle are different questions.",
-      "caption": "A service sits between many clients and its backends.",
+      "body": "Your service feels quick when you test it alone. Then launch day comes, thousands of users arrive, and some of them wait several seconds. Nothing is broken. You were measuring only one kind of 'fast'. This lesson separates the different meanings: how long one request takes, how many you can handle at once, and what happens to the slowest ones.",
+      "idea": "Fast has several meanings. How long one request takes and how many you can serve are different questions.",
+      "caption": "Many clients send requests to one service and its backends.",
       "focus": [
         "client",
         "app"
@@ -116,9 +116,9 @@
     {
       "tag": "CONCEPT",
       "title": "Latency: one request's wait",
-      "body": "Latency is the time one request takes from being sent to being answered. Here a client call goes through the load balancer, the app checks the cache, and returns. Assume the whole trip takes 40 ms. Latency is measured per request, in milliseconds, and users feel it directly.",
-      "idea": "Latency is how long one request waits; lower is better and users feel it.",
-      "caption": "One request, 40 ms start to finish.",
+      "body": "Latency is how long one request waits, from the moment it is sent until the answer arrives. In the animation, a client calls the load balancer, the app checks the cache (a fast store of recent answers), and the reply travels back. We assume the whole trip takes 40 ms. Users feel latency directly, so lower is better.",
+      "idea": "Latency is one request's wait time. Users feel it directly.",
+      "caption": "One request, start to finish: 40 ms.",
       "focus": [
         "client",
         "lb",
@@ -179,9 +179,9 @@
     {
       "tag": "CONCEPT",
       "title": "Throughput: requests per second",
-      "body": "Throughput is how many requests the system completes each second. If each request takes 40 ms and the app handles 20 at the same time, it finishes about 20 / 0.04 = 500 requests per second. Latency and throughput are related but separate: you can raise throughput by doing more work in parallel without making any single request faster.",
-      "idea": "Throughput is the count of completed requests per second; parallelism raises it without cutting latency.",
-      "caption": "Many requests flow through at once: 500 per second.",
+      "body": "Throughput is how many requests the system finishes each second. If each request takes 40 ms and the app works on 20 at the same time, it finishes 20 ÷ 0.04 = 500 requests per second. Think of a shop: more cashiers serve more people per hour, but each customer still takes the same time. Doing work in parallel raises throughput without making any single request faster.",
+      "idea": "Throughput is completed requests per second. Parallelism raises it without cutting latency.",
+      "caption": "20 requests in progress at once give 500 per second.",
       "focus": [
         "client",
         "lb",
@@ -230,9 +230,9 @@
     {
       "tag": "CONCEPT",
       "title": "Bandwidth is the pipe, not the speed",
-      "body": "Bandwidth is the maximum data a link can carry per second, such as 1 Gbit/s. It sets an upper bound on throughput for large responses, but a fat pipe does not shorten the trip. A 1 KB reply on a 10 Gbit/s link and on a 100 Mbit/s link both take about 40 ms in total, almost all of it delay (network round trip plus server work), not transfer time (the 1 KB transfer takes about 0.08 ms even on 100 Mbit/s). Bandwidth matters when the payload is big, latency when it is small.",
-      "idea": "Bandwidth is capacity, latency is delay; a wider pipe barely makes a small message arrive sooner.",
-      "caption": "A wide pipe still waits for the round trip.",
+      "body": "Bandwidth is the most data a link can carry per second, like the width of a pipe. A wider pipe moves more bytes at once, but it does not shorten the trip. Take a 1 KB reply. On a 10 Gbit/s link and on a 100 Mbit/s link it still takes about 40 ms, because almost all of that is delay (network round trip plus server work). The transfer itself takes about 0.08 ms even on the slower link. Bandwidth matters for big files. Latency matters for small messages.",
+      "idea": "Bandwidth is capacity and latency is delay. A wider pipe barely helps a small message arrive sooner.",
+      "caption": "A wider pipe does not remove the round-trip delay.",
       "focus": [
         "client",
         "lb"
@@ -271,9 +271,9 @@
     {
       "tag": "CONCEPT",
       "title": "Percentiles beat averages",
-      "body": "Latency varies from request to request, so one number cannot describe it. The p50 (median) is the value half of requests beat: 40 ms here. The p99 is the value 99% of requests beat, so the slowest 1% take longer: about 400 ms here. If 99% of requests take 40 ms and 1% take 400 ms, the average is about 44 ms and hides the slow ones entirely. Report percentiles alongside the mean, never the mean alone.",
-      "idea": "p50 shows the typical request, p99 shows the slowest 1%; the average hides both.",
-      "caption": "Most requests are fast; a few are ten times slower.",
+      "body": "Latency differs from request to request, so one number cannot describe it. The p50 (median) is the time that half of requests beat. Here it is 40 ms. The p99 is the time that 99 of every 100 requests beat, so the slowest 1% are worse. Here it is 400 ms. If 99% take 40 ms and 1% take 400 ms, the average is about 44 ms, which hides the slow ones completely. Report percentiles, not only the mean.",
+      "idea": "p50 shows the typical request and p99 shows the slow end. The average hides both.",
+      "caption": "Out of 100 requests, 99 take 40 ms and 1 takes 400 ms.",
       "focus": [
         "app",
         "db"
@@ -283,19 +283,19 @@
           "from": "app",
           "to": "db",
           "kind": "request",
-          "label": "99 fast"
+          "label": "100 requests"
         },
         {
           "from": "db",
           "to": "app",
           "kind": "response",
-          "label": "40 ms"
+          "label": "99 take 40 ms"
         },
         {
           "from": "db",
           "to": "app",
           "kind": "response",
-          "label": "slow: 400 ms"
+          "label": "1 takes 400 ms"
         }
       ],
       "metrics": {
@@ -315,7 +315,7 @@
         },
         {
           "node": "app",
-          "text": "avg ≈ 44 ms",
+          "text": "average ≈ 44 ms",
           "at": "bottom"
         }
       ]
@@ -323,9 +323,9 @@
     {
       "tag": "CONCEPT",
       "title": "Why the tail exists",
-      "body": "Slow outliers have ordinary causes: a garbage collection (GC) pause, a noisy neighbour (another tenant hogging the shared host), a cold cache miss that hits the database, a retry after packet loss, or a lock held by another query. They are rare per request, but they never fully go away. The slow end of the distribution is called tail latency.",
-      "idea": "Tail latency comes from many small, random stalls; you manage it, you cannot eliminate it.",
-      "caption": "A cache miss sends one request down the slow path.",
+      "body": "The slowest requests are called the tail. Their causes are ordinary. A garbage collection (GC) pause is when a program freezes briefly to clean up memory. A noisy neighbour is another tenant hogging the shared host. A cache miss (the data was not in the cache) forces a trip to the slow database, as shown. A lost network packet causes a retry. A lock held by another query makes yours wait. Each is rare, but together they never fully go away.",
+      "idea": "Tail latency comes from many small random stalls. You manage it; you cannot remove it.",
+      "caption": "A cache miss sends this request down the slow path to the database.",
       "focus": [
         "app",
         "cache",
@@ -376,9 +376,9 @@
     {
       "tag": "CONCEPT",
       "title": "Fan-out multiplies the tail",
-      "body": "A single page often calls many backends. Suppose each call has a 1% chance of being slow (its per-call p99 is 400 ms), the calls are independent, and a page waits on 20 of them in parallel. The chance that at least one is slow is 1 - 0.99^20, about 18%. So a backend's p99 becomes roughly your page's p82. The more calls per request, the more the tail dominates what users see.",
-      "idea": "With N parallel calls, the page is only as fast as its slowest one, so rare slowness becomes common.",
-      "caption": "3 of the 20 calls shown: the app waits on every backend, so one slow reply delays all.",
+      "body": "A single page often calls many backends at once. Suppose each call has a 1% chance of being slow, and the calls are independent. The page needs all 20 answers, so it waits for the slowest. The chance that at least one is slow is 1 − 0.99^20, about 18%. So one backend's p99 turns into roughly your page's p82. The more calls per request, the more users feel the tail.",
+      "idea": "With N parallel calls the page is only as fast as its slowest one, so rare slowness becomes common.",
+      "caption": "3 of the 20 calls shown: one slow reply delays the whole page.",
       "focus": [
         "app",
         "cache",
@@ -435,9 +435,9 @@
     {
       "tag": "CONCEPT",
       "title": "Little's Law",
-      "body": "Little's Law says the average number of requests in the system equals the arrival rate times the average time each spends there: L = λ × W. At 500 req/s and 0.04 s each, L = 500 × 0.04 = 20 requests in flight. W is the average time in system, not the median (about 44 ms by the earlier numbers, so L is roughly 22; we use 40 ms to keep the arithmetic round). It holds for any stable system and needs no assumptions about the distribution. Use it to size thread pools, connection pools, and queues, and size them above the average L for headroom, since real concurrency fluctuates.",
-      "idea": "In-flight requests = arrival rate × time in system, so latency and concurrency are linked.",
-      "caption": "500 req/s × 0.04 s = 20 requests in flight.",
+      "body": "Little's Law links three numbers: L = λ × W. L is the average number of requests inside the system. λ (lambda) is the arrival rate. W is the average time one request spends there. At 500 req/s and 0.04 s each, L = 500 × 0.04 = 20 requests in flight. W is the average, not the median (about 44 ms by the earlier numbers, so L would be about 22; we use 40 ms to keep the math round). It holds for any stable system. Use it to size thread pools, connection pools and queues, with headroom above L.",
+      "idea": "Requests in flight = arrival rate × time in system, so latency and concurrency are linked.",
+      "caption": "500 requests/s × 0.04 s = 20 requests in flight.",
       "focus": [
         "lb",
         "app"
@@ -479,9 +479,9 @@
     {
       "tag": "WHAT IF",
       "title": "Latency rises, the pool runs out",
-      "body": "Now the database slows and each request takes 400 ms. Same 500 req/s arrive, so you would need L = 500 × 0.4 = 200 requests in flight. But 50 worker threads can finish only 50 / 0.4 = 125 requests per second. The other 375 per second pile up in the queue (only 50 can be in service at once; the rest wait) until it fills or clients time out (assume a 2 s timeout, so most requests wait in the queue until then). Arrivals exceed the 125/s the pool can finish, so the queue grows; clients that time out often retry, adding even more load. Slowness spreads and can topple the service.",
-      "idea": "When W grows at a fixed arrival rate, concurrency explodes past capacity and queues feed on themselves.",
-      "caption": "Need 200 in flight, have 50 slots: 375 req/s pile up.",
+      "body": "Now the database slows down and every request takes 400 ms. Arrivals are still 500 per second, so you would need L = 500 × 0.4 = 200 requests in flight. But the app has only 50 worker threads, and 50 ÷ 0.4 = 125 requests finish per second. The other 375 per second wait in a queue. We assume clients give up after 2 s, so most requests wait until then. Clients that time out often retry, which adds even more load. One slow dependency can topple the whole service.",
+      "idea": "When time per request grows at a fixed arrival rate, needed concurrency explodes past capacity and queues feed on themselves.",
+      "caption": "Need 200 slots, have 50: 375 req/s pile up in the queue.",
       "focus": [
         "lb",
         "app",
@@ -521,7 +521,7 @@
         },
         {
           "node": "app",
-          "text": "100%",
+          "text": "pool 100% busy",
           "tone": "red",
           "kind": "progress",
           "value": 100
@@ -537,9 +537,9 @@
     {
       "tag": "RECAP",
       "title": "What to remember",
-      "body": "Latency is one request's wait, throughput is requests completed per second, and bandwidth is the pipe's capacity. Track p50 and p99, never only the average, and expect fan-out to make tails matter more. Use L = λ × W to check that your pools cover your latency. To protect the tail, add timeouts, cache hot data, bound queues, and shed load (reject excess requests early) before queues grow.",
+      "body": "Latency is one request's wait. Throughput is requests finished per second. Bandwidth is the pipe's capacity. Track p50 and p99, never only the average, and expect fan-out to make tails matter more. Use L = λ × W to check that your pools cover your latency. To protect the tail, set timeouts, cache hot data, bound your queues, and shed load, which means rejecting extra requests early so the rest stay fast.",
       "idea": "Measure percentiles, watch concurrency with Little's Law, and design for the tail.",
-      "caption": "Healthy service: fast median, bounded tail, enough slots.",
+      "caption": "A healthy service: fast median, bounded tail, enough slots.",
       "focus": [
         "client",
         "lb",

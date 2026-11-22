@@ -118,7 +118,7 @@
     {
       "tag": "QUESTION",
       "title": "A firehose of numbers",
-      "body": "Picture 10,000 servers, each reporting 100 metrics (CPU, latency, queue depth) every 10 seconds. That is 1 million separate series and 100,000 new points per second, forever. Nobody edits old points, and people mostly ask about the last hour. How do you store this so it stays fast and cheap? These numbers are an assumed scenario.",
+      "body": "Picture 10,000 servers, each reporting 100 metrics (CPU, latency, queue depth) every 10 seconds. That is 1 million separate series (one stream of values per metric per server) and 100,000 new points per second, forever. Nobody edits old points, and people mostly ask about the last hour. For now raw data is kept for 90 days. How do you store this so it stays fast and cheap? These numbers are an assumed scenario.",
       "idea": "Time-series data is a never-ending stream of timestamped appends, read mostly by recent time range.",
       "caption": "Many hosts, constant small writes.",
       "focus": [
@@ -136,7 +136,7 @@
     {
       "tag": "FLOW",
       "title": "Buffer the stream",
-      "body": "Each host sends points as (series name, timestamp, value). They land in an ingest queue first, so a slow database or a traffic spike delays points instead of losing them. The writer then pulls batches rather than handling 100,000 tiny writes one by one.",
+      "body": "Each host sends points as (series name, timestamp, value). They land in an ingest queue first, so a slow database or a traffic spike delays points instead of losing them. The writer then pulls batches (5,000 points here) instead of handling 100,000 tiny writes per second one by one. Appending in bulk is cheap; many tiny writes are not.",
       "idea": "Buffer and batch: appends are cheap in bulk and painful one at a time.",
       "caption": "Points flow through a buffer to the writer.",
       "focus": [
@@ -175,7 +175,7 @@
     {
       "tag": "CONCEPT",
       "title": "Append into the newest chunk",
-      "body": "The writer groups points by series and writes them into the chunk for the current time window, say one day. Within a chunk, timestamps and values compress well: consecutive timestamps differ by a steady 10 seconds, and values change slowly. A good scheme gets raw points down to roughly 1 to 2 bytes each, so a day is about 17 GB here. Slightly late points are still accepted into recent chunks.",
+      "body": "The writer groups points by series and writes them into the chunk for the current time window, say one day. Within a chunk, data compresses well: consecutive timestamps differ by a steady 10 seconds, and values change slowly. At about 2 bytes per point (good schemes reach 1 to 2), a day of 8.6 billion points is about 17 GB here. Slightly late points are still accepted into recent chunks.",
       "idea": "Writes only touch the newest chunk, and regular timestamps compress extremely well.",
       "caption": "Today's chunk takes all the writes.",
       "focus": [
@@ -218,7 +218,7 @@
     {
       "tag": "CONCEPT",
       "title": "Query a time range",
-      "body": "A dashboard asks for one service's p95 latency over the last hour. Because data is partitioned by time, the database opens only today's chunk and skips every older one. This is partition pruning, and it is the main reason time-partitioned storage stays fast as history grows. A narrow query like this returns in tens of milliseconds.",
+      "body": "A dashboard asks for one service's p95 latency (the value 95 percent of requests beat) over the last hour. Because data is partitioned by time, the database opens only today's chunk and skips every older one. This is partition pruning, and it is the main reason time-partitioned storage stays fast as history grows. This narrow query reads 360 points (one hour at 10 s) and returns in about 40 ms.",
       "idea": "Time partitioning lets a range query ignore almost all the data.",
       "caption": "One chunk is read; the rest are skipped.",
       "focus": [
@@ -263,7 +263,7 @@
     {
       "tag": "TRADE-OFF",
       "title": "Long ranges hurt",
-      "body": "Now someone charts one metric across 90 days from raw data. The database must open 90 chunks and read every point for the matching series, yet the screen can only draw a couple thousand points anyway. Scanning far more detail than the chart can show wastes time and money. In a big fleet this kind of query can take many seconds.",
+      "body": "Now someone charts one metric across 90 days from raw data. The database must open 90 chunks and read every point for the matching series (over 700,000), yet the screen can only draw a couple thousand points anyway. Scanning far more detail than the chart can show wastes time and money. In a big fleet this kind of query can take many seconds (about 9 s here).",
       "idea": "Raw points answer long-range questions slowly, and the chart cannot show that detail anyway.",
       "caption": "A 90-day raw scan is slow.",
       "focus": [
@@ -345,7 +345,7 @@
     {
       "tag": "FLOW",
       "title": "Serve long ranges from rollups",
-      "body": "The 90-day chart now reads hourly rollups: about 2,160 points per series instead of over 700,000 raw ones. The query layer picks the coarsest resolution that still gives enough points for the screen. The chart that took seconds returns in tens of milliseconds, with the trade-off that you cannot zoom back into 10-second detail.",
+      "body": "The 90-day chart now reads hourly rollups: about 2,160 points per series instead of over 700,000 raw ones. The query layer picks the coarsest resolution that still gives enough points for the screen. The chart that took 9 seconds returns in about 30 ms, with the trade-off that you cannot zoom back into 10-second detail.",
       "idea": "Pick the resolution to match the question: coarse for long ranges, raw for short ones.",
       "caption": "Long queries are answered from rollups.",
       "focus": [
@@ -390,7 +390,7 @@
     {
       "tag": "CONCEPT",
       "title": "Retention: drop, do not delete",
-      "body": "Nobody needs 10-second data from a year ago, so a retention policy might keep raw data for 15 days, 1-minute rollups for 13 months, and hourly ones for years. Because each chunk covers a fixed time window, expiry means dropping a whole old chunk, which is close to deleting a file. Running DELETE on billions of rows would be slow and leave the table bloated. These durations are examples; pick yours from alerting and audit needs.",
+      "body": "Nobody needs 10-second data from a year ago, so a retention policy (a rule for how long to keep data) might keep raw data for 15 days, 1-minute rollups for 13 months, and hourly ones for years. Because each chunk covers a fixed time window, expiry means dropping a whole old chunk, which is close to deleting a file. Running DELETE on billions of rows would be slow and leave the table bloated. These durations are examples; pick yours from alerting and audit needs.",
       "idea": "Retention works best as dropping whole time chunks, not deleting individual rows.",
       "caption": "Expired raw chunks are removed whole.",
       "focus": [
@@ -428,7 +428,7 @@
     {
       "tag": "WHAT IF",
       "title": "A label explodes the series count",
-      "body": "A developer adds user_id as a label on a request-count metric. Every distinct label combination is its own series, so 1 million series can become 100 million. Indexes and memory grow with series count, not with points per second, so the system falls over even though traffic is unchanged. Keep labels low-cardinality (region, status code) and put per-user detail in logs or traces.",
+      "body": "A developer adds user_id as a label on a request-count metric. Every distinct label combination is its own series, so 1 million series can become 100 million. Indexes and memory grow with series count, not with points per second, so the system falls over even though traffic is unchanged. Keep labels low-cardinality (few distinct values, like region or status code) and put per-user detail in logs or traces.",
       "idea": "Cost grows with the number of distinct series, so unbounded labels are the classic way to break a metrics store.",
       "caption": "Series count explodes and ingest stalls.",
       "focus": [

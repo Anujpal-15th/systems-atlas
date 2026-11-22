@@ -118,9 +118,9 @@
     {
       "tag": "QUESTION",
       "title": "Suggest while they type",
-      "body": "A user types 'wea' and expects 'weather', 'weather tomorrow' and 'wearable tech' to appear before they finish the next letter. Assume 5 billion searches a day and about 4 suggestion requests per search once the client waits for a short typing pause. That is roughly 20 billion requests a day, about 230k per second on average and perhaps 700k at peak. Each answer must feel instant, so we aim for under 100 ms, measured from the request being sent to the list being drawn.",
+      "body": "A user types \"wea\" and expects \"weather\", \"weather tomorrow\" and \"wearable tech\" to appear before they type the next letter. Assume 5 billion searches a day. The app waits for a short typing pause, so each search triggers about 4 suggestion requests. That is roughly 20 billion requests a day: about 230,000 per second on average and perhaps 700,000 at peak. Each answer must feel instant, so we aim for under 100 ms from the request being sent to the list appearing.",
       "idea": "Autocomplete is a read-heavy, latency-critical lookup: huge request volume, tiny responses, strict deadline.",
-      "caption": "Every pause in typing sends a prefix to the system.",
+      "caption": "Each pause in typing sends a prefix (the letters typed so far) to the system.",
       "focus": [
         "user"
       ],
@@ -143,9 +143,9 @@
     {
       "tag": "CONCEPT",
       "title": "A trie finds prefixes",
-      "body": "A trie stores strings one character per level, so every word sharing 'wea' hangs below the same path w-e-a. Finding the node for a prefix takes time proportional to the prefix length, not the number of stored queries. That is exactly the shape of our question. But the node only tells us where the matches start. Collecting every completion beneath 'w' would mean scanning millions of descendants.",
+      "body": "A trie (say \"try\") is a tree that stores words one letter per level, so every word starting with \"wea\" hangs below the same path w-e-a. Finding the spot for a prefix takes time proportional to the prefix length, not to the number of stored searches. That is exactly our question. But the spot only tells us where matches start. Collecting every completion below \"w\" would mean scanning millions of entries.",
       "idea": "A trie makes 'find everything starting with X' cheap to locate, but expensive to enumerate and rank.",
-      "caption": "The index is a trie, but we cannot scan subtrees per request.",
+      "caption": "The index is a trie, but we cannot scan a whole subtree for every request.",
       "focus": [
         "index"
       ],
@@ -167,7 +167,7 @@
     {
       "tag": "CONCEPT",
       "title": "Precompute top-k per prefix",
-      "body": "The fix is to do the ranking ahead of time. Every trie node stores its top k completions, with k around 10, already sorted by popularity score. A request now walks at most a few dozen characters and returns the list sitting on that node, with no subtree scan and no sorting. The price is memory and build time: each popular query is copied into the lists of all its prefixes. As a rule of thumb that is still only a few GB per shard, so it fits in RAM. In practice the same prefix-to-list idea can live in a compressed trie or a plain key-value map; the trie is the clearest way to picture it.",
+      "body": "The fix is to do the ranking ahead of time. Every trie node stores its top k completions (k is about 10), already sorted by popularity. A request walks a few dozen letters at most and returns the list sitting on that node: no scanning, no sorting. The price is memory and build time, because each popular search is copied onto all of its prefixes. As a rule of thumb that is only a few GB per shard (one slice of the index), so it fits in RAM.",
       "idea": "Trade space and offline work for speed: store the answer on each prefix so the read path is one lookup.",
       "caption": "Each prefix node already holds its ranked suggestions.",
       "focus": [
@@ -191,9 +191,9 @@
     {
       "tag": "FLOW",
       "title": "Most requests end at the edge",
-      "body": "The client sends a prefix such as 'wea' after a 100 to 150 ms typing pause, cancelling any older in-flight request. The request goes to an edge cache near the user. Short prefixes are shared by millions of people, so the same URL (for example /suggest?q=wea) is asked again and again. The cache key is the normalized prefix plus language/locale, and personalization would lower the hit rate. With a TTL of a few minutes, assume about 90% as a rule of thumb for a non-personalized, short-TTL setup; this lesson uses 90% for the numbers. A hit costs only one short network hop.",
+      "body": "The app sends a prefix like \"wea\" after a 100 to 150 ms typing pause (a \"debounce\"), cancelling any older request still in flight. The request goes to an edge cache, a cache server near the user. Short prefixes are typed by millions of people, so the same request (like /suggest?q=wea) arrives again and again. With a TTL (expiry time) of a few minutes, a hit rate around 90% is a fair rule of thumb, and this lesson uses it. A hit costs one short network hop.",
       "idea": "Because short prefixes are asked by everyone, caching the response at the edge absorbs most of the load.",
-      "caption": "Edge cache answers a popular prefix directly.",
+      "caption": "The edge cache answers a popular prefix directly.",
       "focus": [
         "user",
         "edge"
@@ -237,9 +237,9 @@
     {
       "tag": "FLOW",
       "title": "A miss goes to the index",
-      "body": "Long or rare prefixes like 'weather in lisb' are unlikely to be in the edge cache yet, so the edge forwards them to the suggest service. The service looks up the prefix in the in-memory index and returns the stored list. Because there is no scan, server time is around 1 to 5 ms. The edge stores the response, with a short TTL since few people will repeat it, so the next person typing the same prefix gets a hit. Only the remaining ~10% of traffic, about 70k per second of the 700k total at peak, reaches this tier.",
+      "body": "Long or rare prefixes like \"weather in lisb\" are probably not in the edge cache, so the edge forwards them to the suggest service. The service looks the prefix up in the in-memory index and returns the stored list. There is no scan, so server time is about 1 to 5 ms. The edge saves the answer for next time. Only the remaining 10% of traffic, about 70,000 requests per second of the 700,000 peak, reaches this tier.",
       "idea": "The origin sees only misses, and each miss is a single in-memory lookup.",
-      "caption": "Miss: edge asks the service, service reads the index.",
+      "caption": "On a miss, the edge asks the suggest service, which reads the index.",
       "focus": [
         "edge",
         "svc",
@@ -294,9 +294,9 @@
     {
       "tag": "PIPELINE",
       "title": "Collect what people search",
-      "body": "Suggestions are only as good as the popularity data behind them. When a user actually submits a search, the search backend (or a small client beacon) appends an event to a log stream, off the critical path so a slow log never slows suggestions. We draw it from the suggest tier to keep the picture small. We log only completed searches, not every keystroke, which is both less noise and less volume. Raw logs also need cleaning later: bots, abuse and private queries must not become suggestions.",
+      "body": "Suggestions are only as good as the popularity data behind them. When a user actually submits a search, an event is appended to a log stream. This happens in the background, so a slow log never slows down suggestions. (The drawing shows it leaving the suggest service to keep the picture small.) We log completed searches, not every keystroke, which means less noise and less volume. Later, the logs must be cleaned so bots, abuse and private queries never become suggestions.",
       "idea": "Feed the index from completed searches, written asynchronously so reads stay fast.",
-      "caption": "Submitted searches are logged to a stream.",
+      "caption": "Each submitted search is logged to a stream, off the fast path.",
       "focus": [
         "svc",
         "queue"
@@ -324,9 +324,9 @@
     {
       "tag": "PIPELINE",
       "title": "Aggregate and rebuild",
-      "body": "A batch job reads the stream, filters spam and sensitive terms, drops queries searched by only a handful of distinct users so rare private strings never surface, and counts each query over a window, often with a recency weighting so fresh interest counts more than old. It writes the counts to storage, then builds a new trie with top-k lists per node. The finished index is shipped to the serving machines as a whole new version. A rebuild every hour or so is common, with the heavy work done offline on separate machines.",
+      "body": "A batch job reads the log stream, filters spam and sensitive terms, and drops queries searched by only a handful of users so rare private strings never surface. It counts each query over a time window, often weighting recent searches higher. It saves the counts, then builds a new trie with top-k lists on every node, and ships it to the serving machines as a whole new version. A rebuild about every hour is common, done offline on separate machines.",
       "idea": "Ranking is computed offline in batches, so the serving path never does aggregation.",
-      "caption": "Worker counts queries and builds a fresh index.",
+      "caption": "A worker counts queries and builds a fresh index.",
       "focus": [
         "queue",
         "builder",
@@ -374,9 +374,9 @@
     {
       "tag": "TRADE-OFF",
       "title": "Freshness versus speed",
-      "body": "A breaking-news term can surge in minutes, yet an hourly rebuild plus a few minutes of edge TTL means it can appear up to an hour or more late (the average lag is shorter, but the worst case is what users notice). Teams close the gap with a small separate 'trending' list updated every minute or so from a stream counter, and merge it into results at request time, which brings the visible age for spikes down to about 5 minutes while the main index stays hourly. Swapping in a new index is done by loading the new version beside the old one and switching atomically, so readers never see a half-built trie.",
+      "body": "A breaking-news term can surge in minutes, yet an hourly rebuild plus a few minutes of edge caching can delay it by an hour or more. The worst case is what users notice. Teams close the gap with a small \"trending\" list, updated about every minute from a stream counter and merged into results at request time. That brings the age of spikes down to about 5 minutes while the big index stays hourly. A new index is loaded beside the old one and switched atomically, so nobody sees a half-built trie.",
       "idea": "Batch rebuilds give stable, cheap ranking; a small fast side-channel handles breaking trends.",
-      "caption": "Stale by design: fresher data costs more work.",
+      "caption": "Fresher data costs more work, so a small fast list handles trends.",
       "focus": [
         "builder",
         "index",
@@ -424,9 +424,9 @@
     {
       "tag": "BUDGET",
       "title": "Spend the 100 ms",
-      "body": "Here is a defensible budget for a miss. The 100 ms budget is measured from when the request is sent to when the list is drawn. The debounce delay comes on top, which is why many clients use a short pause (50 to 150 ms) or skip it for the first characters. Then roughly 30 ms round trip to the edge, 20 ms round trip from edge to origin, 2 to 5 ms for the lookup, and a few ms to render the list. An edge hit skips the origin trip entirely. Network distance is the biggest term, which is why the edge cache matters more than a faster trie.",
+      "body": "Here is a budget for a cache miss, measured from request sent to list drawn. The typing pause comes on top, so many apps use a short pause (100 to 150 ms) or skip it for the first letters. The path costs roughly 30 ms round trip to the edge, 20 ms round trip from edge to origin, 2 to 5 ms for the lookup, and a few ms to draw the list, about 60 ms in all. An edge hit skips the origin trip and takes about 35 ms. Network distance is the biggest cost, so the edge cache matters more than a faster trie.",
       "idea": "Latency is dominated by distance; the index lookup is the cheap part.",
-      "caption": "Edge hit about 35 ms, full miss about 60 ms.",
+      "caption": "Edge hit takes about 35 ms; a full miss takes about 60 ms.",
       "focus": [
         "user",
         "edge",
@@ -478,9 +478,9 @@
     {
       "tag": "RECAP",
       "title": "The whole design",
-      "body": "Reads: debounce on the client, answer from the edge when possible, otherwise do one lookup of a precomputed top-k list in a memory-resident trie. Writes: log completed searches to a stream, aggregate and filter in batches, build a new index, and swap it in atomically. Scaling the index means sharding by prefix range and replicating each shard for load and failure. The key move is shifting all expensive work from request time to build time.",
+      "body": "Reading: the app waits for a typing pause, the edge answers if it can, and otherwise the service does one lookup of a precomputed top-k list in a memory-resident trie. Writing: log completed searches, aggregate and filter them in batches, build a new index, and swap it in atomically, with a small trending list merged in for breaking queries. To scale, shard the index by prefix range and replicate each shard. The key move is shifting expensive work from request time to build time.",
       "idea": "Make reads trivial by precomputing answers, and refresh them on a schedule you can afford.",
-      "caption": "Fast read path on top, slow build path below.",
+      "caption": "A fast read path on top, a slower build path underneath.",
       "focus": [
         "user",
         "edge",
@@ -495,7 +495,7 @@
         "latency": "35",
         "hit": "90",
         "qps": "70",
-        "fresh": "60"
+        "fresh": "5"
       },
       "chips": [
         {
@@ -564,12 +564,12 @@
     {
       "q": "The p99 latency is 300 ms for users far from your region, while lookup time is 3 ms. What is the most effective fix?",
       "options": [
-        "Serve cached suggestions from edges near those users",
         "Replace the trie with a faster data structure",
         "Increase k so fewer requests are needed",
-        "Rebuild the index more often"
+        "Rebuild the index more often",
+        "Serve cached suggestions from edges near those users"
       ],
-      "answer": 0,
+      "answer": 3,
       "why": "Time is dominated by network distance, not the lookup. Moving answers closer to users removes the biggest term."
     }
   ],

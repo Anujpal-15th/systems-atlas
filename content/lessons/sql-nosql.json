@@ -93,9 +93,9 @@
     {
       "tag": "QUESTION",
       "title": "One shop, five kinds of data",
-      "body": "An online shop stores orders, login sessions, a product catalog, a firehose of click events, and a 'people also bought' network. Each has a different shape and is read in a different way. Should they all live in one database, or does each deserve its own? The numbers in this lesson are rough single-node figures to show orders of magnitude, not benchmarks.",
+      "body": "An online shop stores five kinds of data: orders, login sessions, a product catalog, click events, and a 'people also bought' network. Each kind is written and read in a different way. Should they all share one database, or should each get its own? The numbers in this lesson are rough single-server figures that show scale, not benchmarks.",
       "idea": "Pick a database by how the data is read and written, not by whether it is called SQL or NoSQL.",
-      "caption": "Five data shapes, five candidate stores.",
+      "caption": "The shop app has five kinds of data and five possible stores.",
       "focus": [
         "app"
       ],
@@ -106,9 +106,9 @@
     {
       "tag": "RELATIONAL",
       "title": "Orders in tables with a schema",
-      "body": "A relational database stores rows in tables with fixed, declared columns: customers, orders, order_items. The schema is a contract the database enforces, including types, foreign keys (a column that must point at a real row in another table) and uniqueness. Placing an order touches several tables, and a transaction makes them succeed or fail together. A well-tuned PostgreSQL node typically handles from a few thousand multi-statement write transactions to tens of thousands of simple queries per second, depending on hardware.",
+      "body": "Watch checkout. The app sends one transaction (a group of writes that all succeed or all fail) to a relational (SQL) database. It keeps data in tables of rows and columns, like linked spreadsheets: customers, orders, order_items. The schema (the declared columns and types) is a contract the database enforces, including foreign keys (a column that must point at a real row in another table). Three tables are written, then COMMIT confirms all three at once. A well-tuned PostgreSQL server handles thousands of such writes per second (8,000 here).",
       "idea": "A relational schema trades flexibility for guarantees: the database itself rejects bad or half-written data.",
-      "caption": "A checkout transaction writes three tables atomically.",
+      "caption": "Checkout: one transaction writes three tables, then the database replies COMMIT ok.",
       "focus": [
         "app",
         "sql"
@@ -151,9 +151,9 @@
     {
       "tag": "JOINS",
       "title": "Ask a question nobody planned for",
-      "body": "Next quarter someone asks: revenue per product category for customers who signed up in Berlin. Because data is stored once in normalized tables (each fact stored once), one SQL query can join customers, orders, items and products to answer it. No one had to predict this question when designing the tables. On a shop-sized dataset with indexes this report runs in a second or so; it is slow-ish but possible with no redesign (and heavy reports like this belong on a replica or warehouse, covered later). That ad hoc power is the main reason relational databases are the default.",
-      "idea": "Normalized tables plus joins let you answer new questions without changing how data is stored.",
-      "caption": "One query joins four tables on demand.",
+      "body": "Next quarter someone asks: what is the revenue per product category for customers who signed up in Berlin? Relational data is normalized, meaning each fact is stored once in its own table. So one SQL query can join (link up rows from) customers, orders, items and products to answer it. Nobody had to predict this question when the tables were designed. With indexes, a shop-sized dataset answers in about 800 ms. Heavy reports like this usually move to a replica or warehouse, covered later.",
+      "idea": "Normalized tables plus joins let you answer new questions without changing how the data is stored.",
+      "caption": "One query joins four tables on demand and returns the totals.",
       "focus": [
         "app",
         "sql"
@@ -196,9 +196,9 @@
     {
       "tag": "KEY-VALUE",
       "title": "Sessions: give me the value for this key",
-      "body": "A login session is read on every request and is only ever fetched by its session id. A key-value store such as Redis (or the simplest use of DynamoDB) maps a key to a value and is built around lookup by that key. Because there are no joins or ad hoc queries to plan, and Redis keeps data in memory, a lookup takes about half a millisecond and one node serves 100 thousand or more operations per second. Disk-based stores like DynamoDB are typically single-digit milliseconds. Sessions in an in-memory store need persistence or replication if they must survive a restart.",
+      "body": "A login session is read on every request, and only ever by its session id. A key-value store such as Redis maps a key to a value and is built for exactly that lookup. There are no joins or ad hoc queries, and Redis keeps data in memory. So the app's GET returns in about 0.5 ms, and one node serves 100,000 or more operations per second. Disk-based stores like DynamoDB take a few milliseconds. An in-memory store needs persistence or replication if sessions must survive a restart.",
       "idea": "A key-value store is the fastest design when the only question is 'what is stored under this key?'",
-      "caption": "GET by session id returns in under 1 ms.",
+      "caption": "The app asks for one session id and gets the session back in 0.5 ms.",
       "focus": [
         "app",
         "kv"
@@ -241,9 +241,9 @@
     {
       "tag": "DOCUMENT",
       "title": "Catalog: one product, one document",
-      "body": "A laptop has RAM and ports; a T-shirt has size and fabric. Forcing both into one table means many empty columns or many joined tables. A document store such as MongoDB keeps each product as one JSON-like document with whatever fields it needs, so a single read returns the whole product page. The cost is that by default the shape is enforced by your code rather than the database (some stores let you opt in to validation), and cross-document joins are limited and often slower at scale.",
-      "idea": "Documents fit data that is read and written as a self-contained unit with varying fields.",
-      "caption": "One read returns the full product document.",
+      "body": "A laptop has RAM and ports; a T-shirt has size and fabric. Forcing both into one table leaves many empty columns or needs many joined tables. A document store such as MongoDB keeps each product as one JSON-like document with whatever fields it needs, so one read returns the whole product page (2 ms here). The cost: by default your code, not the database, enforces the shape (some stores offer optional validation), and joins across documents are limited and often slower at scale.",
+      "idea": "Documents fit data that is read and written as one self-contained unit with varying fields.",
+      "caption": "One lookup by SKU returns the whole product document.",
       "focus": [
         "app",
         "doc"
@@ -285,9 +285,9 @@
     {
       "tag": "WIDE-COLUMN",
       "title": "Click events: huge write volume",
-      "body": "The shop logs 200 thousand click events per second during a sale, spread over a 5-node cluster (about 40 thousand writes per node). A wide-column store such as Cassandra or ScyllaDB spreads data by a partition key (say user id) and keeps rows inside a partition sorted by a clustering key such as time. Writes are cheap appends, and 'latest 50 events for user 42' reads one sorted slice. Design the table per query; other columns are not queried efficiently. Such stores usually favor availability and can return slightly stale reads by default (see Replication).",
-      "idea": "Wide-column stores scale writes by making every query hit one partition, so the table is designed around the query.",
-      "caption": "Writes fan out by partition key across the cluster.",
+      "body": "During a sale the shop logs 200,000 click events per second. Spread over a 5-node cluster, each node takes about 40,000 writes per second. A wide-column store such as Cassandra or ScyllaDB splits data by a partition key (say user id) and sorts rows inside each partition by a clustering key such as time. Writes are cheap appends. 'Latest 50 events for user 42' reads one sorted slice from one partition. The catch: you design each table around a known query, and other queries are slow. These stores often favor availability, so reads can be slightly stale (see Replication).",
+      "idea": "Wide-column stores scale writes by making every query hit one partition, so you design the table around the query.",
+      "caption": "The app appends clicks, then reads one sorted slice for user 42.",
       "focus": [
         "app",
         "wide"
@@ -335,9 +335,9 @@
     {
       "tag": "GRAPH",
       "title": "Recommendations: follow the relationships",
-      "body": "'Customers who bought this also bought...' means walking from a product to buyers to their other purchases, two or three hops deep. In SQL each hop is another join, here a self-join (a table joined to itself, following product-buyer-product links). With indexes two or three hops are fine, but intermediate results multiply and deep or variable-length paths become awkward and slow. Many graph databases store each node's neighbours directly, so a traversal costs about the edges visited rather than the table sizes. Real recommendation systems often precompute results, so graphs earn their place when live path queries are the product.",
+      "body": "'Customers who bought this also bought...' means walking from a product to its buyers, then to their other purchases: two or three hops. In SQL each hop is another join (here a self-join, a table joined to itself). With indexes, two or three hops are fine, but results multiply and deep or variable-length paths get slow and awkward. Many graph databases store each node's neighbours directly, so a walk costs about the number of links visited (5 ms here), not the table sizes. Real recommenders often precompute results, so graphs earn their place when live path queries are the product.",
       "idea": "Pick a graph store when queries are about paths and neighbours several hops deep.",
-      "caption": "A multi-hop traversal follows stored edges.",
+      "caption": "The app asks for items 2-3 hops away and the graph follows stored links.",
       "focus": [
         "app",
         "graph"
@@ -375,9 +375,9 @@
     {
       "tag": "WHAT IF",
       "title": "Run the finance report on the document store",
-      "body": "Suppose orders had been put in the document store because it was fashionable. The revenue-by-category question now needs data from three collections. A document store can join across them (MongoDB has $lookup), but those joins are limited compared with a relational engine's and are not what the data model is optimized for. So you either combine orders, products and customers in application code, or copy product and customer fields into every order. Assume the app fetches a quarter of orders and joins in code; that takes seconds. Copies must be kept in sync.",
+      "body": "Suppose orders had gone into the document store because it was fashionable. The revenue-by-category question now needs data from three collections. A document store can join (MongoDB has $lookup), but its joins are limited and are not what the model is built for. So you either combine orders, products and customers in application code, or you copy product and customer fields into every order. Here the app fetches a quarter of orders and joins them in code, which takes about 3 seconds. Copied fields must then be kept in sync.",
       "idea": "NoSQL stores make known queries fast by pre-shaping data; unplanned queries then cost you code or copies.",
-      "caption": "Cross-collection joins are limited, so the app does the work.",
+      "caption": "The app pulls three collections and joins them itself, which takes seconds.",
       "focus": [
         "app",
         "doc"
@@ -421,9 +421,9 @@
     {
       "tag": "TRADE-OFF",
       "title": "Start boring, add stores on evidence",
-      "body": "A common mistake is to adopt five databases on day one. As a rule of thumb, a single relational database, with good indexes and read replicas, handles most products well past a million users, and it gives transactions, constraints and joins for free. Add a key-value cache when reads hurt: the app checks it first, reads SQL only on a miss, then fills the cache. Add wide-column or time-series storage when writes outgrow one node, a graph store when traversals dominate. Each added store means more operations work, and cached copies can go stale, so you must decide when to expire or refresh them.",
-      "idea": "Every extra database is a new thing to run, back up and keep in sync, so add one only for a measured need.",
-      "caption": "SQL is the source of truth; others serve special reads.",
+      "body": "A common mistake is adopting five databases on day one. As a rule of thumb, one relational database with good indexes and read replicas handles most products well past a million users, and it gives you transactions, constraints and joins. Add a key-value cache when reads hurt: the app checks the cache first, reads SQL only on a miss, then fills the cache so later reads take 0.5 ms. Add wide-column or time-series storage when writes outgrow one node, and a graph store when traversals dominate. Each extra store is more to run, and cached copies can go stale, so decide when they expire.",
+      "idea": "Every extra database is one more thing to run, back up and keep in sync, so add one only for a measured need.",
+      "caption": "Cache miss: the app reads SQL, then fills the cache. Later reads hit it at 0.5 ms.",
       "focus": [
         "app",
         "sql",
@@ -485,7 +485,7 @@
     {
       "tag": "RECAP",
       "title": "Choose by access pattern",
-      "body": "Relational suits structured data, joins and transactions, and answers questions you did not plan for. Key-value is fastest for lookups by key. Documents suit self-contained records with varying fields. Wide-column scales heavy writes when queries are known and partition-aligned. Graphs suit deep relationship queries. Ask how the data is read and written, how it must stay consistent, and how big it gets, then choose. The line is blurry: Postgres stores JSON documents in JSONB columns, and document stores such as MongoDB now offer multi-document transactions, so choose by access pattern and consistency needs, not by label.",
+      "body": "Relational suits structured data, joins and transactions, and can answer questions nobody planned. Key-value is fastest for lookups by key. Documents suit self-contained records with varying fields. Wide-column scales heavy writes when queries are known and fit one partition. Graphs suit deep relationship queries. Ask how the data is read and written, how consistent it must be, and how big it gets. The lines blur: Postgres stores JSON in JSONB columns, and MongoDB offers multi-document transactions. So choose by access pattern, not by label.",
       "idea": "List your queries first; the store that serves them directly is usually the right one.",
       "caption": "Each store matches one access pattern.",
       "focus": [

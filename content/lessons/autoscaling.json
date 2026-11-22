@@ -118,9 +118,9 @@
     {
       "tag": "QUESTION",
       "title": "How many servers do you need?",
-      "body": "An online shop gets 600 requests per second most of the day. Assume each instance comfortably handles 100 req/s at 60% CPU, so 6 instances is right. But the number you need changes through the day, and nobody wants to stare at a dashboard and add servers by hand. Autoscaling is software that changes the instance count for you.",
+      "body": "An online shop gets 600 requests per second most of the day. Assume one instance (one server) comfortably handles 100 requests per second at 60 percent CPU, so 6 instances is the right size. But the number you need changes through the day, and nobody wants to watch a dashboard and add servers by hand. Autoscaling is software that changes the instance count for you.",
       "idea": "The right fleet size moves with traffic; autoscaling is the control loop that follows it.",
-      "caption": "Steady state: 6 instances, 60% CPU.",
+      "caption": "Steady state: 6 instances at 60% CPU.",
       "focus": [
         "users",
         "lb",
@@ -167,9 +167,9 @@
     {
       "tag": "PROBLEM",
       "title": "The lunch spike arrives",
-      "body": "At 11:45 a promotion email lands and traffic doubles to 1,200 req/s within a minute. Six instances now face twice the traffic they were sized for. At 60% CPU they handled 600 req/s, so their ceiling at 100% is only about 1,000. CPU pins at 100%, requests queue up, and p95 latency (the time under which 95% of requests finish) jumps from 120 ms to about 1.8 seconds. Some requests start timing out.",
-      "idea": "Too little capacity does not degrade gently; queues build and latency explodes.",
-      "caption": "Demand doubles, capacity does not.",
+      "body": "At 11:45 a promotion email goes out and traffic doubles to 1,200 requests per second within a minute. Six instances are now facing twice the load. At 60 percent CPU they handled 600, so at 100 percent their ceiling is only about 1,000. CPU maxes out and requests queue up. p95 latency (the time within which 95 percent of requests finish) jumps from 120 ms to about 1.8 seconds, and some requests time out.",
+      "idea": "Too little capacity does not degrade gently: queues build up and latency explodes.",
+      "caption": "Demand doubles, but capacity does not.",
       "focus": [
         "users",
         "lb",
@@ -218,9 +218,9 @@
     {
       "tag": "METRICS",
       "title": "Pick a signal to scale on",
-      "body": "Each instance reports numbers to a metrics store, usually averaged per minute. Good signals track load and move before users suffer: average CPU, requests per instance, or for queue workers the queue depth or age of the oldest message. Memory is often a poor signal because many runtimes hold on to heap after a spike, so it tracks load weakly. Latency is useful as an alarm, but it rises only after the damage is done.",
-      "idea": "Scale on a metric that rises with load and falls when capacity is added, ideally a leading one.",
-      "caption": "Instances publish CPU to the metrics store.",
+      "body": "Every instance reports numbers to a metrics store, usually averaged per minute. Here they report CPU at 100 percent. Good signals rise with load and move before users suffer: average CPU, requests per instance, or for queue workers the queue length or the age of the oldest message. Memory is often a poor signal, because many runtimes keep their memory after a spike. Latency is a useful alarm, but it rises only after users are already hurting.",
+      "idea": "Scale on a metric that rises with load and falls when capacity is added, ideally one that moves early.",
+      "caption": "Instances publish their CPU to the metrics store.",
       "focus": [
         "fleet",
         "metrics"
@@ -249,9 +249,9 @@
     {
       "tag": "REACTIVE",
       "title": "Reactive: react to what happened",
-      "body": "A reactive policy compares a metric to a target. With target tracking, you say keep average CPU near 60%. The autoscaler computes desired = current × (measured ÷ target), so 6 × 100 ÷ 60 = 10, and asks the cloud API for 4 more instances. Notice the catch: CPU cannot exceed 100%, so a saturated fleet hides how overloaded it truly is. Unsaturated, the load would read about 120%, and 6 × 120 ÷ 60 = 12. The real need was 12.",
-      "idea": "Reactive scaling is simple and handles surprises, but it only acts after load has already arrived.",
-      "caption": "Autoscaler decides +4 and calls the cloud API.",
+      "body": "A reactive policy compares a metric with a target. With target tracking you say \"keep average CPU near 60 percent\". The autoscaler computes desired = current x (measured / target): 6 x 100 / 60 = 10, so it asks the cloud API for 4 more instances. The catch: CPU cannot go above 100 percent, so a saturated fleet hides how overloaded it really is. Unsaturated, the load would read 120 percent, and 6 x 120 / 60 = 12. The real need was 12.",
+      "idea": "Reactive scaling is simple and handles surprises, but it only acts after the load has already arrived.",
+      "caption": "The autoscaler decides on +4 and calls the cloud API.",
       "focus": [
         "metrics",
         "scaler",
@@ -296,9 +296,9 @@
     {
       "tag": "LAG",
       "title": "Scaling lag",
-      "body": "Help is not instant. Metrics are aggregated per minute, so the spike is noticed about a minute late. The scaler may wait for a couple of readings to avoid false alarms. Then the cloud must start a VM and boot your app, often 60 to 120 seconds. All that time users still see 1.8 s latency. A typical total is 3 to 5 minutes from spike to relief.",
-      "idea": "Scaling lag = metric delay + decision delay + boot time + warm-up; reactive scaling always pays it.",
-      "caption": "New instances are booting; none are serving yet.",
+      "body": "Help is not instant. Metrics are averaged per minute, so the spike is noticed about a minute late. The scaler may wait for a couple of readings to avoid false alarms. Then the cloud must start a virtual machine and boot your app, often 60 to 120 seconds. All that time users still see 1.8 s latency. Typically 3 to 5 minutes pass between the spike and relief.",
+      "idea": "Scaling lag is metric delay plus decision delay plus boot time plus warm-up, and reactive scaling always pays it.",
+      "caption": "New instances are booting; none are serving traffic yet.",
       "focus": [
         "cloud",
         "fleet"
@@ -336,9 +336,9 @@
     {
       "tag": "WARM-UP",
       "title": "Warm-up and the second round",
-      "body": "The 4 new instances join and the load balancer sends them traffic. They start cold: empty caches, unopened database connections, code not yet optimized by the runtime. So they serve less than full speed for a minute or so. CPU settles around 72%, still above target, so the scaler adds 2 more. Once warmed, 12 instances run at 60% CPU and p95 returns to about 130 ms.",
-      "idea": "A new instance is not full capacity the moment it boots; give it a warm-up period before counting its metrics.",
-      "caption": "Fleet grows 6 to 10 to 12 and latency recovers.",
+      "body": "The 4 new instances join, and the load balancer sends them traffic. They start cold: empty caches, no open database connections yet, code not yet optimized by the runtime. So for a minute or so they run below full speed. With 10 instances sharing 1,200 req/s (120 each), CPU settles around 72 percent, still above the 60 percent target, so the scaler adds 2 more (10 x 72 / 60 = 12). Once warm, 12 instances run at 60 percent and p95 returns to about 130 ms.",
+      "idea": "A new instance is not at full capacity the moment it boots, so give it a warm-up period before trusting its metrics.",
+      "caption": "The fleet grows from 6 to 10 to 12 and latency recovers.",
       "focus": [
         "scaler",
         "cloud",
@@ -389,9 +389,9 @@
     {
       "tag": "COOLDOWN",
       "title": "Scaling in, slowly",
-      "body": "At 12:30 the spike ends and traffic falls back to 600 req/s. CPU drops to 30%. The scaler does not delete half the fleet at once. A cooldown (say 5 to 10 minutes) and removing only a few instances at a time make scale-in slower than scale-out. Without that, a brief dip would remove servers just before the next wave and the fleet would flap up and down, paying boot lag every time.",
-      "idea": "Scale out fast, scale in slow: removing capacity wrongly is costlier than keeping it a bit longer.",
-      "caption": "Traffic falls; instances drain a few at a time toward 6.",
+      "body": "At 12:30 the spike ends and traffic falls back to 600 req/s, so CPU drops to 30 percent on 12 instances. The scaler does not remove half the fleet at once. A cooldown (say 5 to 10 minutes) and removing only a few instances at a time make scale-in slower than scale-out. Without that, a short dip would remove servers just before the next wave, and the fleet would flap up and down, paying boot lag every time.",
+      "idea": "Scale out fast and scale in slowly: removing capacity too early costs more than keeping it a bit longer.",
+      "caption": "Traffic falls, so instances are removed a few at a time, back toward 6.",
       "focus": [
         "metrics",
         "scaler",
@@ -449,9 +449,9 @@
     {
       "tag": "SCHEDULED",
       "title": "Scheduled: you know the pattern",
-      "body": "The spike happens every weekday at 11:45, so waiting for CPU to rise is wasteful. A scheduled action raises the minimum to 12 instances at 11:35, leaving time to boot and warm up, and a second action lowers the minimum back to 6 after the peak. The spike then meets full capacity with no lag. The cost is a few extra instance-hours, and the schedule goes stale if the pattern changes, such as a holiday or a new marketing time.",
+      "body": "The spike happens every weekday at 11:45, so waiting for CPU to rise is wasteful. A scheduled action raises the minimum to 12 instances at 11:35, leaving time to boot and warm up, and a second action lowers it back to 6 after the peak. The spike now meets full capacity with no lag. The cost is a few extra instance-hours, and the schedule goes stale if the pattern changes, such as on a holiday or when marketing changes the send time.",
       "idea": "Scheduled scaling removes lag for predictable load, but it is only as good as your calendar.",
-      "caption": "Capacity is added before the spike.",
+      "caption": "Capacity is added before the spike arrives.",
       "focus": [
         "sched",
         "scaler",
@@ -509,9 +509,9 @@
     {
       "tag": "PREDICTIVE",
       "title": "Predictive: let history forecast",
-      "body": "Predictive scaling trains on past load, typically days to a couple of weeks of it, to forecast the next day or so and pre-launch capacity. It suits recurring daily and weekly shapes without hand-written schedules. It cannot see a surprise, like a viral post. So teams combine the three: forecast or schedule for the known shape, reactive scaling as the safety net, and a sensible minimum and maximum.",
+      "body": "Predictive scaling learns from past load, typically days to a couple of weeks of history, to forecast the next day or so and launch capacity early. It suits regular daily and weekly patterns without hand-written schedules. It cannot see a surprise, like a viral post. So teams combine all three: a forecast or schedule for the known shape, reactive scaling as a safety net, and sensible minimum and maximum limits.",
       "idea": "Forecasts handle regular rhythms; reactive scaling covers what the forecast cannot know.",
-      "caption": "A forecast feeds the autoscaler ahead of time.",
+      "caption": "A forecast feeds the autoscaler ahead of time, while live CPU keeps watch.",
       "focus": [
         "metrics",
         "sched",
@@ -546,8 +546,8 @@
     {
       "tag": "RECAP",
       "title": "Choosing a policy",
-      "body": "Reactive scaling follows live metrics and handles surprises but lags 3 to 5 minutes. Scheduled scaling kills lag for known events. Predictive scaling learns the rhythm. Keep a minimum so you survive the first seconds of a spike, a maximum so a bug cannot buy 500 servers, and headroom (the 60% target, not 90%) because capacity arrives late. Idle headroom is the price you pay for it: holding 6 extra instances for 1 hour costs 6 instance-hours, tiny next to minutes of 1.8 s latency during the lunch peak. You can also shorten boot lag with lean images, pre-baked machine images, or a warm pool of stopped instances.",
-      "idea": "Autoscaling trades a little idle cost for resilience; tune target, minimum, and lag to your traffic.",
+      "body": "Reactive scaling follows live metrics and handles surprises but lags 3 to 5 minutes. Scheduled scaling removes lag for known events. Predictive scaling learns the rhythm. Set a minimum so you survive the first seconds of a spike, a maximum so a bug cannot buy 500 servers, and headroom (a 60 percent target, not 90) because capacity arrives late. Idle headroom is cheap: 6 extra instances for 1 hour is 6 instance-hours, tiny next to minutes of 1.8 s latency. You can also shorten boot lag with lean images, pre-baked machine images, or a warm pool of stopped instances.",
+      "idea": "Autoscaling trades a little idle cost for resilience; tune the target, the minimum and the lag to your traffic.",
       "caption": "Three policies, one fleet.",
       "focus": [
         "metrics",

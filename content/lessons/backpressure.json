@@ -103,8 +103,8 @@
     {
       "tag": "QUESTION",
       "title": "What happens when work arrives faster than it leaves?",
-      "body": "Our service has a worker pool that finishes 100 requests per second at best. Today 80 requests per second arrive, 80% of that ceiling, so the queue stays small. Every real system has a ceiling like this. The question is what it does the moment arrivals go above that ceiling, even briefly.",
-      "idea": "Every service has a maximum throughput; the design question is how it behaves beyond it.",
+      "body": "Picture a service where a pool of workers finishes at most 100 requests per second. Requests wait in a queue (a line) until a worker is free. Today 80 requests per second arrive, 80% of the ceiling, so the line stays short. Every real system has a ceiling like this. The question is what it does when arrivals go above it, even briefly.",
+      "idea": "Every service has a maximum throughput. The design question is how it behaves beyond it.",
       "caption": "Arrivals sit below capacity, so the queue stays small.",
       "focus": [
         "users",
@@ -167,8 +167,8 @@
     {
       "tag": "CONCEPT",
       "title": "A spike makes the queue grow",
-      "body": "A marketing email lands and arrivals jump to 150 requests per second. Workers still finish only 100, so 50 per second pile up. After 10 seconds the queue holds 500 requests, a 5 second wait. A queue is a buffer that absorbs short bursts, which is useful, but only if the burst ends before it fills.",
-      "idea": "Queue growth rate is arrivals minus capacity; a buffer hides overload only for as long as it has room.",
+      "body": "A marketing email lands and arrivals jump to 150 requests per second. Workers still finish only 100, so 50 extra requests per second pile up in the queue. After 10 seconds the queue holds 500 requests, and a new request waits 5 seconds. A queue is a buffer that absorbs short bursts, which is useful, but only if the burst ends before the buffer fills.",
+      "idea": "Queue growth = arrivals minus capacity. A buffer hides overload only while it has room.",
       "caption": "150 in, 100 out: the queue grows by 50 per second.",
       "focus": [
         "users",
@@ -221,8 +221,8 @@
     {
       "tag": "WHAT IF",
       "title": "The unbounded queue",
-      "body": "Suppose the queue has no limit. After 60 seconds of the spike it holds 3,000 requests. A new request must wait behind all of them, and 3,000 divided by 100 per second is 30 seconds. The service never returns an error, it just gets slower and slower, and memory use climbs until the process may crash.",
-      "idea": "Wait time equals queue length divided by service rate, so a long queue means a long wait for everyone.",
+      "body": "Suppose the queue has no size limit. After 60 seconds of the spike it holds 3,000 requests (50 x 60). A new request waits behind all of them: 3,000 divided by 100 per second is 30 seconds. The service never returns an error. It just gets slower and slower, and memory use climbs until the process may crash.",
+      "idea": "Wait time = queue length divided by service rate. A long queue means a long wait for everyone.",
       "caption": "3,000 items deep: every new request waits 30 seconds.",
       "focus": [
         "queue",
@@ -263,7 +263,7 @@
     {
       "tag": "WHAT IF",
       "title": "Work nobody is waiting for",
-      "body": "Say the spike ends and arrivals fall back to 80 per second, but the 3,000-item backlog remains. API clients, proxies and impatient users often give up after a few seconds, say 5. A request that waited 30 seconds is abandoned before a worker starts it, yet the worker still does the full work and the answer is thrown away. Useful output drops toward zero while workers stay 100% busy. Draining 3,000 items at a net 20 per second takes 150 seconds. Workers can check each request's deadline first and drop expired ones, one more reason to keep queues short.",
+      "body": "Say the spike ends and arrivals fall back to 80 per second, but the 3,000-item backlog remains. Clients, proxies and impatient users often give up after about 5 seconds. A request that waited 30 seconds was abandoned before a worker started it, yet the worker still does the full work and the answer is thrown away. Workers stay 100% busy but almost nothing useful comes out. Draining 3,000 items at a net 20 per second (100 out minus 80 in) takes 150 seconds. Workers can check each request's deadline and skip expired ones, one more reason to keep queues short.",
       "idea": "Long queues make workers burn capacity on stale requests, so overload outlasts the spike that caused it.",
       "caption": "Stale requests reach workers after clients gave up.",
       "focus": [
@@ -313,8 +313,8 @@
     {
       "tag": "CONCEPT",
       "title": "Bound the queue",
-      "body": "Cap the queue at 200 items. At 100 requests per second that is at most 2 seconds of wait, inside the caller's 5 second timeout. When the queue is full, new requests get an immediate 503 or 429 error instead of a slow death. This is backpressure: the system pushes the overload signal back to the sender, which can slow down, retry later or show a message. Other forms of backpressure make the sender wait instead, such as a blocked write on a full bounded channel or a TCP window that shrinks.",
-      "idea": "A bounded queue caps latency and turns overload into a fast, explicit error that callers can react to.",
+      "body": "Cap the queue at 200 items. At 100 requests per second that is at most 2 seconds of wait, inside the caller's 5-second timeout. When the queue is full, new requests get an immediate 503 or 429 error instead of a slow death. This is backpressure: the system pushes the overload signal back to the sender, which can slow down, retry later or show a message. Other forms make the sender wait instead, like a blocked write on a full buffer or a shrinking TCP window.",
+      "idea": "A bounded queue caps latency and turns overload into a fast, explicit error callers can react to.",
       "caption": "Queue full at 200: excess requests are refused instantly.",
       "focus": [
         "gw",
@@ -369,8 +369,8 @@
     {
       "tag": "CONCEPT",
       "title": "Shed the least important work",
-      "body": "Rejecting at random hurts checkout the same as a nightly report. So tag requests with a priority. Say 50 of the 150 requests per second come from batch jobs. Reject those first and keep the interactive traffic flowing. Batch work can wait or retry in an hour, while a shopper who sees an error leaves. This is load shedding: deliberately dropping some work to protect the rest.",
-      "idea": "Shedding by priority spends the lost capacity on the work that matters least.",
+      "body": "Rejecting at random hurts checkout as much as a nightly report. So tag requests with a priority. Say 50 of the 150 requests per second come from batch jobs. The gateway rejects those first and keeps interactive traffic flowing. Batch work can wait or retry in an hour, while a shopper who sees an error leaves. This is load shedding: deliberately dropping some work to protect the rest.",
+      "idea": "Shedding by priority spends the unavoidable loss on the work that matters least.",
       "caption": "Batch requests get 503; interactive requests go through.",
       "focus": [
         "batch",
@@ -425,7 +425,7 @@
     {
       "tag": "CONCEPT",
       "title": "Reject early, reject cheaply",
-      "body": "Admission control decides at the front door, before any real work happens. A rejection costs a tiny fraction of a real request, while a request that is queued and then dropped has already used memory, a connection and maybe a database call. The gate can look at queue depth, in-flight count or the age of the oldest item, and aim for a wait target such as 500 ms. A Retry-After header tells polite clients when to come back.",
+      "body": "Admission control means deciding at the front door, before any real work starts. A rejection costs almost nothing. A request that is queued and then dropped has already used memory, a connection and maybe a database call. The gate can look at queue depth, number in flight, or the age of the oldest item, and aim for a wait target such as 500 ms. A Retry-After header tells polite clients when to come back.",
       "idea": "The cheapest place to say no is before the request enters the system.",
       "caption": "The gateway keeps expected wait near 500 ms.",
       "focus": [
@@ -478,9 +478,9 @@
     {
       "tag": "CONCEPT",
       "title": "Fixed limits go stale",
-      "body": "A fixed limit is a guess about capacity, and capacity changes. Say a rate limit of 100 req/s was tuned when 20 workers each took 200 ms per request. The database slows to 400 ms, so the same 20 workers now finish only 50 req/s, and the limit still lets in twice what the system can handle. A concurrency limit counts requests in flight instead, which already tracks slowdowns (concurrency = throughput x latency). Adaptive concurrency finds the right number itself: it grows the limit slowly while latency is healthy and cuts it multiplicatively, for example by 10% to 50%, when latency rises.",
+      "body": "A fixed limit is a guess about capacity, and capacity changes. Say a limit of 100 req/s was tuned when 20 workers each took 200 ms per request (20 / 0.2 = 100). Now the database slows to 400 ms, so the same workers finish only 50 req/s. A fixed limit would keep admitting 100. Adaptive concurrency fixes this by limiting requests in flight (concurrency = throughput x latency). It raises the limit slowly while latency is healthy and cuts it sharply, for example by 10% to 50%, when latency rises. Here the in-flight limit stays near 20, so at 400 ms the admitted rate falls to about 50 req/s and the excess is refused.",
       "idea": "Adaptive limits follow real capacity by watching latency, instead of trusting a number someone picked last year.",
-      "caption": "The database slows, so the limit shrinks to match.",
+      "caption": "The database slows, so the adaptive limit shrinks to match.",
       "focus": [
         "gw",
         "workers",
@@ -526,7 +526,8 @@
         },
         {
           "node": "gw",
-          "text": "limit 100 req/s",
+          "text": "limit 100 → 50 /s",
+          "tone": "green",
           "at": "bottom"
         }
       ]
@@ -534,7 +535,7 @@
     {
       "tag": "RECAP",
       "title": "Say no early, say no fast",
-      "body": "Overload is a math problem: when arrivals exceed capacity, something must give. An unbounded queue gives up latency and eventually the whole service. Bounded queues, priority shedding, admission control and adaptive limits give up a little work on purpose so the rest finishes on time. Clients should treat 429 and 503 as a signal to back off, which is covered in the timeouts and retries lesson.",
+      "body": "Overload is a math problem: when arrivals exceed capacity, something must give. An unbounded queue gives up latency, and eventually the whole service. Bounded queues, priority shedding, admission control and adaptive limits give up a little work on purpose so the rest finishes on time. Clients should treat 429 and 503 as a signal to back off (see the timeouts and retries lesson).",
       "idea": "Protect latency by refusing excess work deliberately, early and in priority order.",
       "caption": "Fast, explicit rejection keeps the system healthy.",
       "focus": [

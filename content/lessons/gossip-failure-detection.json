@@ -123,9 +123,9 @@
     {
       "tag": "QUESTION",
       "title": "Is that node dead or just quiet?",
-      "body": "A five-node cluster stores data and must route around machines that fail. One node, A, is the leader that coordinates writes. But no node can look at another's power light. All it can see is messages arriving or not arriving. Silence could mean a crash, a slow disk, a long garbage-collection pause, or a broken network cable. This lesson shows how a cluster turns silence into a decision.",
-      "idea": "Over an unreliable network, failure detection is inference from missing messages, never direct observation.",
-      "caption": "Five peers and a client; nobody can see another node's health.",
+      "body": "A five-node cluster stores data and must route around machines that fail. One node, A, is the leader that coordinates writes. But no node can look at another's power light. All it can see is messages arriving or not arriving. Silence could mean a crash, a slow disk, a long garbage-collection pause (the program freezes while it cleans up memory), or a broken network cable. This lesson shows how a cluster turns silence into a decision.",
+      "idea": "Over an unreliable network, failure detection is a guess from missing messages, never a direct observation.",
+      "caption": "Five peers and a client. Nobody can see another node's health.",
       "focus": [
         "a",
         "b",
@@ -151,9 +151,9 @@
     {
       "tag": "CONCEPT",
       "title": "Heartbeats",
-      "body": "Each node sends a tiny heartbeat to its peers on a schedule, say once per second. Every receiver records when the last one arrived. As long as beats keep landing about a second apart, the sender is presumed healthy. A heartbeat proves only that the sender could send a moment ago, not that it is doing useful work. In large clusters each node heartbeats only a few peers, or the heartbeat counter rides on gossip messages, so heartbeating does not cost N-squared messages.",
-      "idea": "A heartbeat is a periodic I-am-alive message; its absence is the only signal of trouble.",
-      "caption": "E sends a heartbeat to D every second; D logs each arrival.",
+      "body": "Each node sends a tiny heartbeat message (\"I'm alive\") to its peers on a schedule, say once per second. Every receiver records when the last one arrived. As long as beats keep landing about a second apart, the sender is presumed healthy. Here E sends beats #41 and #42 to D. A heartbeat only proves the sender could send a moment ago, not that it is doing useful work. Big clusters limit the cost: each node beats to only a few peers, or the counter rides on gossip messages.",
+      "idea": "A heartbeat is a regular \"I am alive\" message. Its absence is the only warning sign.",
+      "caption": "E sends a heartbeat to D every second, and D logs each arrival.",
       "focus": [
         "d",
         "e"
@@ -191,9 +191,9 @@
     {
       "tag": "CONCEPT",
       "title": "The fixed timeout",
-      "body": "Now E crashes. The simplest rule is a fixed timeout: if no heartbeat arrives for 5 seconds, declare E dead. It is easy to reason about but rigid. On a quiet LAN it is slower than it needs to be. On a congested or cross-region link where delays vary a lot, 5 seconds fires on healthy nodes. One number cannot fit every network or every moment.",
+      "body": "Now E crashes and its heartbeats stop. The simplest rule is a fixed timeout: if no heartbeat arrives for 5 seconds, declare E dead. It is easy to understand but rigid. On a quiet local network, 5 seconds is slower than it needs to be. On a congested or cross-region link where delays vary a lot, 5 seconds will wrongly fire on healthy nodes. One number cannot suit every network or every moment.",
       "idea": "A fixed timeout trades detection speed against false alarms, and the right value changes with conditions.",
-      "caption": "E has crashed; D waits for the 5 s timer to expire (phi is introduced next).",
+      "caption": "E has crashed. D waits for the 5 s timer to expire.",
       "focus": [
         "d",
         "e"
@@ -226,9 +226,9 @@
     {
       "tag": "CONCEPT",
       "title": "Phi-accrual detection",
-      "body": "A phi-accrual detector (Cassandra, Akka) learns how late beats normally are and reports a suspicion score, phi, that grows with silence. Phi 1 means a gap this long would occur about 10% of the time if the node were healthy, phi 2 about 1%, phi 8 about one in a hundred million. With a 1 s mean, threshold 8 needs about 18.5 s of silence. That is slower than the 5 s rule on a steady link, because threshold 8 is deliberately cautious; the gain is that the same threshold stretches on a jittery link (mean 4 s gives about 74 s) and tightens on a fast one (mean 100 ms gives about 1.8 s). A lower threshold detects sooner at the price of more false alarms.",
-      "idea": "Phi adapts to observed network jitter and outputs a graded suspicion level, not a yes or no.",
-      "caption": "Silence grows; phi climbs past the threshold of 8.",
+      "body": "A phi-accrual detector (used by Cassandra and Akka) learns how late beats normally are. It reports a suspicion score, phi, that grows as silence continues. Phi 1 means a gap this long would happen about 10% of the time if the node were healthy. Phi 2 is about 1%, and phi 8 about one in a hundred million. With a 1 s average gap, threshold 8 needs about 18.4 s of silence. That is slower than the 5 s rule on a steady link, because 8 is deliberately cautious. The gain is that the same threshold stretches on a jittery link (4 s average gives about 74 s) and tightens on a fast one (100 ms average gives about 1.8 s). A lower threshold detects sooner but causes more false alarms.",
+      "idea": "Phi adapts to the network's observed jitter and gives a graded suspicion level, not a plain yes or no.",
+      "caption": "Silence grows, and phi climbs past the threshold of 8.",
       "focus": [
         "d",
         "e"
@@ -262,8 +262,8 @@
     {
       "tag": "FLOW",
       "title": "Gossip starts",
-      "body": "D now suspects E, but a cluster needs every node to converge on one membership view. Instead of D messaging everyone, nodes gossip: every second each node picks a few random peers and swaps what it knows, with a version number per member. D tells B and C that E looks down. Systems differ here: Cassandra gossips heartbeat counters and each node judges for itself, while SWIM-style systems (SWIM is a gossip membership protocol) gossip suspicion itself, as this cluster does. New nodes join via a seed node and spread by gossip; no coordinator is needed.",
-      "idea": "Gossip is periodic random pairwise exchange of state, with no central coordinator.",
+      "body": "D now suspects E, but every node must end up with the same view of who is alive. Instead of D messaging everyone, nodes gossip: every second, each node picks a few random peers and swaps what it knows, tagging each fact with a version number. D tells B and C that E looks down. Cassandra gossips heartbeat counters and each node judges for itself. SWIM-style systems (SWIM is a gossip membership protocol) gossip the suspicion itself, as here. New nodes join through a seed node, and no coordinator is needed.",
+      "idea": "Gossip means each node regularly swaps its knowledge with random peers, with no central coordinator.",
       "caption": "D tells two random peers that E is suspected.",
       "focus": [
         "d",
@@ -305,9 +305,9 @@
     {
       "tag": "FLOW",
       "title": "The rumor spreads",
-      "body": "In the next round, B and C each pick their own random peers, and A hears it. With one peer per round, the informed set roughly doubles in the early rounds, so news reaches N nodes in about log2(N) rounds plus a few more for stragglers: roughly 15 to 17 rounds for 1,000 nodes. Contacting a few peers per round makes it faster. Each node sends a constant number of messages per round no matter how large the cluster is; real systems keep them small by exchanging digests and only the newer entries.",
-      "idea": "Informed nodes roughly double each early round, so spread time grows with log N while per-node load stays flat.",
-      "caption": "A, B and C now agree; the live cluster converges.",
+      "body": "In the next round, B and C each pick their own random peers, and A hears the news. With one peer per round, the number of informed nodes roughly doubles in the early rounds. So news reaches N nodes in about log2(N) rounds, plus a few more for stragglers: roughly 15 to 17 rounds for 1,000 nodes. Contacting a few peers per round makes it faster. Each node sends the same small number of messages per round however big the cluster is.",
+      "idea": "Informed nodes roughly double each early round, so spread time grows with log N while each node's load stays flat.",
+      "caption": "A, B, C and D now all know. The live cluster agrees.",
       "focus": [
         "a",
         "b",
@@ -346,9 +346,9 @@
     {
       "tag": "TRADE-OFF",
       "title": "False alarms",
-      "body": "Suppose instead that E is fine, but a 20 s garbage-collection pause froze it. Its heartbeats stop, phi passes the threshold of 8, and the cluster marks it down. When E wakes it can refute: SWIM lets a suspect raise its incarnation number, a counter only that node increments, and the higher number overwrites the suspect entry in gossip. SWIM also uses indirect probes: other nodes ping the suspect on your behalf, cutting false alarms from one bad link. Too sensitive a threshold causes flapping, with nodes shunned and readmitted and data moving needlessly. Too lax a threshold leaves real failures undetected longer.",
-      "idea": "A detector is never certain; threshold choice balances slow detection against false positives.",
-      "caption": "In this alternate run E was only paused, yet all four peers think it is down until E refutes.",
+      "body": "Suppose in an alternate run that E is fine, but a 20 s garbage-collection pause froze it. Its heartbeats stop, phi passes 8, and the cluster marks it down, though E is healthy. When E wakes up it can refute the rumor. In SWIM, a suspect raises its incarnation number (a counter only that node increments), and the higher number overwrites the suspicion in gossip. SWIM also uses indirect probes: other nodes ping the suspect for you, which avoids false alarms from one bad link. A too-sensitive threshold causes flapping, where nodes are shunned and readmitted and data moves for nothing. A too-lax one leaves real failures undetected longer.",
+      "idea": "A detector is never certain. The threshold balances slow detection against false alarms.",
+      "caption": "In this alternate run E was only paused, yet all four peers think it is down until it refutes.",
       "focus": [
         "e",
         "c"
@@ -394,9 +394,9 @@
     {
       "tag": "WHAT IF",
       "title": "Split brain",
-      "body": "Now a network partition cuts the cluster: A, B, C can talk to each other, as can D, E, but the two groups cannot. Each side sees the other go silent and concludes it is the survivor. If both sides then accept writes or elect their own leader, you get split brain: two active leaders with diverging data. Clients who reach different sides see different truths.",
-      "idea": "Split brain happens when both halves of a partition believe they alone are in charge.",
-      "caption": "Both sides suspect the other and each elects a leader; clients write to both.",
+      "body": "Now a network partition cuts the cluster in two. A, B and C can talk to each other, and so can D and E, but the two groups cannot reach each other. Each side sees the other go silent and decides it is the survivor. If both sides elect their own leader and accept writes, you get split brain: two active leaders with diverging data. Here a client writes x=1 to A and another write x=2 lands on E, so the two sides now disagree.",
+      "idea": "Split brain is when both halves of a partition believe they alone are in charge.",
+      "caption": "Both sides suspect the other and each has a leader. Clients write to both.",
       "focus": [
         "b",
         "d",
@@ -464,9 +464,9 @@
     {
       "tag": "TRADE-OFF",
       "title": "Containing it with a majority",
-      "body": "The usual defence is a quorum rule: only a group holding a strict majority of the configured members (3 of 5 here) may act as the leader or accept writes. The 2-node side can still detect that it lost contact, so it steps down or goes read-only. Two disjoint groups can never both hold a majority, so at most one side can elect a leader or commit writes. A stale leader on the minority side may linger briefly, so real systems add terms, leases and fencing, covered in later lessons.",
-      "idea": "Detection only suspects; a majority rule lets at most one side make progress, because two majorities always overlap.",
-      "caption": "A, B, C keep the majority; D and E refuse writes.",
+      "body": "The usual defence is a quorum rule: only a group holding a strict majority of the configured members (3 of 5 here) may act as leader or accept writes. The 2-node side can still tell it lost contact, so it steps down or goes read-only. Two separate groups can never both hold a majority, so at most one side can elect a leader or commit writes. A stale leader on the minority side may linger briefly, so real systems add terms, leases and fencing, covered in later lessons.",
+      "idea": "Detection only suspects. A majority rule lets at most one side make progress, because two majorities always overlap.",
+      "caption": "A, B and C keep the majority. D and E refuse writes.",
       "focus": [
         "a",
         "b",
@@ -513,8 +513,8 @@
     {
       "tag": "RECAP",
       "title": "From silence to decision",
-      "body": "Heartbeats make silence measurable. Phi-accrual turns the length of that silence into a graded suspicion that adapts to the network. Gossip spreads the verdict to every node in about log N rounds without a coordinator. Because any verdict can be wrong, safety-critical actions such as electing a leader need a majority, not just a detector's opinion.",
-      "idea": "Detect by heartbeat, spread by gossip, and act only with a majority.",
+      "body": "Heartbeats make silence measurable. Phi-accrual turns the length of that silence into a graded suspicion that adapts to the network. Gossip spreads the verdict to every node in about log N rounds with no coordinator. Because any verdict can be wrong, safety-critical actions such as electing a leader need a majority, not just one detector's opinion.",
+      "idea": "Detect with heartbeats, spread with gossip, and act only with a majority.",
       "caption": "Heartbeats, suspicion, gossip, then quorum.",
       "focus": [
         "a",

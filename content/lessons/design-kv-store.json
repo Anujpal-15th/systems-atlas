@@ -110,9 +110,9 @@
     {
       "tag": "QUESTION",
       "title": "A store that never says no",
-      "body": "Design a key-value store for a shopping cart: 200,000 operations per second, 50 TB of data, values under 10 KB, and it must accept writes even when machines fail or a data centre link breaks. One database server is a poor fit: it would be a single point of failure, and 200,000 operations per second plus 50 TB leaves no headroom. So the data must be split across many nodes. The hard part is that every node can fail at any time, and we still want fast answers.",
+      "body": "Design a key-value store (think \"look up a value by its name\") for a shopping cart. It must handle 200,000 operations per second and 50 TB of data, with values under 10 KB. It must also accept writes when machines fail or a data centre link breaks. One database server is a poor fit: it would be a single point of failure and has no headroom for that load. So the data must be split across many nodes (servers). The hard part is that any node can fail at any time, and we still want fast answers.",
       "idea": "Choose availability and low latency up front, and accept that replicas may briefly disagree.",
-      "caption": "A client talks to a cluster, not one server.",
+      "caption": "A client talks to a cluster of nodes, not to one server.",
       "focus": [
         "client",
         "coord"
@@ -134,9 +134,9 @@
     {
       "tag": "PARTITION",
       "title": "Place the key on a ring",
-      "body": "Hash the key (say cart:42) to a point on a ring of hash values. Each node owns many points, called virtual nodes, often 16 to 256 slices per machine, depending on the system. The key belongs to the first node clockwise from its point. Adding a node takes small slices from many neighbours, so only about 1/N of keys move instead of nearly all of them.",
+      "body": "First, which node owns which key? Hash the key (say cart:42) to a point on a ring of hash values. Each node owns many points on the ring, called virtual nodes (often 16 to 256 per machine). The key belongs to the first node clockwise from its point. When a node is added, it takes small slices from many neighbours, so only about 1/N of keys move, instead of nearly all of them. Any node can act as the coordinator, the node that handles a request and finds the owners.",
       "idea": "Consistent hashing with virtual nodes spreads load evenly and keeps rebalancing cheap.",
-      "caption": "Any node can act as coordinator and finds the owners.",
+      "caption": "The client sends PUT cart:42; the coordinator hashes the key onto the ring.",
       "focus": [
         "client",
         "coord"
@@ -169,9 +169,9 @@
     {
       "tag": "REPLICATE",
       "title": "Copy it to N nodes",
-      "body": "One copy would be lost with its machine. The coordinator writes to the owner plus the next distinct nodes on the ring, giving N = 3 replicas, ideally in different racks or zones. Every node has the full ring map, so the coordinator sends to all three directly with no lookup service in the middle. N = 3 is a rule of thumb: no data is lost unless all three copies die, at three times the storage, while W = 2 still lets writes proceed with one replica down.",
+      "body": "One copy would be lost with its machine. So the coordinator writes to the key's owner plus the next distinct nodes on the ring, giving N = 3 replicas (copies), ideally in different racks or zones. Every node has the full ring map, so the coordinator sends the write straight to all three, with no lookup service in the middle. N = 3 is a rule of thumb: no data is lost unless all three copies die, at three times the storage.",
       "idea": "Replication is what makes failure survivable; the ring tells you which nodes hold a key.",
-      "caption": "Coordinator fans the write out to three replicas.",
+      "caption": "The coordinator sends the write to three replicas.",
       "focus": [
         "coord",
         "a",
@@ -223,9 +223,9 @@
     {
       "tag": "QUORUM",
       "title": "Wait for W acknowledgements",
-      "body": "Waiting for all three replicas makes the write as slow as the slowest node. Instead the coordinator answers the client after W = 2 acks. Assume 1 ms network time and replicas that take 2 to 3 ms to persist, with one stuck for 40 ms in a garbage collection pause. The write completes in about 4 ms, not 40. The third replica still receives the data.",
+      "body": "Waiting for all three replicas would make every write as slow as the slowest node. Instead, the coordinator answers the client after W = 2 acknowledgements (acks). Assume 1 ms network time, replicas that need 2 to 3 ms to save, and one replica frozen for 40 ms by a garbage-collection pause (the runtime briefly stops to clean memory). The write finishes in about 4 ms, not 40. The slow third replica still gets the data.",
       "idea": "A write quorum W hides slow replicas: latency is set by the W-th fastest, not the slowest.",
-      "caption": "Two acks arrive, the client is answered.",
+      "caption": "Two acks arrive, so the client is answered while C is still stuck.",
       "focus": [
         "coord",
         "a",
@@ -277,9 +277,9 @@
     {
       "tag": "QUORUM",
       "title": "Read R, overlap with W",
-      "body": "A read asks the replicas and waits for R = 2 answers. Because R + W = 4 is greater than N = 3, when writes go to the key's home replicas, any two replicas that answer must include at least one that acknowledged the latest write. The coordinator returns the newest value (by vector clock, introduced later) in about 3 ms with the same assumptions, and repairs stale replicas in the background (read repair). Setting R = 1 reads faster but may return old data.",
+      "body": "A read asks the replicas and waits for R = 2 answers. Because R + W = 4 is greater than N = 3, any two replicas that answer must include at least one that acknowledged the latest write (when writes went to the key's home replicas). The coordinator returns the newest value (judged by a vector clock, explained later) in about 3 ms, and quietly fixes stale replicas in the background (read repair). Setting R = 1 reads faster but may return old data.",
       "idea": "When R + W > N and writes go to the key's home replicas, the read set overlaps the write set, so reads normally see the latest acknowledged write.",
-      "caption": "Two replicas answer; the overlap carries the newest value.",
+      "caption": "Two replicas answer, and the overlap with the write set carries the newest value.",
       "focus": [
         "client",
         "coord",
@@ -346,9 +346,9 @@
     {
       "tag": "GOSSIP",
       "title": "Detecting failure without a master",
-      "body": "Nodes need to know who is alive and who owns which ring slices. Every second each node picks a random peer and swaps its view: member list, heartbeat counters and ring changes. News reaches all nodes in roughly log2 of the cluster size rounds, so with one-second rounds a 1,000-node cluster converges in about 10 to 15 seconds. A node marks a peer suspect when its heartbeat counter has not advanced for a threshold time (many systems use an adaptive phi-accrual detector). No central coordinator exists to fail or become a bottleneck.",
+      "body": "Nodes need to know who is alive and who owns which ring slices. Every second, each node picks a random peer and swaps what it knows: the member list, heartbeat counters (numbers each node keeps raising to prove it is alive) and ring changes. News reaches everyone in roughly log2(cluster size) rounds, so a 1,000-node cluster agrees in about 10 to 15 seconds. A node marks a peer \"suspect\" when its heartbeat has not advanced for a while. No central master exists to fail or become a bottleneck.",
       "idea": "Gossip spreads membership and failure information epidemically, with no single point of failure.",
-      "caption": "Peers exchange heartbeat tables.",
+      "caption": "Peers swap heartbeat tables with random neighbours.",
       "focus": [
         "a",
         "b",
@@ -393,9 +393,9 @@
     {
       "tag": "WHAT IF",
       "title": "A replica dies mid-write",
-      "body": "Node C crashes. The write for cart:42 reaches A and B, which both ack, so W = 2 is met and the client sees success in about 4 ms. If a second replica were also down, a strict quorum would reject the write. Dynamo-style stores relax this with a sloppy quorum: the write may use a healthy stand-in node instead. A sloppy quorum keeps writes available but weakens the R+W>N overlap guarantee until hints are replayed.",
+      "body": "Node C crashes. The write for cart:42 still reaches A and B, which both ack, so W = 2 is met and the client sees success in about 4 ms. If a second replica were also down, a strict quorum would reject the write. Dynamo-style stores relax this with a sloppy quorum: a healthy stand-in node may take the write instead. That keeps writes available but weakens the \"reads overlap writes\" guarantee until the missed data is replayed.",
       "idea": "With N = 3 and W = 2 the system tolerates one failed replica with no client-visible effect.",
-      "caption": "C is unreachable; A and B still acknowledge.",
+      "caption": "C is unreachable, but A and B still acknowledge.",
       "focus": [
         "coord",
         "a",
@@ -463,9 +463,9 @@
     {
       "tag": "HANDOFF",
       "title": "Hinted handoff",
-      "body": "To keep three copies alive, the coordinator also sends the missing copy to node D, the next healthy node on the ring, tagged with a hint saying it belongs to C. D's ack makes three copies alive, but C still has none until the replay. D keeps hints in a separate area. When gossip reports that C is back, D streams the hinted writes to C and deletes them. Hints are kept only for a limited outage window, for example 3 hours; a slower anti-entropy repair using Merkle trees (hash trees that find differing key ranges) fixes any remaining gap.",
+      "body": "To keep three copies alive, the coordinator also sends C's copy to node D, the next healthy node on the ring, with a hint: \"this belongs to C\". D's ack means three copies exist (A, B and D), but C still has none. D keeps hints in a separate area. When gossip reports that C is back, D sends the hinted writes to C and deletes them. Hints are kept for a limited outage window, for example 3 hours. A slower background repair, anti-entropy using Merkle trees (hash trees that find which key ranges differ), fixes any remaining gap.",
       "idea": "Hinted handoff catches a returning node up quickly; anti-entropy repair is the safety net.",
-      "caption": "D holds C's write, then forwards it when C returns.",
+      "caption": "D holds C's write with a hint, then forwards it when C returns.",
       "focus": [
         "coord",
         "d",
@@ -486,7 +486,7 @@
         }
       ],
       "metrics": {
-        "acks": "2",
+        "acks": "3",
         "versions": "1"
       },
       "chips": [
@@ -509,9 +509,9 @@
     {
       "tag": "CONFLICT",
       "title": "Concurrent writes and vector clocks",
-      "body": "Two phones update the same cart at the same moment, and their requests are coordinated by different nodes (the Coordinator box stands for two different coordinators, here nodes A and B), so neither sees the other. Each coordinator stamps its write with a vector clock, a list of (node, counter) pairs: [A:1] and [B:1]. Neither clock includes the other, so the writes are concurrent, and the store keeps both as siblings. The replicas then exchange the versions, so each ends up holding both siblings. The next read returns both, and the application merges them (union the carts) and writes back with a clock that covers both.",
+      "body": "Two phones update the same cart at the same moment, through different coordinators (in the diagram, A and B each play coordinator), so neither sees the other's write. Each coordinator stamps its write with a vector clock: a list of (node, counter) pairs, here [A:1] and [B:1]. Neither clock includes the other, so the writes are concurrent, and the store keeps both as siblings. Replicas swap versions so each holds both. The next read returns both, the app merges them (for example, the union of the two carts), and it writes the result back with a clock covering both.",
       "idea": "Vector clocks tell causal order from true concurrency; concurrent versions are kept and merged, not silently dropped.",
-      "caption": "Two concurrent versions are stored side by side.",
+      "caption": "Two concurrent versions are stored side by side as siblings.",
       "focus": [
         "client",
         "coord",
@@ -583,7 +583,7 @@
     {
       "tag": "RECAP",
       "title": "The whole design",
-      "body": "A hash ring places each key on N = 3 replicas. Quorums W = 2 and R = 2 give fast reads and writes with overlap. Gossip finds failures, hinted handoff and Merkle repair heal them, and vector clocks expose conflicts for the application to merge. The price is eventual consistency: if you need single-copy ordering, use a consensus-based store instead.",
+      "body": "A hash ring places each key on N = 3 replicas. Quorums W = 2 and R = 2 give fast reads and writes that overlap. Gossip finds failures, hinted handoff and Merkle-tree repair heal them, and vector clocks expose conflicts for the application to merge. The price is eventual consistency (replicas may briefly disagree, then converge). If you need strict single-copy ordering, use a consensus-based store instead.",
       "idea": "Dynamo-style systems trade strict consistency for availability, using tunable quorums to choose the balance.",
       "caption": "Every mechanism serves one goal: stay writable.",
       "focus": [

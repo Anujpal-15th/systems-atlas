@@ -84,9 +84,9 @@
     {
       "tag": "QUESTION",
       "title": "Only one may write",
-      "body": "Two copies of a worker run for availability, but a nightly job must be run by only one at a time, or a file will be written twice and corrupted. Someone has to be chosen as leader, and if that leader dies, someone else must take over quickly. How do machines that cannot see each other's memory agree on who is in charge?",
-      "idea": "Leader election is mutual exclusion across machines: at most one holder, with a way to recover when the holder dies.",
-      "caption": "Two workers, one shared resource, one allowed writer.",
+      "body": "You run two copies of a worker so the job survives a crash. But a nightly job must be run by only one copy at a time, or the same file is written twice and gets corrupted. So one worker must be chosen as the leader, and if it dies, the other must take over quickly. The workers cannot see each other's memory. How do they agree on who is in charge?",
+      "idea": "Leader election is mutual exclusion across machines: at most one holder, plus a way to recover when the holder dies.",
+      "caption": "Two workers, one shared resource, only one allowed to write.",
       "focus": [
         "a",
         "b",
@@ -99,9 +99,9 @@
     {
       "tag": "ELECTION",
       "title": "Race to create one key",
-      "body": "Both workers ask a lock service (etcd, ZooKeeper, or a database row with a unique key) to create the key /leader. The service handles requests one at a time, so exactly one create succeeds. The loser gets an error and either retries later or watches the key to be told when it disappears.",
-      "idea": "A central service that serialises requests turns a race between machines into a single winner.",
-      "caption": "A wins the create; B is told the key exists.",
+      "body": "Both workers ask a lock service (etcd, ZooKeeper, or a database row with a unique key) to create the key /leader. The service handles requests one at a time, so exactly one create succeeds. Here A wins and becomes leader. B gets an \"already exists\" error. B then either retries later or watches the key to be told when it disappears.",
+      "idea": "A central service that handles requests one at a time turns a race between machines into a single winner.",
+      "caption": "A wins the create; B is told the key already exists.",
       "focus": [
         "a",
         "b",
@@ -150,9 +150,9 @@
     {
       "tag": "LEASE",
       "title": "A lock must expire",
-      "body": "If A simply held the key forever and then crashed, nobody could ever take over. So the lock is a lease: it is valid for a TTL, here 10 seconds, and A must renew it before it runs out. The service also hands out a fencing token, a number that increases with every grant. A gets token 33. A short TTL fails over fast but may expire a healthy, slow leader; a long TTL slows recovery. Renewing at roughly a third of the TTL is a common rule of thumb.",
-      "idea": "A lease turns 'held until released' into 'held until it times out', so a dead holder cannot block everyone forever.",
-      "caption": "A holds a 10 s lease and token 33.",
+      "body": "If A held the key forever and then crashed, nobody could ever take over. So the lock is a lease: it is valid for a TTL (time to live), here 10 seconds, and A must keep renewing it before it runs out. The service also hands out a fencing token, a number that goes up with every grant. A gets token 33. A short TTL fails over fast but may expire a healthy, slow leader. A long TTL slows recovery. Renewing at about a third of the TTL is a common rule of thumb.",
+      "idea": "A lease turns \"held until released\" into \"held until it times out\", so a dead holder cannot block everyone forever.",
+      "caption": "A holds a 10 s lease and token 33, and keeps renewing.",
       "focus": [
         "a",
         "lock"
@@ -191,7 +191,7 @@
     {
       "tag": "WORK",
       "title": "The healthy case",
-      "body": "While A keeps renewing, B stays out and A writes to storage as the leader. Nothing is wrong here, and for many jobs a plain TTL lock would look fine in testing. The danger is not a crash, which the lease handles well. The danger is a holder that is slow but still alive.",
+      "body": "While A keeps renewing, B stays out and A writes to storage as the leader. Each write carries A's token, 33. Nothing is wrong here, and for many jobs a plain TTL lock would look fine in testing. The danger is not a crash, which the lease handles well. The danger is a holder that is slow but still alive.",
       "idea": "TTL locks work in the happy path, which is why their flaw survives testing.",
       "caption": "A renews its lease and writes with token 33.",
       "focus": [
@@ -241,9 +241,9 @@
     {
       "tag": "WHAT IF",
       "title": "A freezes for 15 seconds",
-      "body": "Just after checking that it still holds the lock, A hits a long garbage-collection pause, a VM migration, or a stalled disk. The whole process is frozen, so it cannot renew, and nothing in it runs while time passes. Any check it made before the pause may already be false when it resumes, so checking the lease first cannot protect A.",
-      "idea": "A process cannot reliably know it was paused: a check like 'do I still hold the lock?' can be stale by the time the write happens.",
-      "caption": "A is frozen; its renewal never arrives.",
+      "body": "Just after checking that it still holds the lock, A hits a long pause: a garbage-collection (memory cleanup) stall, a VM migration, or a stuck disk. The whole process freezes, so it cannot renew its lease, and no code in it runs while time passes. A check made before the pause may be false by the time it resumes, so checking the lease first cannot protect A. In the animation, A's renewal never arrives.",
+      "idea": "A process cannot reliably know it was paused. A check like \"do I still hold the lock?\" can be out of date by the time the write happens.",
+      "caption": "A is frozen, so its renewal never reaches the lock service.",
       "focus": [
         "a",
         "lock"
@@ -275,9 +275,9 @@
     {
       "tag": "EXPIRE",
       "title": "The lease runs out",
-      "body": "After 10 seconds without a renewal, the lock service expires A's lease and deletes the key. B, which was watching, immediately creates it and becomes the new leader with token 34. From the service's point of view everything is correct: A looked dead, so B took over.",
-      "idea": "The service did the right thing; the problem is that A does not know yet.",
-      "caption": "B takes over with token 34.",
+      "body": "After 10 seconds with no renewal, the lock service expires A's lease and deletes the key. B, which was watching, is told the key is gone, creates it at once, and becomes the new leader with token 34. From the service's point of view this is correct: A looked dead, so B took over. The problem is that A does not know yet.",
+      "idea": "The lock service did the right thing. The problem is that A does not know its lease is gone.",
+      "caption": "The lease expires and B takes over with token 34.",
       "focus": [
         "b",
         "lock"
@@ -322,8 +322,8 @@
     {
       "tag": "FAILURE",
       "title": "Two writers, one file",
-      "body": "At second 15, A wakes up. Its last check said it was leader, so it finishes its write. B is also writing. If storage accepts anything from anyone, A's old write lands after B's newer one and overwrites it. No lock service bug happened: the lock was granted correctly. The unsafe part is trusting the holder. No TTL is long enough to rule out a pause, so a longer TTL only makes the bug rarer.",
-      "idea": "Lock plus TTL alone cannot guarantee exclusion; a stale holder can still act after its lease is gone.",
+      "body": "At second 15, A wakes up. Its last check said it was leader, so it finishes its write. B is also writing. If storage accepts anything from anyone, A's old write lands after B's newer one and overwrites it. The lock service had no bug: the lock was granted correctly. The unsafe part is trusting the holder. No TTL is long enough to rule out a pause, so a longer TTL only makes this bug rarer.",
+      "idea": "A lock plus TTL cannot guarantee exclusion. A stale holder can still act after its lease is gone.",
       "caption": "A's stale write lands next to B's write.",
       "focus": [
         "a",
@@ -381,8 +381,8 @@
     {
       "tag": "FENCING",
       "title": "Let the resource say no",
-      "body": "Replay the same pause, this time with fencing. The fix is to check at the place that matters. Every write carries the fencing token, and storage remembers the highest token it has seen. B wrote with 34, so a later write with 33 is rejected as stale. The check happens in storage, so it still works however long A was frozen and whatever A believes. This also catches a write that was sent in time but delayed in the network.",
-      "idea": "A fencing token makes the protected resource, not the lock holder, the final judge of who is allowed to write.",
+      "body": "Now replay the same pause, this time with fencing. Every write carries its fencing token, and storage remembers the highest token it has seen. B wrote with 34, so A's later write with 33 is rejected as stale. The check happens in storage, so it works however long A was frozen and whatever A believes. It also catches a write that was sent in time but delayed in the network.",
+      "idea": "A fencing token makes the protected resource, not the lock holder, the final judge of who may write.",
       "caption": "Replay: storage rejects token 33 because it has seen 34.",
       "focus": [
         "a",
@@ -439,8 +439,8 @@
     {
       "tag": "TRADE-OFF",
       "title": "What this costs",
-      "body": "The lock service must itself survive failures, so real ones (etcd, ZooKeeper) replicate through a consensus protocol and need a majority up, which is covered in the Raft lesson. Every grant needs a round trip to a majority, so lock operations take milliseconds, and without a majority the service cannot grant or renew anything. Fencing also needs storage that can compare tokens, and not every system can; the check and the write must be one atomic step, for example a conditional write. A lock that is only an efficiency hint, like avoiding duplicate emails, can skip fencing. A lock that protects correctness cannot.",
-      "idea": "Use fencing when correctness depends on the lock; accept a plain TTL lock only when a rare double run is harmless.",
+      "body": "The lock service must itself survive failures, so real ones (etcd, ZooKeeper) replicate through a consensus protocol and need a majority of servers up (see the Raft lesson). Every grant needs a round trip to a majority, so lock operations take milliseconds, and with no majority the service cannot grant or renew anything. Fencing also needs storage that can compare tokens, and the check and the write must be one atomic step, for example a conditional write. A lock that only saves effort, like avoiding duplicate emails, can skip fencing. A lock that protects correctness cannot.",
+      "idea": "Use fencing when correctness depends on the lock. Accept a plain TTL lock only when a rare double run is harmless.",
       "caption": "The lock service itself needs a replicated majority (not drawn).",
       "focus": [
         "lock",
@@ -462,8 +462,8 @@
     {
       "tag": "RECAP",
       "title": "Lease, token, check",
-      "body": "Election picks one winner by serialising a create. A lease with a TTL lets the system recover from a dead leader. But a paused leader can wake up after its lease ended, so every grant carries an increasing fencing token and the resource rejects any older token. TTL gives liveness; fencing gives safety.",
-      "idea": "Never trust 'I hold the lock' alone; make the resource verify the token.",
+      "body": "Election picks one winner by letting only one create succeed. A lease with a TTL lets the system recover from a dead leader. But a paused leader can wake up after its lease ended, so every grant carries an increasing fencing token and storage rejects any older token. The TTL gives liveness (the system keeps moving). Fencing gives safety (no two writers).",
+      "idea": "Never trust \"I hold the lock\" on its own. Make the resource verify the token.",
       "caption": "Election, lease, and fencing together.",
       "focus": [
         "a",

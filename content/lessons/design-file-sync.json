@@ -1,7 +1,7 @@
 {
   "slug": "design-file-sync",
   "title": "Design File Sync (Dropbox-like)",
-  "subtitle": "Edit one spot in a 100 MiB file and watch only 4 MB travel, then see how your other laptop learns about it.",
+  "subtitle": "Edit one spot in a 100 MiB file and watch only 4 MiB travel, then see how your other laptop learns about it.",
   "minutes": 14,
   "level": "Intermediate",
   "learn": [
@@ -94,7 +94,7 @@
     {
       "id": "sent",
       "label": "Data moved",
-      "unit": "MB"
+      "unit": "MiB"
     },
     {
       "id": "saved",
@@ -106,9 +106,9 @@
     {
       "tag": "QUESTION",
       "title": "One small edit, one big file",
-      "body": "You fix a typo in a 100 MiB slide deck on Laptop A. Laptop B should show the fix within seconds. The naive plan is to upload all 100 MiB and make B download all 100 MiB. Multiply that by millions of users saving files all day and the bandwidth bill is absurd. We want to move only what changed. Pretend the deck is stored uncompressed.",
+      "body": "You fix a typo in a 100 MiB slide deck on Laptop A. Laptop B should show the fix within seconds. The naive plan is to upload all 100 MiB and make B download all 100 MiB. Multiply that by millions of users saving files all day and the bandwidth bill is absurd. We want to move only what changed. (MiB means mebibyte, about 1.05 MB; think of it as \"a megabyte\". Pretend the deck is stored uncompressed.)",
       "idea": "Sync is a bandwidth problem first: send the change, not the file.",
-      "caption": "A 100 MiB file changed on Laptop A.",
+      "caption": "A 100 MiB file has just changed on Laptop A.",
       "focus": [
         "laptop"
       ],
@@ -124,9 +124,9 @@
     {
       "tag": "CHUNKING",
       "title": "Cut the file into blocks",
-      "body": "The sync client splits the file into fixed 4 MiB blocks, so 100 MiB becomes about 25 blocks. It computes a SHA-256 hash of each block; the hash is the block's name, because identical bytes always give the same hash. The file is now just an ordered list of 25 hashes. This all happens locally, before any network call. Assume the app edits in place and keeps the length, as with a database file, disk image or raw media; zipped formats like .pptx can shift bytes, which the trade-off step covers.",
+      "body": "The sync client cuts the file into fixed 4 MiB blocks, so 100 MiB becomes 25 blocks. It computes a SHA-256 hash of each block, a short fingerprint of its bytes. The hash becomes the block's name, because identical bytes always give the same hash. The file is now just an ordered list of 25 hashes. All this happens on the laptop, before any network call. Assume the app edits in place without changing the length (like a database file or disk image). Zipped formats like .pptx can shift bytes; the trade-off step covers that.",
       "idea": "A file becomes an ordered list of content hashes, and a block's name is its content.",
-      "caption": "Laptop A hashes 25 blocks locally.",
+      "caption": "Laptop A hashes its 25 blocks locally.",
       "focus": [
         "laptop"
       ],
@@ -150,9 +150,9 @@
     {
       "tag": "DEDUP",
       "title": "Ask which blocks are missing",
-      "body": "Laptop A sends the 25 hashes to the Sync API. The API checks the metadata database to see which hashes already exist in the block store. Only one hash is unknown, because the edit changed just one block; the other 24 are unchanged from the previous version. The same check also dedups across files and users: a block the system already holds is never uploaded again.",
+      "body": "Laptop A sends the 25 hashes to the Sync API. The API asks the metadata database which hashes the block store already holds. Only one is unknown, because the edit changed just one block; the other 24 are the same as in the previous version. So the server answers \"send me 1 block\", a saving of 96%. The same check also avoids duplicates across files and users: a block the system already has is never uploaded again.",
       "idea": "Because blocks are named by content, the server can say exactly which ones it still needs.",
-      "caption": "Server replies: need 1 of 25 blocks.",
+      "caption": "The server replies: I need 1 of your 25 blocks.",
       "focus": [
         "laptop",
         "api",
@@ -211,7 +211,7 @@
     {
       "tag": "UPLOAD",
       "title": "Upload only the changed block",
-      "body": "Laptop A uploads the single 4 MiB block straight to the block store, usually with a short-lived signed URL the API handed out, so file bytes never pass through the API servers. Blocks are immutable: written once under their hash, never modified. That makes retries safe, since re-uploading the same block just writes identical bytes. The store (or a verifier) recomputes the SHA-256 of what arrives and rejects a mismatch, so a block's name can be trusted.",
+      "body": "Laptop A uploads the single 4 MiB block straight to the block store, usually through a short-lived signed URL the API handed out, so file bytes never pass through the API servers. Blocks are immutable: written once under their hash and never modified. That makes retries safe, because uploading the same block again writes identical bytes. The store (or a checker) recomputes the SHA-256 of what arrives and rejects a mismatch, so a block's name can be trusted.",
       "idea": "Immutable, content-addressed blocks make uploads idempotent (doing it twice has the same effect as once) and cacheable.",
       "caption": "One 4 MiB block reaches the block store.",
       "focus": [
@@ -257,9 +257,9 @@
     {
       "tag": "METADATA",
       "title": "Commit the new version",
-      "body": "Now the client tells the API: file /deck.pptx version 8 is this list of 25 hashes, built on top of version 7. The database applies it only if the head is still v7, appends an entry to the user's change log, and checks that every listed block exists, all in one transaction. Metadata is small, relational, and needs strong consistency; blocks are huge, dumb, and need cheap durable storage. Committing only after all blocks exist means no version ever points at a missing block.",
+      "body": "Now the client tells the API: \"/deck.pptx version 8 is this list of 25 hashes, built on top of version 7.\" In one database transaction, the metadata database checks that the current version is still 7, checks that every listed block exists, adds version 8, and appends an entry to the user's change log. Metadata is small and needs strong consistency; blocks are huge and need cheap, durable storage. Committing only after all blocks exist means no version ever points at a missing block.",
       "idea": "Keep tiny, consistent metadata apart from huge, immutable bytes, and commit metadata last.",
-      "caption": "Metadata DB records version 8.",
+      "caption": "The metadata database records version 8.",
       "focus": [
         "laptop",
         "api",
@@ -312,7 +312,7 @@
     {
       "tag": "NOTIFY",
       "title": "Tell the other devices",
-      "body": "After the commit, the API publishes a tiny event to the notify service: something changed in this user's folder. Laptop B holds a long-lived connection (long poll or WebSocket) to it and receives a ping. The ping carries no file data and may be lost, delayed, or duplicated. It is only a nudge to go ask for changes.",
+      "body": "After the commit, the API sends a tiny event to the notify service: \"something changed in this user's folder\". Laptop B keeps a long-lived connection open to that service (long poll or WebSocket) and receives a ping. The ping carries no file data, and it can be lost, delayed or duplicated. It is only a nudge telling B to go and ask for changes.",
       "idea": "Notifications are a cheap hint to wake a device up, not the source of truth.",
       "caption": "A small ping reaches Laptop B.",
       "focus": [
@@ -349,7 +349,7 @@
     {
       "tag": "DELTA SYNC",
       "title": "Laptop B pulls the delta",
-      "body": "Laptop B asks the API for changes since its cursor, a position number it saved after its last sync. The API answers that deck.pptx is now version 8 with a new hash list. B compares it to the list it already has, finds one hash it lacks, and downloads just that block, then reassembles the file locally. If the ping had been lost, B would still catch up on its next poll or reconnect, because the cursor makes the question safe to repeat.",
+      "body": "Laptop B asks the API for changes since its cursor, a position number it saved after its last sync (here 981). The API answers that deck.pptx is now version 8 with a new hash list. B compares that list with the one it has, finds one hash it lacks, downloads just that block, and rebuilds the file locally. If the ping had been lost, B would still catch up at its next poll or reconnect, because asking \"what is new after N?\" is safe to repeat.",
       "idea": "A cursor turns sync into 'give me everything after N', which is repeatable and loss-tolerant.",
       "caption": "B downloads one block, not 100 MiB.",
       "focus": [
@@ -380,7 +380,7 @@
           "from": "blocks",
           "to": "laptopb",
           "kind": "response",
-          "label": "4 MB"
+          "label": "4 MiB"
         }
       ],
       "metrics": {
@@ -398,7 +398,7 @@
         },
         {
           "node": "blocks",
-          "text": "1 block · 4 MB"
+          "text": "1 block · 4 MiB"
         },
         {
           "node": "laptopb",
@@ -412,9 +412,9 @@
     {
       "tag": "WHAT IF",
       "title": "Both laptops edited offline",
-      "body": "Suppose B was offline and edited the same file from version 7, while A already committed version 8. When B reconnects and commits 'new version on top of 7', the API sees the current head is 8, not 7, and rejects it with a conflict. Last-writer-wins by timestamp would silently destroy one person's work, and device clocks are unreliable. Instead the server keeps v8 and B's edit is saved as a separate 'conflicted copy' for a human to merge.",
+      "body": "Suppose B was offline and edited the same file starting from version 7, while A already saved version 8. When B reconnects and commits \"new version on top of 7\", the API sees the current version is 8, not 7, and rejects it as a conflict. Picking the edit with the later timestamp (last-writer-wins) would silently destroy someone's work, and device clocks are unreliable. Instead the server keeps v8 and saves B's edit as a separate \"conflicted copy\" for a person to merge.",
       "idea": "Detect conflicts by comparing base version to head; resolve by keeping both rather than guessing.",
-      "caption": "Commit on stale base v7 is rejected.",
+      "caption": "B's commit is built on the old version 7, so it is rejected.",
       "focus": [
         "laptopb",
         "api",
@@ -467,9 +467,9 @@
     {
       "tag": "TRADE-OFF",
       "title": "How big should a block be?",
-      "body": "Small blocks dedup and delta better but mean more hashes, more metadata rows, and more requests. Big blocks are cheap to track but resend more on each edit. About 4 MiB is a common middle ground. One weakness: fixed boundaries break when bytes are inserted near the start, because every later block shifts. Content-defined chunking, which picks cut points from the data itself, fixes that at the cost of more client CPU.",
+      "body": "Small blocks dedup and sync deltas better, but mean more hashes, more metadata rows and more requests. Big blocks are cheap to track but resend more on every edit. About 4 MiB is a common middle ground. One weakness: fixed boundaries break when bytes are inserted near the start, because every later block shifts. Content-defined chunking (cut points chosen from the data itself) fixes that, at the cost of more client CPU.",
       "idea": "Block size trades metadata overhead against bytes resent; fixed cuts are simple, content-defined cuts survive insertions.",
-      "caption": "Block size balances metadata and bandwidth.",
+      "caption": "Block size balances metadata overhead against bandwidth.",
       "focus": [
         "meta",
         "blocks"
@@ -490,9 +490,9 @@
     {
       "tag": "RECAP",
       "title": "Only the change travels",
-      "body": "The client chunks and hashes, the API dedups against known hashes, only missing blocks are uploaded to the block store, and a final atomic metadata commit publishes the version. A small notification wakes other devices, which pull changes after their cursor and fetch only new blocks. Conflicts are caught by base-version checks and kept as separate copies.",
+      "body": "The client chunks and hashes the file. The API checks which hashes are already known, and only the missing blocks are uploaded to the block store. A final atomic metadata commit publishes the new version. A small notification wakes the other devices, which pull changes after their cursor and fetch only the new blocks. Stale commits are caught by the version check and kept as separate copies.",
       "idea": "Hash blocks, store each once, commit metadata last, sync by cursor, and never silently overwrite.",
-      "caption": "A 100 MiB edit cost about 4 MB each way.",
+      "caption": "A 100 MiB edit cost about 4 MiB each way.",
       "focus": [
         "laptop",
         "api",

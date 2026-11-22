@@ -148,7 +148,7 @@
     {
       "tag": "QUESTION",
       "title": "One file in, thousands of ways out",
-      "body": "A creator uploads one 10-minute 1080p file. Viewers will watch it on a phone over weak mobile data, on a laptop on fibre, and on a TV, at the same time, from every continent. No single file or server fits all of them. This lesson builds the system that turns one upload into something every viewer can play smoothly.",
+      "body": "A creator uploads one 10-minute 1080p video file. Viewers will watch it on a phone over weak mobile data, on a laptop with fast fibre, and on a TV, all at the same time, from every continent. No single file or server fits all of them. This lesson builds the system that turns one upload into something every viewer can play smoothly. It has two halves: a slow, heavy \"prepare the video\" path and a huge, cheap \"deliver the video\" path.",
       "idea": "Streaming is two problems: a slow, heavy write path (upload and process) and a huge, cheap read path (deliver bytes).",
       "caption": "One source video, many different viewers.",
       "focus": [
@@ -161,9 +161,9 @@
     {
       "tag": "UPLOAD",
       "title": "Upload straight to storage",
-      "body": "The creator app asks the upload service to start. The service checks who is uploading, creates a video record marked processing, and returns a presigned URL: a temporary signed link that lets the client write to object storage. The app then sends the file in chunks of about 8 MB and can resume after a dropped connection. The big bytes never pass through our servers.",
+      "body": "The creator app asks the upload service to start. The service checks who is uploading and creates a video record marked \"processing\". It returns a presigned URL: a temporary signed link that lets the app write straight into object storage. The app then sends the file (about 600 MB here) in chunks of roughly 8 MB, and can resume if the connection drops. The big bytes never pass through our app servers.",
       "idea": "Presigned, chunked, resumable uploads keep large files off your app servers and survive flaky networks.",
-      "caption": "Chunks flow into the raw store; a record is created.",
+      "caption": "A record is created, then chunks flow straight into the raw video store.",
       "focus": [
         "creator",
         "upload",
@@ -217,7 +217,7 @@
     {
       "tag": "PIPELINE",
       "title": "Queue the work",
-      "body": "When the last chunk lands, the upload is marked complete and a job message goes onto a queue. Transcoding takes minutes, so the creator is not kept waiting on a request. Workers pull jobs when they have capacity, and a job that fails is simply retried. A big video is split into pieces of a few seconds each, so many workers can encode different pieces in parallel.",
+      "body": "When the last chunk lands, the upload is marked complete and a job message goes onto a queue (a waiting line for tasks). Transcoding (re-encoding the video) takes minutes, so the creator is not kept waiting. Workers pull jobs when they have capacity, and a failed job is simply retried. A long video is split into pieces a few seconds long, so many workers can encode different pieces in parallel.",
       "idea": "A queue decouples slow processing from the upload request and lets you scale workers by backlog.",
       "caption": "A job is queued and a worker picks it up.",
       "focus": [
@@ -254,9 +254,9 @@
     {
       "tag": "TRANSCODE",
       "title": "Encode a bitrate ladder",
-      "body": "Workers read the source and re-encode it several times, producing a ladder: for example 240p at 0.4 Mbps, 360p at 0.8, 480p at 1.4, 720p at 3, and 1080p at 5 Mbps. Together that is about 10.6 Mbps, so a 10-minute video becomes roughly 800 MB across all renditions. This is CPU-heavy work, often on GPUs or dedicated encoder hardware. Audio is encoded once or twice and shared.",
+      "body": "Workers read the source and re-encode it several times. The result is a bitrate ladder: the same video at several qualities, for example 240p at 0.4 Mbps, 360p at 0.8, 480p at 1.4, 720p at 3 and 1080p at 5 Mbps. Together that is about 10.6 Mbps, so a 10-minute video becomes roughly 800 MB across all versions (renditions). This is CPU-heavy work, often done on GPUs or dedicated encoder chips. Audio is encoded once or twice and shared.",
       "idea": "Each rendition is a separate encode of the same content at a different resolution and bitrate.",
-      "caption": "Workers read the raw file and produce 5 renditions.",
+      "caption": "Workers read the raw file and produce 5 renditions of it.",
       "focus": [
         "raw",
         "workers"
@@ -279,11 +279,14 @@
         },
         {
           "node": "workers",
-          "text": "10.6 Mbps total",
-          "at": "bottom"
+          "text": "10.6 Mbps total"
         },
         {
           "node": "raw",
+          "text": "source ≈ 600 MB"
+        },
+        {
+          "node": "origin",
           "text": "≈ 800 MB out"
         }
       ]
@@ -291,7 +294,7 @@
     {
       "tag": "SEGMENT",
       "title": "Cut into short segments",
-      "body": "Each rendition is cut into segments of about 4 seconds and stored as ordinary files, with a playlist listing them in order. This is HLS (Apple's format, .m3u8 playlists) or DASH (an open standard, .mpd manifests); both can share the same fMP4 segment files (CMAF). Every segment starts on a keyframe, and the cut points are identical across renditions. A 600-second video gives 150 segments per rendition, so about 750 files.",
+      "body": "Each rendition is cut into segments of about 4 seconds, saved as ordinary files, and listed in order in a playlist. The two main formats are HLS (Apple's, .m3u8 playlists) and DASH (an open standard, .mpd manifests); both can share the same segment files (CMAF). Every segment starts on a keyframe (a full picture that needs no earlier frames), and the cut points are identical in every rendition. A 600-second video gives 150 segments per rendition, so about 750 files.",
       "idea": "Segments are plain static files, so any HTTP server or CDN can serve them. Aligned cuts make switching quality safe.",
       "caption": "Segments and playlists land in the segment store.",
       "focus": [
@@ -326,7 +329,7 @@
     {
       "tag": "PUBLISH",
       "title": "Mark it ready",
-      "body": "When every rendition is done, a worker updates the metadata service: status becomes ready, and the record stores the manifest location, duration, available renditions, and thumbnails. The metadata service holds titles, owners, permissions, and counters, usually in a database with a cache in front. It stores kilobytes per video, never the video bytes. Search and recommendations read from it too.",
+      "body": "When every rendition is done, a worker updates the metadata service: the status becomes \"ready\" and the record stores the playlist location, the duration, the available renditions and thumbnails. The metadata service holds titles, owners, permissions and counters, usually in a database with a cache in front. It stores kilobytes per video, never the video itself. Search and recommendations read from it too.",
       "idea": "Metadata is small and queried constantly; media is huge and fetched by URL. Keep them in separate systems.",
       "caption": "The video record flips from processing to ready.",
       "focus": [
@@ -358,9 +361,9 @@
     {
       "tag": "PLAYBACK",
       "title": "Player asks what to play",
-      "body": "A viewer opens the video. The player calls the metadata service, which checks that the viewer is allowed to watch and returns the title and a signed manifest URL. The player then downloads the master playlist, a small file listing every rendition. No video bytes have moved yet, and the metadata service is already out of the picture for the rest of the session.",
+      "body": "A viewer opens the video. The player asks the metadata service, which checks the viewer may watch it and returns the title plus a signed playlist URL. The player then downloads the master playlist from the CDN (a network of cache servers near viewers). It is a small file listing every rendition. No video bytes have moved yet, and the metadata service is now out of the picture for the rest of the session.",
       "idea": "The metadata call happens once per video; everything after it is plain file fetching.",
-      "caption": "Metadata returns a manifest URL for the player.",
+      "caption": "Metadata returns a playlist URL, and the player fetches the master playlist.",
       "focus": [
         "viewer",
         "meta",
@@ -413,9 +416,9 @@
     {
       "tag": "CDN",
       "title": "Segments come from the edge",
-      "body": "The player requests the first segment at a middle quality. The request goes to the nearest CDN edge. On the first view the edge has nothing, so it fetches the segment from the segment store (a cache miss) and keeps a copy. Every later viewer in that region gets it straight from the edge. Segments never change, so they can be cached for a very long time. Startup lands around 1.2 seconds.",
+      "body": "The player requests the first segment at a middle quality. The request goes to the nearest CDN edge. On the first view the edge does not have it, so it fetches the segment from the segment store (a cache miss) and keeps a copy. Every later viewer in that region gets it straight from the edge. Segments never change, so they can be cached for a very long time. Startup takes about 1.2 seconds.",
       "idea": "Only the first viewer per region pays the trip to the origin; the CDN serves everyone after that.",
-      "caption": "Cache miss: the edge fetches from origin, then serves.",
+      "caption": "Cache miss: the edge fetches from the origin, keeps a copy, and serves it.",
       "focus": [
         "viewer",
         "cdn",
@@ -469,9 +472,9 @@
     {
       "tag": "ADAPT",
       "title": "Bandwidth drops, quality follows",
-      "body": "The player measures how fast each segment downloads and how much video it has buffered. When the train enters a tunnel, throughput falls and the buffer shrinks, so the player asks for the next segment at 360p instead of 480p. The server does nothing special: it just serves whichever file is requested. Because cut points line up, the switch is invisible apart from sharper or softer pixels. Popular segments are now cached, so the edge hit rate climbs.",
+      "body": "The player times each segment download and watches how much video it has buffered. When a train enters a tunnel, speed drops and the buffer shrinks, so the player asks for the next segment at 360p instead of 480p. This is adaptive bitrate. The server does nothing special; it serves whichever file is requested. Because every rendition is cut at the same points, the switch is invisible apart from softer pixels. Popular segments are now cached, so the edge hit rate climbs.",
       "idea": "Adaptive bitrate is decided by the player, using ordinary file requests. This keeps the servers stateless and cacheable.",
-      "caption": "Player drops to 360p; edge serves it from cache.",
+      "caption": "The player drops to 360p, and the edge serves it from cache.",
       "focus": [
         "viewer",
         "cdn"
@@ -521,9 +524,9 @@
     {
       "tag": "RECAP",
       "title": "Heavy write, cheap read",
-      "body": "Upload goes direct to storage, a queue feeds workers that encode a ladder and cut segments, and the metadata service records when it is ready. Playback is one metadata call, then segment files from a CDN, with the player choosing quality. The write path is slow and compute-bound but runs once per video. The read path runs millions of times, so it is built from cacheable static files.",
+      "body": "Upload goes straight to storage, a queue feeds workers that encode the ladder and cut segments, and the metadata service records when the video is ready. Playback is one metadata call, then segment files from a CDN, with the player choosing the quality. The write path is slow and compute-heavy but runs once per video. The read path runs millions of times, so it is built from cacheable static files.",
       "idea": "Do the expensive work once, ahead of time, so serving is just fetching cached files.",
-      "caption": "The whole path from upload to playback.",
+      "caption": "The whole path, from upload to playback.",
       "focus": [
         "creator",
         "upload",
@@ -582,7 +585,7 @@
         "The metadata service can skip storing the manifest URL"
       ],
       "answer": 1,
-      "why": "A segment that begins on a keyframe can be decoded on its own. Aligned boundaries mean segment 41 at 360p picks up exactly where segment 40 at 480p ended."
+      "why": "A segment that begins on a keyframe can be decoded on its own. Aligned boundaries mean segment 40 at 360p picks up exactly where segment 39 at 480p ended."
     },
     {
       "q": "A video goes viral and 2 million people start watching within an hour. Which part of the design protects the origin segment store?",

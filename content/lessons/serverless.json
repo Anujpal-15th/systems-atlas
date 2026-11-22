@@ -102,7 +102,7 @@
     {
       "tag": "QUESTION",
       "title": "Who runs your code, and when?",
-      "body": "Your API handler is ready. Someone has to start it on a machine, give it CPU and memory, restart it when it crashes, and add copies when traffic grows. You can hand that job to a container orchestrator, which keeps your code running all the time, or to a functions platform, which runs it only while a request is in flight. Same code, very different trade-offs.",
+      "body": "Your API handler is written. Someone must start it on a machine, give it CPU and memory, restart it if it crashes and add copies when traffic grows. You can hand that job to a container orchestrator, which keeps your code running all the time, or to a functions platform, which runs it only while a request is in flight. The same code, with very different trade-offs. The diagram shows a client and a gateway (the router that receives requests) waiting to see where the handler will run.",
       "idea": "Containers and functions are two answers to the same question: who owns starting and stopping your process?",
       "caption": "A client and a gateway: where should the handler run?",
       "focus": [
@@ -120,9 +120,9 @@
     {
       "tag": "CONCEPT",
       "title": "A container is a packaged process",
-      "body": "A container bundles your app with its libraries and runs as an ordinary process that the kernel isolates with namespaces and cgroups, kernel features that limit what a process can see and use. The process itself starts in well under a second once the image is on the machine, and it costs megabytes, not the gigabytes of a full virtual machine. Kubernetes wraps one or more containers in a pod, the smallest unit it schedules.",
+      "body": "A container bundles your app with its libraries and runs as an ordinary process. The kernel isolates it using namespaces (what the process can see) and cgroups (how much it can use). Once the image is on the machine, it starts in well under a second, and it costs megabytes, not the gigabytes of a full virtual machine. Kubernetes wraps one or more containers in a pod, the smallest unit it schedules.",
       "idea": "A container is an isolated process plus its dependencies, not a small virtual machine.",
-      "caption": "Pod holds your container image, ready to serve.",
+      "caption": "The pod holds your container image, ready to serve.",
       "focus": [
         "pod"
       ],
@@ -142,9 +142,9 @@
     {
       "tag": "ORCHESTRATE",
       "title": "The scheduler places pods",
-      "body": "You tell Kubernetes the desired state: run 3 replicas of this image, each requesting 0.5 CPU and 512 MB. The scheduler looks at every node (a machine in the cluster) and its unreserved capacity, and picks a fit for each new pod. Controllers then loop forever: compare what is running with what you asked for, and fix the difference by starting or killing pods.",
+      "body": "You tell Kubernetes the desired state: run 3 copies (replicas) of this image, each asking for 0.5 CPU and 512 MB. The scheduler looks at every node (a machine in the cluster) and its spare capacity, and picks a fit for each new pod, as the animation shows. Then controllers loop forever: compare what is running with what you asked for, and fix any difference by starting or killing pods.",
       "idea": "You declare the desired state; control loops keep reconciling reality toward it, including replacing crashed pods.",
-      "caption": "Scheduler assigns pods to nodes with spare capacity.",
+      "caption": "The scheduler assigns pods to nodes that have spare capacity.",
       "focus": [
         "sched",
         "pod"
@@ -180,9 +180,9 @@
     {
       "tag": "FLOW",
       "title": "Steady traffic on warm pods",
-      "body": "A request arrives at the gateway, which routes it to one of the running pods. The process is already loaded with its database connections open, so the handler just runs. In this example we assume a simple request takes about 25 ms. Those 3 pods are paid for every hour, busy or idle. Adding pods is not instant: the scheduler must place each one, the node must pull the image, and the pod must pass health checks, so scaling up takes seconds to minutes.",
+      "body": "A request reaches the gateway, which routes it to one of the running pods. The process is already loaded with its database connections open, so the handler just runs. We assume a simple request takes about 25 ms. The catch: those 3 pods are paid for around the clock, busy or idle. Adding pods is not instant either. The scheduler must place each one, the node must download the image and the pod must pass health checks, so scaling up takes seconds to minutes.",
       "idea": "Always-on containers give predictable low latency, and you pay for capacity whether or not it is used.",
-      "caption": "Request served by one of 3 already-running pods.",
+      "caption": "A request is served by one of 3 pods that are already running.",
       "focus": [
         "client",
         "gw",
@@ -242,7 +242,7 @@
         },
         {
           "node": "pod",
-          "text": "billed hourly",
+          "text": "paid even if idle",
           "at": "bottom"
         }
       ]
@@ -250,9 +250,9 @@
     {
       "tag": "CONCEPT",
       "title": "Functions run only on demand",
-      "body": "With functions-as-a-service you upload a handler, not a server. The platform runs it per event and bills for the time your code runs, in milliseconds on most platforms. When nothing is happening it runs zero copies and costs nothing. On platforms like AWS Lambda each running copy handles one request at a time, so 200 simultaneous requests means up to 200 copies (some platforms let one instance serve many). Scaling is automatic, within limits like maximum concurrency and run time.",
+      "body": "With functions-as-a-service you upload a handler, not a server. The platform runs it per event and bills for the time your code actually runs, in milliseconds on most platforms. When nothing is happening, zero copies run and you pay nothing. On platforms like AWS Lambda each copy handles one request at a time, so 200 simultaneous requests mean up to 200 copies (some platforms let one copy serve many). Scaling is automatic, within limits such as maximum concurrency and run time.",
       "idea": "Functions scale to zero and out per request, and you are billed for execution time rather than idle capacity.",
-      "caption": "Function runtime holds no copies while idle.",
+      "caption": "While idle, the function runtime holds no copies at all.",
       "focus": [
         "fn"
       ],
@@ -279,9 +279,9 @@
     {
       "tag": "WHAT IF",
       "title": "The first request: a cold start",
-      "body": "A request arrives and no copy of the function exists. The platform must find a host, create a sandbox, download your code, start the language runtime, and run your initialisation code, including a new database connection. This is a cold start. Typical setup is 100 ms to a couple of seconds, and heavy runtimes like Java can take several seconds without snapshotting. Here we assume about 800 ms of setup, so this request takes roughly 850 ms. Only that unlucky request pays it.",
+      "body": "A request arrives and no copy of the function exists. The platform must find a host, create a sandbox (an isolated space to run in), download your code, start the language runtime and run your setup code, including opening a database connection. This is a cold start. Setup typically takes 100 ms to a couple of seconds, and heavy runtimes like Java can take several seconds without snapshotting. We assume about 800 ms, so this request takes roughly 850 ms. Only that unlucky request pays it.",
       "idea": "A cold start is the setup tax paid by a request that arrives when no warm copy is available.",
-      "caption": "Sandbox is built before the handler can run.",
+      "caption": "The sandbox is built first, so the handler cannot run right away.",
       "focus": [
         "client",
         "gw",
@@ -352,9 +352,9 @@
     {
       "tag": "FLOW",
       "title": "Warm reuse and the fan-out",
-      "body": "After a request the platform keeps the sandbox alive for some minutes, so the next request skips setup and runs in about 30 ms (a little more than the pod because of platform routing). But a burst of 500 concurrent requests needs up to 500 copies, and each new one cold starts. If each copy opens its own database connection, that can exceed a database limit of a few hundred. Connection pooling proxies and concurrency limits exist for this reason.",
+      "body": "After a request, the platform keeps the sandbox alive for some minutes. The next request skips setup and runs in about 30 ms (a little more than the pod, because of platform routing). But a burst of 500 requests at once needs up to 500 copies, and each new one cold starts. If every copy opens its own database connection, that can pass a database limit of a few hundred, as the animation shows. Connection poolers (shared connections) and concurrency limits exist for this reason.",
       "idea": "Warm copies are fast, but bursts create many cold starts and can overwhelm downstream dependencies like databases.",
-      "caption": "Warm copy answers in ~30 ms; a 500-copy burst overruns the DB connection limit.",
+      "caption": "A warm copy answers in about 30 ms; a 500-copy burst overruns the database limit.",
       "focus": [
         "gw",
         "fn",
@@ -417,7 +417,7 @@
     {
       "tag": "TRADE-OFF",
       "title": "Shrinking cold starts",
-      "body": "Cold starts are reduced, not removed. Keep the package small, avoid heavy work at startup, pick a fast-starting runtime, and lazily load rarely used libraries. You can also pay for provisioned or minimum instances that stay warm, and some platforms snapshot an initialised runtime and restore it. Each fix trades money or complexity for latency, so the more you keep warm, the closer you drift toward an always-on container. Here we keep 5 copies provisioned.",
+      "body": "Cold starts can be reduced, not removed. Keep the package small, avoid heavy work at startup, pick a fast-starting runtime and load rarely used libraries only when needed. You can also pay for provisioned (minimum) instances that stay warm, and some platforms snapshot a ready runtime and restore it. Each fix trades money or complexity for speed, so the more you keep warm, the closer you drift toward an always-on container. Here we keep 5 copies provisioned.",
       "idea": "You can buy down cold starts with warm capacity, which erodes the cost advantage of scale to zero.",
       "caption": "Keeping copies warm costs money but removes the wait.",
       "focus": [
@@ -452,9 +452,9 @@
     {
       "tag": "RECAP",
       "title": "Choosing between them",
-      "body": "Pick containers for steady, high-volume, latency-sensitive services, long-lived connections like websockets, and anything needing long jobs or tight control of the environment. Pick functions for spiky or rare traffic, event glue like resizing an image after upload, and small teams who do not want to run a cluster. Serverless container platforms blur the line by running container images that scale to zero. Many systems use both, with a container core and functions around the edges.",
-      "idea": "Steady and latency-critical favours containers; spiky, rare, or event-driven favours functions; mixing is normal.",
-      "caption": "Same gateway, two backends, chosen per workload.",
+      "body": "Pick containers for steady, high-volume, latency-sensitive services, long-lived connections such as websockets, and long jobs or tight control of the environment. Pick functions for spiky or rare traffic, small event jobs like resizing an image after upload, and small teams who do not want to run a cluster. Serverless container platforms blur the line by running container images that scale to zero. Many systems use both: containers for the core, functions around the edges.",
+      "idea": "Steady and latency-critical favours containers; spiky, rare or event-driven favours functions; mixing is normal.",
+      "caption": "One gateway, two backends, chosen per workload.",
       "focus": [],
       "flows": [
         {

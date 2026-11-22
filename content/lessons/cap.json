@@ -77,9 +77,9 @@
     {
       "tag": "QUESTION",
       "title": "Two copies of one value",
-      "body": "A profile setting x is stored on two replicas: A in the US and B in Europe, so each user reads from a nearby copy. Both hold x = 4. Alice sets x = 5 on A. Bob, in Europe, reads x from B a moment later. What should Bob see, and what if the link between A and B is cut right now?",
-      "idea": "Copying data to two places creates a question: which copy is allowed to be behind?",
-      "caption": "Alice writes x = 5 to A; B still holds x = 4.",
+      "body": "Imagine a setting x stored on two servers, called replicas: A in the US and B in Europe, so each user reads from a nearby copy. Both hold x = 4. Alice (US) sets x = 5 on A. A moment later, Bob (Europe) reads x from B. What should Bob see? And what if the link between A and B is cut right now?",
+      "idea": "Copying data to two places raises a question: which copy is allowed to be behind?",
+      "caption": "Alice's write reaches A; B still holds x = 4.",
       "focus": [
         "alice",
         "a",
@@ -94,7 +94,17 @@
           "label": "write x = 5"
         }
       ],
-      "chips": [],
+      "chips": [
+        {
+          "node": "a",
+          "text": "x = 5",
+          "tone": "green"
+        },
+        {
+          "node": "b",
+          "text": "x = 4"
+        }
+      ],
       "metrics": {
         "wlat": "5",
         "rlat": "5",
@@ -104,9 +114,9 @@
     {
       "tag": "BASELINE",
       "title": "Healthy network: easy",
-      "body": "With the link up, A forwards x = 5 to B and waits for B's acknowledgement before telling Alice it worked. Now any read from either replica returns 5. This is strong consistency: the system behaves as if there were one copy. The price is that Alice waits for a transatlantic round trip, roughly 80 ms, on top of the local write.",
-      "idea": "When nothing is broken you can have both consistency and availability; you just pay latency for it.",
-      "caption": "A copies to B and waits for the ack before replying.",
+      "body": "The link is healthy, so A copies x = 5 to B and waits for B's \"got it\" (an acknowledgement, or ack) before telling Alice it worked. Now a read from either replica returns 5. This is strong consistency: the system acts as if there were only one copy. The cost is time. Alice waits for a round trip across the Atlantic, about 80 ms, on top of 5 ms for the local write: 85 ms in total.",
+      "idea": "With a healthy network you can have both consistency and availability. You just pay for it in latency.",
+      "caption": "A copies to B and waits for the ack before replying to Alice.",
       "focus": [
         "alice",
         "a",
@@ -150,7 +160,7 @@
         },
         {
           "node": "a",
-          "text": "RTT ≈ 80 ms",
+          "text": "round trip ≈ 80 ms",
           "at": "bottom"
         }
       ],
@@ -163,9 +173,9 @@
     {
       "tag": "PARTITION",
       "title": "The link breaks",
-      "body": "Now a fibre cut or a bad router config severs the path between the regions. Both replicas are healthy and both users can still reach their nearest copy, but A and B cannot talk. This is a network partition. Neither side can tell whether the other is dead or just unreachable. You cannot design partitions away: any system spread over a network will eventually see one.",
-      "idea": "Partitions are not a choice. CAP is about what you do once one happens.",
-      "caption": "A and B are both up but cannot reach each other.",
+      "body": "Now a cut cable or a bad router setting breaks the path between the regions. Both replicas are still running and both users can reach their nearest one, but A and B cannot talk to each other. This is a network partition. Neither side can tell whether the other has crashed or is just unreachable. Any system spread across a network will eventually see one, so you cannot design partitions away.",
+      "idea": "You do not get to choose whether partitions happen. CAP is about what you do once one does.",
+      "caption": "A and B are both up, but the link between them is down.",
       "focus": [
         "a",
         "b"
@@ -201,9 +211,9 @@
     {
       "tag": "CHOOSE C",
       "title": "Option 1: stay correct, refuse",
-      "body": "A consistency-first (CP) system protects the single-copy illusion. A cannot confirm that B will see the write, so it rejects Alice's request with an error. B likewise refuses reads it cannot prove are current. Nobody ever sees stale or conflicting data, but during the partition users get errors. Real CP systems with three or more replicas keep serving on the side that still has a majority; the minority side stops.",
-      "idea": "Choosing consistency means some requests fail while the partition lasts.",
-      "caption": "A returns an error rather than accept a write B cannot see.",
+      "body": "Option 1 puts correctness first. Such a system is called CP (consistent, partition-tolerant). A cannot be sure B will ever see the write, so it rejects Alice's request with an error (a 503, as the animation shows). B likewise refuses reads it cannot prove are current. Nobody sees stale or conflicting data, but users get errors while the partition lasts. Real CP systems with three or more replicas keep serving on the side that still has a majority. Only the minority side stops.",
+      "idea": "Choosing consistency means some requests fail for as long as the partition lasts.",
+      "caption": "A returns an error instead of accepting a write that B cannot see.",
       "focus": [
         "alice",
         "a",
@@ -247,9 +257,9 @@
     {
       "tag": "CHOOSE A",
       "title": "Option 2: stay up, diverge",
-      "body": "An availability-first (AP) system keeps answering. A accepts x = 5 and replies instantly, since it does not wait for B. But Bob's read from B returns the old value 4: stale, and still a valid answer because B is up. If Bob had also written x on B, the two copies would now hold different values that must be reconciled later.",
-      "idea": "Choosing availability means replicas can disagree while the partition lasts.",
-      "caption": "A accepts the write; B serves the old value x = 4.",
+      "body": "Option 2 keeps the service up. Such a system is called AP (available, partition-tolerant). A accepts x = 5 and replies at once, because it does not wait for B. But Bob's read from B returns the old value 4. That answer is stale (out of date) but still valid, because B did respond. If Bob had also written x on B, the two copies would now disagree and must be reconciled later.",
+      "idea": "Choosing availability means the replicas can disagree while the partition lasts.",
+      "caption": "A accepts the write; B answers with the old value x = 4.",
       "focus": [
         "alice",
         "a",
@@ -309,9 +319,9 @@
     {
       "tag": "HEALING",
       "title": "The link comes back",
-      "body": "When the partition heals, an AP system must converge. A sends the missed update to B, and B applies it, so both hold 5 again. This is eventual consistency: if writes stop, all replicas end up equal. The hard case is two conflicting writes made on both sides. Deciding which wins, or merging them, is covered in the clocks and CRDT lessons.",
-      "idea": "Eventual consistency promises convergence, not when, and not which concurrent write survives.",
-      "caption": "A pushes the missed write to B; copies converge.",
+      "body": "When the link comes back, an AP system has to catch up. A sends the missed update to B, and B applies it, so both hold 5 again. This is eventual consistency: if writes stop, all replicas end up equal. It promises the copies will agree, but not when. The hard case is two conflicting writes made on both sides. Deciding which one wins, or merging them, is covered in the clocks and CRDT lessons.",
+      "idea": "Eventual consistency promises the copies will converge, but not when, and not which conflicting write survives.",
+      "caption": "A pushes the missed write to B, and the copies match again.",
       "focus": [
         "a",
         "b"
@@ -354,8 +364,8 @@
     {
       "tag": "PACELC",
       "title": "Even with no partition",
-      "body": "CAP only talks about failures, but partitions are rare and the trade-off is constant. PACELC extends it: if Partition, choose Availability or Consistency; Else, choose Latency or Consistency. That gives four postures: PA/EL (always favour speed and uptime), PC/EC (always favour correctness), PA/EC and PC/EL (mixed). The Else half is the one you live with daily, because a healthy system pays it on every request, not only during outages.",
-      "idea": "PACELC: the everyday cost of consistency is latency, paid even when everything works.",
+      "body": "CAP only describes failures, but partitions are rare while the trade-off is constant. PACELC (say \"pass-elk\") extends it: if there is a Partition, choose Availability or Consistency; Else, choose Latency or Consistency. That gives combinations such as PA/EL (favour uptime and speed) and PC/EC (favour correctness), plus the mixed PA/EC and PC/EL. The \"Else\" half matters most day to day, because every request pays it. Here, Alice waits for B's ack on every write.",
+      "idea": "PACELC: the everyday price of consistency is latency, paid even when nothing is broken.",
       "caption": "Synchronous replication: Alice waits for B's ack.",
       "focus": [
         "alice",
@@ -379,7 +389,7 @@
           "from": "b",
           "to": "a",
           "kind": "response",
-          "label": "ack (80 ms)"
+          "label": "ack"
         },
         {
           "from": "a",
@@ -391,7 +401,7 @@
       "chips": [
         {
           "node": "a",
-          "text": "ack ≈ 80 ms",
+          "text": "round trip ≈ 80 ms",
           "at": "edge:a-b"
         },
         {
@@ -408,9 +418,9 @@
     {
       "tag": "TRADE-OFF",
       "title": "Else: pick latency",
-      "body": "The alternative is asynchronous replication. A confirms to Alice after its own write, taking about 5 ms, then ships x = 5 to B in the background. Writes are 17 times faster, but for roughly the next 40 ms (one way across the Atlantic) or longer under load, Bob can still read 4. By default, Dynamo-style stores (Cassandra, Riak) lean PA/EL, though quorum settings can shift that (see the Quorums lesson). Google Spanner is usually classed as PC/EC.",
-      "idea": "Async replication buys speed by letting replicas briefly lag. Sync replication buys correctness with delay.",
-      "caption": "A replies at once and replicates in the background.",
+      "body": "The alternative is asynchronous replication. A confirms to Alice after its own 5 ms write, then sends x = 5 to B in the background. Writes become 17 times faster (5 ms instead of 85 ms). The price is that for roughly the next 40 ms (one way across the Atlantic), or longer under load, Bob can still read 4. Dynamo-style stores such as Cassandra and Riak lean PA/EL by default, though quorum settings can shift that (see the Quorums lesson). Google Spanner is usually classed as PC/EC.",
+      "idea": "Async replication buys speed by letting replicas lag briefly. Sync replication buys correctness with delay.",
+      "caption": "A replies at once and copies to B in the background.",
       "focus": [
         "alice",
         "a",
@@ -476,9 +486,9 @@
     {
       "tag": "MODELS",
       "title": "A ladder of consistency",
-      "body": "Consistency is a spectrum. Strong (linearizable): every read sees the latest completed write, as if there were one copy. Causal: if one event could have influenced another, everyone sees them in that order. Alice posts a question and Bob replies; nobody may see the reply before the question. Eventual: replicas only converge over time, with no ordering promise. Weaker models are cheaper and faster. Causal consistency can even stay available during a partition, since it needs ordering metadata rather than agreement on every write.",
-      "idea": "Pick the weakest model your feature can tolerate: causal adds ordering bookkeeping, and strong adds cross-replica coordination (latency, and refusals during partitions).",
-      "caption": "Causal ordering: B must hold the post before showing the reply.",
+      "body": "Consistency comes in levels. Strong (linearizable): every read sees the latest completed write, as if there were one copy. Causal: if one event could have influenced another, everyone sees them in that order. Example: Alice posts a question and Bob replies, so nobody may see the reply before the question. Eventual: copies only converge over time, with no ordering promise. Weaker levels are cheaper and faster. Causal can even stay available during a partition, since it needs ordering information, not agreement on every write.",
+      "idea": "Pick the weakest level your feature can tolerate. Causal adds ordering bookkeeping; strong adds cross-replica coordination.",
+      "caption": "Causal order: B must hold the post before showing the reply.",
       "focus": [
         "alice",
         "a",
@@ -520,8 +530,8 @@
     {
       "tag": "RECAP",
       "title": "How to think about it",
-      "body": "CAP: when a partition splits the replicas, choose consistency (reject some requests) or availability (accept and diverge). It is not pick-two-of-three, because partitions will happen. PACELC: even without one, choose latency or consistency. Decide per feature: a bank balance and a unique username need strong consistency; a like counter or a feed can be eventual.",
-      "idea": "Ask two questions: what happens during a partition, and what latency am I paying when it is healthy?",
+      "body": "CAP: when a partition splits the replicas, choose consistency (reject some requests) or availability (accept requests and let copies diverge). It is not \"pick two of three\", because partitions will happen. PACELC: even with no partition, choose latency or consistency. Decide per feature. A bank balance and a unique username need strong consistency. A like counter or a feed can be eventual.",
+      "idea": "Ask two questions: what happens during a partition, and what latency do I pay when things are healthy?",
       "caption": "All four parts: clients, two replicas, and the link between.",
       "focus": [
         "alice",
@@ -533,12 +543,13 @@
       "chips": [
         {
           "node": "a",
-          "text": "sync 85 ms"
+          "text": "sync: 85 ms write"
         },
         {
-          "node": "b",
-          "text": "async 5 ms",
-          "tone": "green"
+          "node": "a",
+          "text": "async: 5 ms write",
+          "tone": "green",
+          "at": "bottom"
         }
       ],
       "metrics": {

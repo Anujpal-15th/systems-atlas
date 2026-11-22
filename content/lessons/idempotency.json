@@ -103,8 +103,8 @@
     {
       "tag": "QUESTION",
       "title": "Did my payment go through?",
-      "body": "A customer taps Pay for a $40 order. The request reaches the server and the charge succeeds, but the response is lost on a bad mobile network. The app sees a timeout. It cannot tell whether the charge happened. Retrying might charge twice; giving up might lose the order.",
-      "idea": "After a timeout the caller cannot distinguish 'never arrived' from 'done, but the reply was lost'.",
+      "body": "A customer taps Pay for a $40 order. The request reaches the server and the charge goes through, but the reply gets lost on a bad mobile network. The app only sees a timeout, so it cannot tell whether the charge happened. Retrying might charge the customer twice. Giving up might lose the order. What should the app do?",
+      "idea": "After a timeout, a caller cannot tell 'never arrived' from 'done, but the reply was lost'.",
       "caption": "One tap, one charge, one lost reply.",
       "focus": [
         "client",
@@ -125,15 +125,14 @@
         },
         {
           "node": "api",
-          "text": "$40 charged",
-          "tone": "green"
+          "text": "did it charge?"
         }
       ]
     },
     {
       "tag": "FLOW",
       "title": "The charge succeeds",
-      "body": "The app sends POST /charges for $40. The API writes the charge to the ledger and returns 200. So far this is the happy path, and the ledger holds one charge. Nothing in the request says 'this is the same order as before', which will matter in a moment.",
+      "body": "First, the happy path. The app sends POST /charges (a request to create a charge) for $40. The API writes the charge to the ledger (the database table of payments) and returns 200, meaning success. The ledger now holds one charge. Notice that nothing in this request says 'this is the same order as before'. That will matter in a moment.",
       "idea": "A plain POST has no identity: the server cannot tell a repeat from a new request.",
       "caption": "Ledger records one $40 charge.",
       "focus": [
@@ -188,8 +187,8 @@
     {
       "tag": "WHAT IF",
       "title": "The reply is lost",
-      "body": "The 200 response never reaches the phone because the connection dropped. The client's timeout fires after, say, 10 seconds. From its side the request failed. Retries are the right instinct (the timeouts and retries lesson covers how to space them), but they are only safe if repeating the operation is harmless.",
-      "idea": "Retries turn an unreliable network into at-least-once execution, so duplicates are expected and you must design for them even when they are infrequent.",
+      "body": "Now the 200 reply never reaches the phone because the connection dropped. After a 10-second timeout, the app thinks the request failed. Retrying is the right instinct (the timeouts and retries lesson covers how to space retries out). But a retry is only safe if repeating the operation is harmless. Right now it is not.",
+      "idea": "Retries mean a request may run at least once, possibly more. So duplicates will happen, even if rarely, and you must design for them.",
       "caption": "Response dropped; the client sees a timeout.",
       "focus": [
         "client",
@@ -220,8 +219,8 @@
     {
       "tag": "WHAT IF",
       "title": "The naive retry double-charges",
-      "body": "The app retries the same POST. The server has no memory of the first one, so it inserts a second $40 charge. The customer is billed $80 for one order, and a support ticket and a refund follow. Assume 1 million payments a day and a 0.1% rate of lost-reply-then-retry (the first charge succeeded but the reply was lost): that is about 1,000 duplicate charges daily.",
-      "idea": "Without a guard, every retry of a non-idempotent operation is a potential duplicate side effect.",
+      "body": "The app retries the same POST. The server has no memory of the first one, so it inserts a second $40 charge. The customer is billed $80 for one order, and a support ticket and refund follow. At scale this adds up. Take 1 million payments a day where 0.1% hit 'first charge worked, reply lost, retry': that is about 1,000 duplicate charges every day.",
+      "idea": "Without a guard, every retry of a non-idempotent operation can repeat its side effect.",
       "caption": "Second insert: customer billed $80.",
       "focus": [
         "client",
@@ -275,8 +274,8 @@
     {
       "tag": "CONCEPT",
       "title": "Add an idempotency key",
-      "body": "Rewind and replay the same order, this time with a key. An operation is idempotent if doing it many times has the same effect as doing it once. Some are idempotent by design, such as PUT /users/42 setting a name, because repeating them sets the same state. Creating a charge is not, so the client generates a unique key (a random UUID) per logical action and sends it in an Idempotency-Key header. Every retry reuses it.",
-      "idea": "The client names the intent once; the server uses that name to collapse repeats into one effect.",
+      "body": "Let us rewind and replay the same order, this time with a key. An operation is idempotent if doing it many times has the same effect as doing it once. Setting a name with PUT /users/42 is idempotent by design: repeating it leaves the same state. Creating a charge is not. So the client makes a unique key (a random UUID) for each user action, sends it in an Idempotency-Key header, and reuses the same key on every retry.",
+      "idea": "The client names the intent once. The server uses that name to turn repeats into one effect.",
       "caption": "Same key on every attempt for this order.",
       "focus": [
         "client",
@@ -314,8 +313,8 @@
     {
       "tag": "FLOW",
       "title": "First attempt claims the key",
-      "body": "The API looks the key up in the dedup table, which lives in the same database as the ledger. It is new, so in one atomic transaction (all-or-nothing) the API inserts the key with status in-progress, inserts the $40 charge, and saves the response to return. The key column has a unique constraint, so two concurrent attempts cannot both claim it: exactly one insert wins.",
-      "idea": "A unique constraint plus a transaction makes 'check then act' atomic; checking first in app code is a race.",
+      "body": "The API looks the key up in a dedup table (a table of keys already seen) that lives in the same database as the ledger. The key is new, so in one atomic transaction (all-or-nothing) the API stores the key, the $40 charge, and the response to send back. They commit together. The key column has a unique constraint, which means the database refuses a second row with the same key. So if two attempts arrive at once, exactly one wins.",
+      "idea": "A unique constraint plus a transaction makes 'check then act' atomic. Checking first in app code is a race.",
       "caption": "Key and charge commit together.",
       "focus": [
         "api",
@@ -349,7 +348,7 @@
       "chips": [
         {
           "node": "ledger",
-          "text": "7f3a · in-progress"
+          "text": "7f3a · saved"
         },
         {
           "node": "ledger",
@@ -366,8 +365,8 @@
     {
       "tag": "FLOW",
       "title": "The retry is recognised",
-      "body": "The reply is lost again, and the app retries with the same key. The API finds the key already stored, does not insert a second charge, and returns the saved response from the first attempt. The customer sees success, and the ledger still shows one charge. The retry cost one cheap lookup instead of a second payment.",
-      "idea": "A repeat returns the original result; it must not re-run the side effect.",
+      "body": "The reply is lost again, and the app retries with the same key. The API finds the key already stored, so it does not insert a second charge. It returns the saved response from the first attempt instead. The customer sees success, and the ledger still shows exactly one charge. In the animation, the retry costs one cheap lookup instead of a second payment.",
+      "idea": "A repeat returns the original result. It must not run the side effect again.",
       "caption": "Duplicate blocked; stored reply returned.",
       "focus": [
         "client",
@@ -432,8 +431,8 @@
     {
       "tag": "TRADE-OFF",
       "title": "Exactly-once is a stack of at-least-once",
-      "body": "The ledger publishes a 'charge created' event, reliably, for example through a transactional outbox table read by a relay. Brokers usually deliver at-least-once, so a message returns if the worker crashes before acking. Exactly-once delivery over a network is not achievable in general; vendor labels like Kafka's exactly-once semantics hold only inside the broker's own read-process-write loop. The worker keeps a processed-IDs table and skips message 91 on try 2. An external effect like an email cannot join that transaction: pass the message ID to the provider as its own idempotency key, or accept a rare duplicate.",
-      "idea": "Exactly-once effect = at-least-once delivery + idempotent processing, with the dedup record committed in the same transaction as the effect when both live in one database.",
+      "body": "The ledger also announces 'charge created' on a queue, reliably (for example with a transactional outbox: the event is saved in the same transaction, then sent by a relay). Queues usually deliver at-least-once: if a worker crashes before confirming, the message comes back. True exactly-once delivery over a network is not possible in general. So the worker keeps a table of processed message IDs, saves message 91, and skips it on try 2. An outside action like an email cannot join that transaction: pass the message ID to the provider as its own key, or accept a rare duplicate.",
+      "idea": "Exactly-once effect = at-least-once delivery + idempotent processing. Save the dedup record in the same transaction as the effect.",
       "caption": "Worker checks its processed IDs and skips the redelivery.",
       "focus": [
         "ledger",
@@ -501,7 +500,7 @@
     {
       "tag": "PITFALL",
       "title": "Edge cases that bite",
-      "body": "Keys are stored with a TTL (time to live: the key is deleted after a set time), often 24 hours. Pick a window longer than any client retry or broker redelivery can occur; a retry after it would run again. If the same key arrives with a different amount, reject it with an error such as 422 rather than guessing. If an attempt is still in progress, a concurrent retry should wait or get a 409 Conflict status, not start a second run. Keys should be random per action, never just the user ID.",
+      "body": "Keys need care. They are kept with a TTL (time to live, meaning they are deleted after a set time such as 24 hours). Pick a window longer than any client retry or queue redelivery, or a late retry would run again. If the same key arrives with a different amount, reject it with an error such as 422 instead of guessing, as the animation shows. If the first attempt is still running, a concurrent retry should wait or get a 409 Conflict, not start a second run. Make keys random per action, never just the user ID.",
       "idea": "Scope the key per action, bind it to the request payload, expire it deliberately, and handle in-flight duplicates.",
       "caption": "Key reused with a new amount is rejected.",
       "focus": [
@@ -547,7 +546,7 @@
     {
       "tag": "RECAP",
       "title": "Safe to retry",
-      "body": "Networks lose replies, so callers must retry, and retries create duplicates. The client sends one key per intent. The server claims the key atomically with the effect, returns the stored result for repeats, and expires keys after a window. Consumers of at-least-once queues do the same with message IDs. That is how systems get exactly-once effects.",
+      "body": "Networks lose replies, so callers must retry, and retries create duplicates. The fix has two sides. The client sends one key per intent. The server claims the key atomically with the effect, returns the stored result for repeats, and expires keys after a window. Queue consumers do the same with message IDs. That is how systems get exactly-once effects from at-least-once delivery.",
       "idea": "Assume duplicates will happen and make them harmless.",
       "caption": "One order, one charge, however many retries.",
       "focus": [

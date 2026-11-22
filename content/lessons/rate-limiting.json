@@ -98,8 +98,8 @@
     {
       "tag": "QUESTION",
       "title": "One client, all the capacity",
-      "body": "Our API service can comfortably handle about 200 requests per second. A buggy script in one customer's code suddenly sends 500 requests per second with the same API key. Nobody is attacking us, yet every other customer now sees timeouts. How do we stop one caller from using more than its fair share?",
-      "idea": "Rate limiting protects shared capacity by capping how much any one caller may consume.",
+      "body": "Our API can comfortably handle about 200 requests per second. Then a buggy script in one customer's code starts sending 500 requests per second with its API key (the ID that says who is calling). Nobody is attacking us, yet every other customer now sees timeouts. How do we stop one caller from using more than its fair share?",
+      "idea": "Rate limiting protects shared capacity by capping how much any one caller may use.",
       "caption": "The noisy client floods the gateway and the service.",
       "focus": [
         "abuser",
@@ -146,8 +146,8 @@
     {
       "tag": "CONCEPT",
       "title": "Token bucket",
-      "body": "Give each API key a bucket that holds up to 10 tokens and refills at 2 tokens per second. Every request must take one token, and if the bucket is empty the request is refused. A quiet client keeps a full bucket, so it can burst 10 requests at once; a steady client is held to 2 per second on average. Two numbers, capacity and refill rate, set burst size and sustained rate.",
-      "idea": "A token bucket permits bursts up to its capacity while enforcing a long-run average rate.",
+      "body": "Give each API key a bucket that holds up to 10 tokens and refills at 2 tokens per second. Every request must take one token. If the bucket is empty, the request is refused. In the animation, a normal client sends one request and spends one token, leaving 9. A quiet client keeps a full bucket, so it can burst 10 requests at once. A steady client is held to 2 per second on average. Two numbers (capacity and refill rate) set burst size and sustained rate.",
+      "idea": "A token bucket allows bursts up to its capacity while enforcing a long-run average rate.",
       "caption": "A normal client spends a token per request.",
       "focus": [
         "client",
@@ -205,8 +205,8 @@
     {
       "tag": "REJECT",
       "title": "Saying no cheaply",
-      "body": "The noisy client drains its 10 tokens in about 20 ms and then gets only the 2 refilled each second. The gateway answers the rest with HTTP 429 Too Many Requests and a Retry-After header, without touching the service or database. Rejecting costs microseconds, while serving would cost real work. Good clients read Retry-After and back off.",
-      "idea": "Reject early and cheaply with 429 and Retry-After so excess load never reaches the expensive parts.",
+      "body": "The noisy client empties its 10 tokens in about 20 ms (10 requests at 500 per second) and then gets only the 2 tokens refilled each second. The gateway answers the rest with HTTP 429 Too Many Requests and a Retry-After header (how long to wait). It does this without touching the service or database. Rejecting costs microseconds, while serving costs real work. Good clients read Retry-After and back off.",
+      "idea": "Reject early and cheaply with 429 and Retry-After, so excess load never reaches the expensive parts.",
       "caption": "The gateway returns 429 to the noisy client.",
       "focus": [
         "abuser",
@@ -253,8 +253,8 @@
     {
       "tag": "CONCEPT",
       "title": "Leaky bucket",
-      "body": "A leaky bucket works like a queue with a hole: requests enter the bucket and drain out at a fixed rate, say 2 per second. If the bucket is full, new requests overflow and are dropped. The output to the service is perfectly smooth, which is useful when the downstream cannot tolerate bursts. The price is that bursts are delayed in the queue rather than served immediately.",
-      "idea": "Token bucket allows bursts through; leaky bucket flattens them into a constant outflow.",
+      "body": "A leaky bucket is another method. Picture a queue with a hole: requests enter the bucket and drain out at a fixed rate, say 2 per second. If the bucket is full, new requests overflow and are dropped. The output to the service is perfectly smooth, which helps when the service cannot handle bursts. The price is that bursts are delayed in the queue instead of being served right away.",
+      "idea": "A token bucket lets bursts through. A leaky bucket flattens them into a constant flow.",
       "caption": "Requests drain to the service at a steady pace.",
       "focus": [
         "gateway",
@@ -293,8 +293,8 @@
     {
       "tag": "TRADE-OFF",
       "title": "Fixed vs sliding windows",
-      "body": "A simpler idea is a fixed window: allow 100 requests per minute and reset a counter at each minute boundary. The flaw is that a client can send 100 requests at 12:00:59 and 100 more at 12:01:00, which is 200 in two seconds, double the limit. A sliding window log stores timestamps and is exact but costs memory. A sliding window counter blends the current and previous window counts, which is cheap and close enough.",
-      "idea": "Fixed windows are cheap but leak a 2x burst at the boundary; sliding windows close the gap at a small cost.",
+      "body": "A simpler idea is a fixed window: allow 100 requests per minute and reset a counter at each minute boundary. The flaw: a client can send 100 requests at 12:00:59 and 100 more at 12:01:00, which is 200 in two seconds, double the limit. A sliding window log stores every timestamp, so it is exact but uses more memory. A sliding window counter blends the current and previous window counts, which is cheap and close enough.",
+      "idea": "Fixed windows are cheap but allow a 2x burst at the boundary. Sliding windows close the gap at a small cost.",
       "caption": "Two back-to-back windows let a 2x burst through.",
       "focus": [
         "abuser",
@@ -333,8 +333,8 @@
     {
       "tag": "DISTRIBUTED",
       "title": "Shared counters in Redis",
-      "body": "Real gateways run as many instances behind a load balancer. If each keeps its own bucket, a limit of 100 per minute across 10 instances silently becomes up to 1000. So the buckets live in Redis, keyed by API key. The gateway runs one Lua script that reads the bucket, refills it from elapsed time, and takes a token atomically. A separate read then write would let two instances both see one token left and both spend it.",
-      "idea": "Keep counters in one shared store and update them atomically, or the limit multiplies by the instance count.",
+      "body": "Real gateways run as many instances behind a load balancer. If each keeps its own bucket, a limit of 100 per minute across 10 instances quietly becomes up to 1,000. So the buckets live in one shared Redis (a fast in-memory store), keyed by API key. The gateway sends one Lua script (a small program that runs inside Redis) that reads the bucket, refills it from elapsed time and takes a token in one step. Doing a separate read and then a write would let two instances both see one token left and both spend it. In the animation Redis replies 'ok, 7 left' for a regular customer's key.",
+      "idea": "Keep counters in one shared store and update them atomically, or the limit multiplies by the number of instances.",
       "caption": "Every gateway instance asks Redis, which decides.",
       "focus": [
         "gateway",
@@ -379,8 +379,8 @@
     {
       "tag": "WHAT IF",
       "title": "Redis goes down",
-      "body": "Now the limiter's own dependency fails. If the gateway fails closed and rejects everything, a counter outage becomes a full outage. If it fails open and allows everything, we lose protection exactly when load may be high. A common compromise is to fall back to a coarse local limit per instance, accept some inaccuracy, and set a short timeout (a few milliseconds) on the Redis call so the limiter never slows requests. Here each instance falls back to a coarse local cap of about 20 requests per second for this key.",
-      "idea": "Decide the limiter's failure mode in advance: usually fail open or degrade to a local limit, never block all traffic.",
+      "body": "Now the limiter's own dependency fails. If the gateway fails closed (rejects everything), a counter outage becomes a full outage. If it fails open (allows everything), we lose protection exactly when load may be high. A common compromise is a coarse local limit per instance, accepting some inaccuracy, plus a short timeout (a few milliseconds) on the Redis call so the limiter never slows requests. Here this gateway instance falls back to about 20 requests per second for this key (each extra instance adds its own 20, so the real limit gets looser).",
+      "idea": "Decide the limiter's failure mode in advance. Usually fail open or use a local limit, never block all traffic.",
       "caption": "Redis is unreachable; the gateway uses a local fallback.",
       "focus": [
         "gateway",
@@ -420,8 +420,8 @@
     {
       "tag": "CONCEPT",
       "title": "Where to enforce, and on what key",
-      "body": "Limits can sit at a CDN or edge, at the API gateway, or inside each service. Edge limits stop floods cheaply; gateway limits know the customer and plan; service limits protect a specific costly endpoint such as search or export. Choose the key carefully: per API key or user is fair, while per IP punishes everyone behind a shared office or mobile NAT address. Different endpoints and plans often get different limits.",
-      "idea": "Enforce as early as the identity is known, and pick a key that matches who you want to be fair to.",
+      "body": "Limits can sit at a CDN or edge, at the API gateway, or inside each service. Edge limits stop floods cheaply. Gateway limits know the customer and plan. Service limits protect one costly endpoint such as search or export. Choose the key carefully: per API key or user is fair, while per IP punishes everyone behind a shared office or mobile address. Different endpoints and plans often get different limits.",
+      "idea": "Enforce as early as you know who the caller is, and pick a key that matches who you want to be fair to.",
       "caption": "Limits apply at the gateway, with a stricter one in the service.",
       "focus": [
         "client",
@@ -474,7 +474,7 @@
     {
       "tag": "RECAP",
       "title": "Fair shares for everyone",
-      "body": "A token bucket allows bursts at a set average rate, and a leaky bucket smooths output. Fixed windows are simple but burst at the boundary, so prefer sliding windows when accuracy matters. With many servers, keep counters in Redis and update them atomically. Return 429 with Retry-After, decide how the limiter fails, and enforce at the earliest point that knows who the caller is.",
+      "body": "A token bucket allows bursts at a set average rate. A leaky bucket smooths output. Fixed windows are simple but burst at the boundary, so prefer sliding windows when accuracy matters. With many servers, keep counters in Redis and update them atomically. Return 429 with Retry-After, decide how the limiter fails, and enforce at the earliest point that knows who the caller is.",
       "idea": "Pick an algorithm for the burst behaviour you want, share state atomically, and plan for limiter failure.",
       "caption": "The limiter shields the service from one noisy caller.",
       "focus": [
@@ -518,12 +518,12 @@
     {
       "q": "A limit of 60 requests per minute uses a fixed window. A client sends 60 requests at 10:00:59 and 60 more at 10:01:01. What happens?",
       "options": [
-        "The second batch is rejected",
         "All 120 are allowed within 2 seconds",
+        "The second batch is rejected",
         "Only 30 of the second batch pass",
         "The first batch is rejected"
       ],
-      "answer": 1,
+      "answer": 0,
       "why": "The counter resets at 10:01:00, so both batches fit in separate windows. This boundary burst is the main weakness of fixed windows."
     },
     {
@@ -541,11 +541,11 @@
       "q": "Why is the Redis rate-limit check done in a single Lua script rather than a GET followed by a SET?",
       "options": [
         "Lua is faster than any other language",
-        "It makes the check and update atomic, so two instances cannot both spend the last token",
+        "It avoids needing a key expiry",
         "Redis cannot do GET and SET separately",
-        "It avoids needing a key expiry"
+        "It makes the check and update atomic, so two instances cannot both spend the last token"
       ],
-      "answer": 1,
+      "answer": 3,
       "why": "With separate commands, two gateways can both read 1 token left and both allow a request. A script runs without interleaving, closing that race."
     },
     {

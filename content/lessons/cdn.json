@@ -107,9 +107,9 @@
     {
       "tag": "QUESTION",
       "title": "The origin is on the other side of the planet",
-      "body": "Your only server (the origin) sits in Virginia. A user in Mumbai is about 200 ms away per round trip. Over HTTP/1.1 or HTTP/2 on TCP, a fresh connection needs one round trip for TCP, one for TLS 1.3 and one for the request, so about 600 ms of network time passes, and with 60 ms for the server to render the page, the user waits about 660 ms (HTTP/3 merges the first two, which shrinks the gap, not the idea). Assume the origin also handles 1,000 requests per second of cacheable traffic.",
+      "body": "Your only server (the origin) sits in Virginia. A user in Mumbai is about 200 ms away for each round trip (a message there and back). A new connection needs one round trip for TCP, one for TLS 1.3 (the encryption setup) and one for the request itself: about 600 ms of travel. Add 60 ms for the server to build the page and the user waits about 660 ms. (HTTP/3 merges the first two trips, which shrinks the gap but not the idea.) Assume the origin gets 1,000 cacheable requests per second.",
       "idea": "Distance costs whole round trips, and the origin pays for every request that reaches it.",
-      "caption": "Every request crosses the planet to the origin.",
+      "caption": "Every request crosses the planet to reach the origin.",
       "focus": [
         "users",
         "origin"
@@ -158,8 +158,8 @@
     {
       "tag": "CONCEPT",
       "title": "Put a server near the user",
-      "body": "A CDN (content delivery network) runs hundreds of small data centers called points of presence (PoPs). DNS or anycast routing sends the user to a nearby one, here Mumbai, about 20 ms away. The user's TCP and TLS handshakes now finish at the edge in roughly 40 ms instead of 400 ms, even before any caching happens.",
-      "idea": "Terminating connections near the user is a win by itself, because handshakes are the expensive part.",
+      "body": "A CDN (content delivery network) runs hundreds of small data centers called points of presence (PoPs). DNS or anycast routing sends each user to a nearby one, here Mumbai, about 20 ms away. The TCP and TLS setup now finishes at this nearby edge in about 40 ms (two 20 ms round trips) instead of 400 ms, even before any caching happens.",
+      "idea": "Ending the connection near the user is a win by itself, because the handshakes are the expensive part.",
       "caption": "Handshake only: 40 ms with the nearby edge.",
       "focus": [
         "users",
@@ -198,8 +198,8 @@
     {
       "tag": "MISS",
       "title": "First request: a cache miss",
-      "body": "The edge has no copy of /product/42, so it forwards the request toward the origin (through a shield, covered soon). Assume the edge already holds an open connection to the origin side, so the miss adds one 200 ms round trip plus 60 ms of rendering to the 60 ms the user spends with the edge. The response carries Cache-Control: max-age=300, so the edge stores a copy for 300 seconds. Total: about 320 ms.",
-      "idea": "Even a miss beats going direct, because the handshakes finish near the user; only the cache hit removes the long trip.",
+      "body": "The edge has no copy of /product/42 yet, so it forwards the request toward the origin through a shield (a middle cache, covered soon). This is a cache miss. The user spends 60 ms with the edge (40 for the handshake, 20 for the request). We assume the edge already keeps an open connection to the origin side, so the miss adds one 200 ms round trip plus 60 ms of page building: about 320 ms in total. The response says Cache-Control: max-age=300, so the edge stores a copy for 300 seconds.",
+      "idea": "Even a miss beats going direct, because the handshakes finish near the user; only a cache hit removes the long trip.",
       "caption": "Miss: the request goes all the way to the origin.",
       "focus": [
         "users",
@@ -270,7 +270,7 @@
     {
       "tag": "HIT",
       "title": "Next request: a cache hit",
-      "body": "The next user in Mumbai asks for the same page. The edge finds a fresh copy and answers directly, so the origin never hears about it. Latency falls to about 60 ms including a fresh handshake, and less on a reused connection. If 95 percent of requests are hits, the origin sees 50 of the 1,000 requests per second.",
+      "body": "The next user in Mumbai asks for the same page. The edge finds a fresh copy and answers by itself, so the origin never hears about it. Latency is about 60 ms (40 for a fresh handshake, 20 for the request), and less on a reused connection. If 95 percent of requests are hits like this, the origin only sees 50 of the 1,000 requests per second.",
       "idea": "Hit ratio is the CDN's main dial: each point you gain removes load from the origin and delay from users.",
       "caption": "Hit: the edge answers without touching the origin.",
       "focus": [
@@ -322,7 +322,7 @@
     {
       "tag": "CACHE KEY",
       "title": "What counts as the same request?",
-      "body": "The edge stores each object under a cache key, typically host plus path plus query string (defaults vary by CDN). The diagram shows the fixed setup, where the CDN ignores utm_* parameters. Adding a session cookie makes every user unique; adding User-Agent splits the cache into hundreds of variants. Either way the hit ratio drops sharply. Static files get long TTLs, pages like /product/42 can cache for seconds or minutes, and personalized responses must be Cache-Control: private or no-store.",
+      "body": "The edge files each object under a cache key, typically host plus path plus query string (defaults vary by CDN). Requests with the same key share one cached copy. Here the CDN is set to ignore utm_* tracking parameters, so both requests map to one copy. A session cookie in the key would make every user unique, and adding User-Agent would split the cache into hundreds of variants. Either way the hit ratio crashes. Static files get long TTLs (how long a copy stays valid), pages like /product/42 cache for seconds or minutes, and personalized responses must be Cache-Control: private or no-store.",
       "idea": "Keep the cache key as small as correctness allows, and strip anything that does not change the response.",
       "caption": "Both tracking variants map to one cached copy.",
       "focus": [
@@ -366,9 +366,9 @@
     {
       "tag": "SHIELD",
       "title": "Origin shield: one miss, not hundreds",
-      "body": "A user in Tokyo asks for the same page. That PoP has an empty cache, so it misses. Without a shield, up to ~200 PoPs could each fetch the object from the origin separately. With a shield, PoPs ask one designated cache first, and only it talks to the origin. Assume the shield lifts the hit ratio from 95% to 98%, since its copy counts as a hit for the edges, so the origin sees about 20 of the 1,000 requests per second. Assume the shield sits in Virginia beside the origin, about 150 ms from Tokyo, so a shield hit costs about 60 + 150 = 210 ms: slower than an edge hit, far cheaper than a full origin trip. Place the shield close to the origin.",
-      "idea": "A shield is a cache in front of the origin that collapses many edge misses into one origin fetch.",
-      "caption": "Tokyo misses, but the shield answers.",
+      "body": "A user in Tokyo asks for the same page. The Tokyo PoP has an empty cache, so it misses. Without a shield, each of up to ~200 PoPs could fetch the object from the origin separately. With a shield, PoPs ask one designated cache first, and only that cache talks to the origin. We assume this lifts the hit ratio from 95 to 98 percent, so the origin sees about 20 of 1,000 requests per second. The shield sits in Virginia beside the origin, about 150 ms from Tokyo, so a shield hit costs 60 + 150 = 210 ms: slower than an edge hit, far cheaper than a full origin trip.",
+      "idea": "A shield is a cache in front of the origin that turns many edge misses into one origin fetch.",
+      "caption": "Tokyo misses, but the shield has the page.",
       "focus": [
         "users",
         "edge2",
@@ -429,9 +429,9 @@
     {
       "tag": "PURGE",
       "title": "Changing content that is already cached",
-      "body": "The price of product 42 changes, but copies live for up to 300 seconds. You can wait for the TTL to expire, or call the CDN's purge API to evict a URL or a group of URLs (many CDNs let you tag objects and purge by tag); this takes from under a second to a couple of minutes. The purge clears the shield too, otherwise edges would refill from its stale copy. For static files, name them app.3f9a1c.js so a new build means a new URL. Purge cannot clear copies already in browsers, so use a shorter browser max-age with a longer s-maxage for the CDN. In the diagram the purge call reaches the shield first, which fans the eviction out to every edge (a real CDN's control plane does this push for you).",
+      "body": "The price of product 42 changes, but cached copies live for up to 300 seconds. You can wait, or call the CDN's purge API to evict a URL or a group of URLs (many CDNs let you tag objects and purge by tag). That takes from under a second to a couple of minutes. The purge must clear the shield too, or edges would refill from its stale copy. In the diagram the call reaches the shield, which tells every edge to evict. For static files, use versioned names like app.3f9a1c.js so a new build means a new URL. A purge cannot clear copies already in browsers, so use a shorter browser max-age with a longer s-maxage for the CDN.",
       "idea": "Short TTLs trade hit ratio for freshness; purge gives freshness on demand but sends a burst of misses to the origin; versioned file names avoid the problem for static files.",
-      "caption": "Purge clears the shield and every edge.",
+      "caption": "The purge clears the shield and every edge.",
       "focus": [
         "origin",
         "shield",
@@ -481,9 +481,9 @@
     {
       "tag": "PUSH VS PULL",
       "title": "Who fills the cache?",
-      "body": "Everything so far was a pull CDN, the default for most sites: the edge fetches from the origin on the first miss and stores only what people ask for. In a push CDN you upload files ahead of time, which suits large files with a known release moment, like a 2 GB game patch. In practice this is often a pre-warm or prefetch call, or an upload to CDN-hosted storage that edges pull from (the shield node here stands for the CDN's storage tier). The cost is managing uploads and deletions yourself.",
+      "body": "Everything so far was a pull CDN, the default for most sites: the edge fetches from the origin on the first miss and stores only what people ask for. In a push CDN you upload files ahead of time. That suits big files with a known release moment, like a 2 GB game patch. In practice this is often a pre-warm call, or an upload to CDN storage that edges pull from (the shield node here stands for that storage tier). The cost is managing uploads and deletions yourself.",
       "idea": "Pull is the sensible default; push fits big, predictable releases where a cold miss would hurt.",
-      "caption": "Push: the content is placed before anyone asks.",
+      "caption": "Push: the content is placed at the edges before anyone asks.",
       "focus": [
         "origin",
         "shield",
@@ -531,7 +531,7 @@
     {
       "tag": "EDGE COMPUTE",
       "title": "Run small code at the edge",
-      "body": "Some responses cannot be cached verbatim: an A/B variant, a redirect by country, a token signature check. An edge function runs a short script in the PoP, with no trip to the origin. It turns the cookie into a small variant key, A or B, so the edge keeps two cached copies, not one per user. A fresh handshake (40 ms), the request (20 ms) and about 5 ms in the function give roughly 65 ms. Keep edge code tiny and stateless; consistent writes belong near the origin.",
+      "body": "Some responses cannot be cached as they are: an A/B test variant, a redirect by country, a token check. An edge function is a short script that runs inside the PoP, with no trip to the origin. Here it reads the user's cookie and turns it into a small variant key, A or B, so the edge keeps just two cached copies instead of one per user. Total: a fresh handshake (40 ms), the request (20 ms) and about 5 ms in the function, roughly 65 ms. Keep edge code tiny and stateless; consistent writes belong near the origin.",
       "idea": "Edge compute handles cheap per-request decisions near the user; heavy or stateful logic still belongs at the origin.",
       "caption": "A function picks the variant without calling the origin.",
       "focus": [
@@ -592,7 +592,7 @@
       "tag": "RECAP",
       "title": "What the edge bought us",
       "body": "The CDN moved handshakes next to the user, answered repeat requests from cache, and let a shield protect the origin, at the cost of an extra hop on a miss. Cache keys decide what is shared; TTLs, purge and versioned names decide freshness; edge functions handle small per-request logic. Result here: about 60 ms instead of 660 ms, and 20 origin requests per second instead of 1,000.",
-      "idea": "A CDN trades some freshness control for large gains in latency and origin capacity.",
+      "idea": "A CDN trades some control over freshness for large gains in latency and origin capacity.",
       "caption": "Fast for users, quiet for the origin.",
       "focus": [
         "users",

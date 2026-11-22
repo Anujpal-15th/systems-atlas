@@ -115,9 +115,9 @@
     {
       "tag": "QUESTION",
       "title": "One order, three databases",
-      "body": "A customer places an order. That means charging a card (Payment DB), reserving stock (Inventory DB), and booking a courier (Shipping DB). Each service owns its own database, so no single BEGIN ... COMMIT covers all three. What happens if the card is charged but the courier booking fails? This lesson is about keeping those three writes consistent without one shared transaction.",
-      "idea": "Once data is split across services, a single ACID transaction (atomic, consistent, isolated, durable) no longer spans the whole business operation.",
-      "caption": "Three services, each owning its data.",
+      "body": "A customer places one order. Behind the scenes that means three separate jobs: charge the card (Payment database), reserve the item (Inventory database) and book a courier (Shipping database). Each service owns its own database, so no single BEGIN ... COMMIT (one transaction where all changes succeed or none do) can cover all three. The animation shows the order arriving at the Order service. The worry: what if the card is charged but the courier booking fails? This lesson shows how to keep the three writes consistent without one shared transaction.",
+      "idea": "Once data is split across services, one ACID transaction (all-or-nothing, consistent, isolated, durable) can no longer cover the whole business action.",
+      "caption": "One order must change data in three services, each with its own database.",
       "focus": [
         "user",
         "orch",
@@ -144,9 +144,9 @@
     {
       "tag": "2PC",
       "title": "The classic answer: two-phase commit",
-      "body": "Two-phase commit adds a coordinator. In phase one it asks every participant to PREPARE: do the work, take locks, and promise you can commit. In phase two, if all said yes, it tells everyone to COMMIT; otherwise ABORT. With 5 ms round trips this takes roughly 10 to 20 ms, and the rows stay locked the whole time. Here the Order service plays coordinator.",
-      "idea": "2PC gives all-or-nothing atomicity by making every participant hold locks until the coordinator decides.",
-      "caption": "Votes collected, then COMMIT sent; locks held throughout.",
+      "body": "Two-phase commit (2PC) is the classic fix. A coordinator, here the Order service, runs two rounds. Round one: it asks every participant to PREPARE, meaning do the work, lock the rows and promise it can commit. Round two: if all answer YES it sends COMMIT, otherwise ABORT. The animation shows three PREPAREs, three YES votes, then three COMMITs. The result is all-or-nothing, but the rows stay locked the whole time. With 5 ms round trips it takes roughly 10 to 20 ms; we use 15 ms.",
+      "idea": "2PC gives all-or-nothing results, but every participant must hold its locks until the coordinator decides.",
+      "caption": "Votes are collected, then COMMIT is sent, and locks are held the whole time.",
       "focus": [
         "orch",
         "payment",
@@ -238,9 +238,9 @@
     {
       "tag": "WHY NOT",
       "title": "Why 2PC hurts at scale",
-      "body": "Suppose the coordinator crashes after collecting the YES votes but before sending its decision. Every participant is stuck: it promised to commit, so it cannot abort alone. It keeps its locks until the coordinator recovers; an operator can force a heuristic decision, but that risks inconsistency. Assume the restart takes 30 seconds, and orders on those rows queue behind the locks. Even with no crash, one slow or down participant stalls everyone. Across independent services and third-party APIs (a card processor does not speak XA, the standard 2PC protocol for databases) 2PC is rarely an option.",
+      "body": "What if the coordinator crashes after the YES votes arrive but before it sends its decision? Every participant is stuck. It promised it could commit, so it cannot abort alone, and it keeps its locks. An operator can force a guess, but that risks inconsistent data. Say the restart takes 30 seconds: for that long, other orders touching those rows wait in line. Even without a crash, one slow participant stalls everyone. And a card processor does not speak XA, the standard 2PC protocol for databases, so across independent services and third-party APIs 2PC is rarely an option.",
       "idea": "2PC blocks on coordinator failure, and it is a poor fit across independently owned services and third-party APIs.",
-      "caption": "Coordinator died; three services hold locks.",
+      "caption": "The coordinator is down and three services are stuck holding locks.",
       "focus": [
         "orch",
         "payment",
@@ -310,9 +310,9 @@
     {
       "tag": "CONCEPT",
       "title": "The saga idea",
-      "body": "A saga drops the global lock. It splits the business operation into a sequence of local transactions, one per service. Each commits immediately and releases its locks. If a later step fails, the saga runs a compensating action for every step already done, such as refunding a payment. The data is briefly inconsistent while the saga runs (eventual consistency: all services agree once the saga finishes), and that is the price: you trade atomicity and isolation for availability. Assume each step takes about 10 ms including a 5 ms round trip, and each local lock lasts about 3 ms.",
-      "idea": "A saga is a series of local commits plus a planned undo for each, giving eventual consistency instead of atomicity.",
-      "caption": "Each step commits alone and frees its locks.",
+      "body": "A saga drops the global lock. It splits the job into a chain of small local transactions, one per service. Each commits right away and releases its locks. If a later step fails, the saga runs a compensating action (a new action that reverses the business effect, like a refund) for every step already done. While it runs, the data is briefly inconsistent; it becomes consistent once the saga finishes (eventual consistency). You give up atomicity and isolation to stay available. Assume 10 ms per step and a 3 ms lock. The animation shows step one: Payment charges $40 and commits.",
+      "idea": "A saga is a series of local commits, each with a planned undo, giving eventual consistency instead of atomicity.",
+      "caption": "Payment commits on its own and frees its lock after about 3 ms.",
       "focus": [
         "orch",
         "payment"
@@ -356,9 +356,9 @@
     {
       "tag": "ORCHESTRATION",
       "title": "Orchestration: a conductor drives it",
-      "body": "Payment is already charged; here the saga continues and Shipping is the step still in progress. In an orchestrated saga one component, here the Order service, holds the workflow. Payment was already charged in the previous step; the orchestrator now commands Inventory, then Shipping, waiting for each reply. The order of steps and the failure rules live in one place, often a persisted state machine, so it can resume after a crash. Each service just does its local job and answers.",
-      "idea": "Orchestration puts the saga's flow in one place that tells each service what to do next.",
-      "caption": "Orchestrator commands each step in turn.",
+      "body": "In an orchestrated saga, one component holds the workflow. Here it is the Order service: it tells each service what to do and waits for the answer. Payment is already charged. The animation shows the orchestrator telling Inventory to reserve the item (done), then telling Shipping to book a courier, which is still in progress. The order of steps and the failure rules live in one place, often a saved state machine, so the saga can resume after a crash. Each service just does its local job and replies.",
+      "idea": "Orchestration keeps the saga's flow in one place that tells each service what to do next.",
+      "caption": "The orchestrator commands each step in turn and waits for the reply.",
       "focus": [
         "orch",
         "inventory",
@@ -407,9 +407,9 @@
     {
       "tag": "COMPENSATE",
       "title": "A step fails: run the undo steps",
-      "body": "Shipping finds no courier is available and replies with a failure. Its own transaction rolled back, so there is nothing to undo there. The orchestrator walks backwards: release the reserved stock, then refund the charge. A compensation is a new forward action, not a database rollback, because earlier steps already committed. Order steps so ones likely to fail come early and hard-to-undo ones come late, after the pivot. Card processors let you authorize first and capture only at the pivot (the go/no-go step), so an early failure is a cheap void, not a visible refund. After the pivot commits you retry forward. If a reply times out, treat the outcome as unknown and compensate anyway.",
-      "idea": "Compensating actions are new transactions that semantically reverse committed steps, run in reverse order.",
-      "caption": "Failure triggers refund and stock release.",
+      "body": "Shipping finds no courier and reports failure. Its own transaction rolled back, so there is nothing to undo there. The orchestrator walks backwards: it releases the reserved stock, then refunds the $40. These are new forward actions, not database rollbacks, because those steps already committed. Tip: put steps likely to fail early and hard-to-undo steps late, after the pivot (the go/no-go step). Here Shipping fails last, so a real design might book the courier first, or only authorize the card and capture it at the pivot, so an early failure is a quiet void, not a visible refund. If a reply times out, treat the result as unknown and compensate anyway.",
+      "idea": "Compensating actions are new transactions that reverse committed steps, run in reverse order.",
+      "caption": "No courier: the saga releases the stock, then refunds the payment.",
       "focus": [
         "orch",
         "payment",
@@ -465,9 +465,9 @@
     {
       "tag": "CHOREOGRAPHY",
       "title": "Choreography: services react to events",
-      "body": "The alternative has no conductor. The Order service publishes OrderPlaced on the event bus. Payment reacts and publishes PaymentTaken, Inventory reacts and publishes StockReserved, and Shipping reacts to that. Every service knows only which events it listens to and emits. There is no central coordinator to fail, though the event bus itself must be highly available. Adding a listener needs no change to the others, but nobody holds the whole flow. Each bus hop adds about 5 ms of publish and deliver time, so this run takes about 30 ms.",
+      "body": "The alternative has no conductor. The Order service publishes an OrderPlaced event on the event bus (a shared message channel). Payment hears it, charges, and publishes PaymentTaken. Inventory hears that, reserves stock and publishes StockReserved, and Shipping reacts to that. Each service only knows which events it listens to and which it emits. There is no central coordinator to fail, though the bus itself must stay highly available. Adding a listener changes nothing else, but nobody holds the whole flow. Each bus hop adds about 5 ms, so the six hops shown take about 30 ms.",
       "idea": "Choreography encodes the saga as a chain of events, with no central coordinator and no single place that shows the whole flow.",
-      "caption": "Events pass the baton through the bus.",
+      "caption": "Each event passes the baton to the next service through the bus.",
       "focus": [
         "orch",
         "payment",
@@ -539,9 +539,9 @@
     {
       "tag": "TRADE-OFF",
       "title": "Choosing between the two",
-      "body": "Watch a choreographed failure: Shipping emits ShipFailed, Inventory releases stock, and Payment reacts to that to refund (Payment could also listen to ShipFailed directly). As a rule of thumb, choreography suits short sagas of two to four steps with few owners, because it is simple and loosely coupled. Past that, the event chain becomes hard to follow and cyclic dependencies creep in, so orchestration pays off: one place to read, test, time out, and monitor the flow. Orchestrators add a component to run and can attract business logic, so keep them to sequencing only.",
+      "body": "Choreography handles failure too. Shipping emits ShipFailed, Inventory hears it and releases stock, and Payment reacts to that by refunding. (Payment could also listen to ShipFailed directly.) As a rule of thumb, choreography suits short sagas of two to four steps with few owners, because it is simple and loosely coupled. Beyond that, the event chain is hard to follow and circular dependencies creep in, so orchestration pays off: one place to read, test, time out and monitor. Its cost is one more component to run, and it can attract business logic, so keep it to sequencing.",
       "idea": "Choreography wins on coupling for small flows; orchestration wins on visibility once flows grow or branch.",
-      "caption": "Choreographed failure: ShipFailed -> stock released -> refund.",
+      "caption": "Choreographed failure: ShipFailed, then stock released, then refund.",
       "focus": [
         "shipping",
         "broker",
@@ -604,9 +604,9 @@
     {
       "tag": "PITFALLS",
       "title": "Retries, duplicates, and dirty reads",
-      "body": "Messages are usually delivered at least once, so every step and compensation must be idempotent: refunding twice must not refund twice, so key each command with the saga and step ID. Retry compensations with backoff, and alert a human if one cannot succeed. Write the local change and the outgoing message in one local transaction (a transactional outbox) so a crash cannot lose the next step. Since each step is visible once committed, another request can see an item as reserved early; semantic locks, such as a PENDING flag, help.",
-      "idea": "Sagas need idempotent steps and explicit handling of intermediate state, because they offer no isolation.",
-      "caption": "Duplicate refund command is ignored.",
+      "body": "Messages are usually delivered at least once, so duplicates happen. Every step and compensation must be idempotent (safe to run twice, with the same result). The animation sends refund #881 twice, and Payment answers 'already done' the second time because each command carries a saga and step ID. Retry compensations with backoff, and alert a human if one cannot succeed. Save the local change and the outgoing message in one local transaction (a transactional outbox) so a crash cannot lose the next step. Because each step is visible once committed, mark in-progress data with a PENDING flag (a semantic lock).",
+      "idea": "Sagas need idempotent steps and explicit handling of half-finished state, because they give no isolation.",
+      "caption": "The duplicate refund command is ignored.",
       "focus": [
         "orch",
         "payment"
@@ -650,9 +650,9 @@
     {
       "tag": "RECAP",
       "title": "Atomic, or available",
-      "body": "2PC gives atomic commits across services but blocks on coordinator failure and holds locks, so it is rare between microservices. A saga gives up atomicity and isolation: each local transaction commits, and failures trigger compensations in reverse order. Pick orchestration for longer or branching flows and choreography for short ones. Make every step idempotent and plan for intermediate states.",
+      "body": "2PC gives atomic commits across services, but it blocks if the coordinator fails and holds locks, so it is rare between microservices. A saga gives up atomicity and isolation: each local transaction commits, and a failure triggers compensations in reverse order. Use orchestration for longer or branching flows and choreography for short ones. Make every step idempotent, and plan for the in-between states.",
       "idea": "Replace one big lock with small commits and planned undo steps, and design for the in-between.",
-      "caption": "Local commits plus compensations.",
+      "caption": "Local commits plus compensations when something fails.",
       "focus": [
         "user",
         "orch",
@@ -671,11 +671,11 @@
       "chips": [
         {
           "node": "orch",
-          "text": "long flows"
+          "text": "orchestrate: long"
         },
         {
           "node": "broker",
-          "text": "short flows"
+          "text": "choreograph: short"
         },
         {
           "node": "payment",

@@ -123,9 +123,9 @@
     {
       "tag": "QUESTION",
       "title": "Charge once, no matter what",
-      "body": "A customer taps Pay on a 50.00 order. The request leaves the phone, but the response is lost in a tunnel. The app cannot tell whether the charge happened, so it retries. Networks fail constantly, so retries are certain. The design question is how to make the retry harmless, because charging someone twice is the one bug a payment system must never ship.",
+      "body": "A customer taps Pay on a 50.00 order. The request leaves the phone, but the response gets lost in a tunnel. The app cannot tell whether the charge happened, so it sends the request again. Networks fail all the time, so retries are certain. The design question is how to make a retry harmless, because charging someone twice is the one bug a payment system must never ship.",
       "idea": "In payments, retries are guaranteed, so the system must be safe under repetition by design.",
-      "caption": "The merchant app sends a payment and may have to send it again.",
+      "caption": "The merchant app sends a payment, and may have to send it again.",
       "focus": [
         "client",
         "api"
@@ -159,9 +159,9 @@
     {
       "tag": "CONCEPT",
       "title": "The idempotency key",
-      "body": "The client generates a random key (a UUID) once per purchase intent and sends it in a header on every attempt. The API first inserts that key into a store with a unique constraint, saving a hash of the request body. Whoever inserts first owns the work. Later requests with the same key are not processed again; they get the saved outcome. The same key with a different body is rejected as a client bug. If the first attempt is still running, the duplicate waits or gets a 409 Conflict. Keys are scoped per merchant.",
+      "body": "The client makes a random key (a UUID) once per purchase and sends it in a header on every attempt. This is the idempotency key: \"idempotent\" means doing it twice has the same effect as doing it once. The API first inserts the key into a store with a unique constraint, saving a hash of the request body. Whoever inserts first owns the work. Later requests with the same key are not processed again; they get the saved outcome. The same key with a different body is rejected as a client bug. If the first attempt is still running, the duplicate waits or gets a 409 Conflict.",
       "idea": "A unique-keyed insert before any side effect decides, atomically, who is allowed to do the work.",
-      "caption": "The API claims the key in a store before touching money.",
+      "caption": "The API claims the key in a store before touching any money.",
       "focus": [
         "client",
         "api",
@@ -212,9 +212,9 @@
     {
       "tag": "FLOW",
       "title": "Authorize with the PSP",
-      "body": "A payment service provider (PSP) such as a card processor talks to the card networks and banks for us. The API records the payment as PENDING in the payments table (in the same transaction as the key claim if both live in one database; the diagram draws them separately for clarity), then calls the PSP. It also sends its own payment id as the PSP's idempotency key, so the PSP protects us the same way we protect the merchant. The PSP approves and returns an authorization id. Many PSPs let you authorize and capture in one call; we assume a one-step charge here, with funds settling to the merchant days later.",
+      "body": "A payment service provider (PSP), such as a card processor, talks to the card networks and banks for us. The API records the payment as PENDING in the payments database, then calls the PSP. (The diagram draws the key store and payments database separately; if they share one database, the key claim and this record can be one transaction.) It also sends its own payment id as the PSP's idempotency key, so the PSP protects us the same way we protect the merchant. The PSP approves and returns an authorization id. We assume a one-step charge, with funds reaching the merchant days later.",
       "idea": "Idempotency must hold at every hop: our API, and again on the call to the provider.",
-      "caption": "Happy path: payment recorded as pending, then approved by the PSP.",
+      "caption": "Happy path: the payment is recorded as pending, then approved by the PSP.",
       "focus": [
         "api",
         "ledger",
@@ -263,7 +263,7 @@
     {
       "tag": "WHAT IF",
       "title": "The call times out",
-      "body": "Now replay the same attempt where the reply is lost: the PSP charged the card, but its response never reached us. After a 10 second timeout the API holds a state it cannot resolve. A timeout is not a failure. The money may have moved. The API marks the payment UNKNOWN in the payments table, keeps the key claimed, and must not release the order or issue a refund yet. Guessing 'failed' here is how double charges and lost sales are born.",
+      "body": "Now replay it with the reply lost: the PSP charged the card, but its answer never reached us. After a 10 second timeout, the API cannot tell what happened. A timeout is not a failure; the money may have moved. So the API marks the payment UNKNOWN, keeps the key claimed, and does not ship the order or refund yet. Guessing \"failed\" here is how double charges and lost sales are born.",
       "idea": "A timeout means 'unknown'. Treat unknown as its own state and resolve it by asking, never by guessing.",
       "caption": "The PSP charged the card, but its reply is lost.",
       "focus": [
@@ -312,9 +312,9 @@
     {
       "tag": "FLOW",
       "title": "The retry replays safely",
-      "body": "The client retries with the same key. The API finds the key already claimed and the payment UNKNOWN. It does not create a second charge. It calls the PSP again with the same PSP idempotency key, and the PSP returns the original approval instead of charging twice. The API stores that result against the key, and every later retry gets it back instantly. The real charge count stays at one.",
+      "body": "The client retries with the same key. The API finds the key already claimed and the payment UNKNOWN, so it does not make a second charge. It calls the PSP again with the same PSP idempotency key, and the PSP returns the original approval instead of charging twice. The API saves that result against the key, and every later retry gets it back instantly. The real charge count stays at one.",
       "idea": "Retry with the same key is a question ('what happened?'), not a second command.",
-      "caption": "Same key everywhere, so the PSP replays the first result.",
+      "caption": "The same key at every step lets the PSP replay its first result.",
       "focus": [
         "client",
         "api",
@@ -393,9 +393,9 @@
     {
       "tag": "CONCEPT",
       "title": "Double-entry ledger",
-      "body": "Once approved, the API writes the money movement to an append-only ledger. Every transaction has at least two rows that sum to zero: debit the PSP receivable (money the PSP owes us) 50.00, credit the merchant's payable 50.00 (less a fee row if there is one). Ledger rows are never updated or deleted; only the payment record's status is mutable. A mistake is fixed by a new, opposite transaction. Because every transaction balances, a single query of total debits minus total credits must return zero.",
+      "body": "Once approved, the API writes the money movement to a ledger, a permanent record of every transaction. It is double-entry: each transaction has at least two rows that add up to zero. Here we debit the PSP receivable (money the PSP owes us) 50.00 and credit the merchant's payable 50.00, less a fee row if there is one. Ledger rows are never changed or deleted. A mistake is fixed by a new, opposite transaction. Because every transaction balances, total debits minus total credits must always be zero.",
       "idea": "Double entry makes money conserved by construction, and any imbalance is instantly visible.",
-      "caption": "Two balanced rows are appended, written in one DB transaction.",
+      "caption": "Two balanced rows are added in one database transaction.",
       "focus": [
         "api",
         "ledger"
@@ -438,9 +438,9 @@
     {
       "tag": "FLOW",
       "title": "Webhooks report later outcomes",
-      "body": "The PSP also posts webhooks such as payment.succeeded, because some outcomes arrive after the API call and responses can be lost. Our endpoint verifies the PSP's signature, drops each event on a queue and acknowledges fast. A worker marks the payment CAPTURED. Delivery is at least once, so an event can arrive three times or out of order. Record the event id (unique constraint) and apply the state change in the same database transaction.",
+      "body": "The PSP also sends webhooks (messages it posts to our server) such as payment.succeeded, because some outcomes arrive later and responses can be lost. Our endpoint checks the PSP's signature, puts each event on a queue, and replies fast. A worker marks the payment CAPTURED. Delivery is at-least-once, so an event can arrive three times or out of order. So we save each event id under a unique constraint and apply the state change in the same database transaction.",
       "idea": "Webhooks are at-least-once and unordered, so consume them with dedup by event id and state checks.",
-      "caption": "A duplicate webhook is absorbed; the ledger changes once.",
+      "caption": "A duplicate webhook is absorbed, so the ledger changes only once.",
       "focus": [
         "psp",
         "queue",
@@ -493,9 +493,9 @@
     {
       "tag": "RECONCILE",
       "title": "Reconciliation finds what slipped",
-      "body": "Even good code loses events: a webhook dropped after retries, a bug, a manual PSP refund. So each day the worker downloads the PSP's settlement report and compares it line by line with our ledger. Here the PSP lists a 50.00 refund that our ledger never saw, leaving a 50.00 (5,000 cents) gap. Bank statements get the same treatment. The worker raises it as a break for investigation rather than silently fixing it.",
+      "body": "Even good code loses events: a webhook dropped after retries, a bug, a manual refund at the PSP. So each day the worker downloads the PSP's settlement report and compares it line by line with our ledger. Here the PSP lists a 50.00 refund our ledger never saw, leaving a gap of 5,000 cents. Bank statements get the same check. The worker raises a \"break\" for people to investigate instead of silently fixing it.",
       "idea": "Reconciliation is the independent audit that catches errors the real-time path cannot see.",
-      "caption": "Daily report vs ledger exposes a 50.00 mismatch.",
+      "caption": "The daily report versus the ledger exposes a 50.00 mismatch.",
       "focus": [
         "worker",
         "psp",
@@ -550,7 +550,7 @@
     {
       "tag": "CONCEPT",
       "title": "Exactly-once is a promise we build",
-      "body": "No network gives exactly-once delivery. What we build is at-least-once delivery plus idempotent handlers, which together have the same effect as exactly-once. The remaining gap is fixed with an adjusting (compensating) ledger entry that books the missing refund, never by editing history. As a rule of thumb, keep idempotency keys at least 24 hours (longer than your clients' retry window, and resolve UNKNOWN payments before the PSP's own key expires). Keep ledger rows for the audit and regulatory retention period, often years. Money amounts are integers in minor units (cents), never floats.",
+      "body": "No network gives true exactly-once delivery. What we build is at-least-once delivery plus idempotent handlers, which has the same effect. The remaining gap is closed with a compensating ledger entry that books the missing refund, never by editing history. Rules of thumb: keep idempotency keys at least 24 hours (longer than clients retry, and resolve UNKNOWN payments before the PSP's own key expires); keep ledger rows for the legal retention period, often years. Store money as whole numbers in cents, never as floats.",
       "idea": "Effectively-once = retries + idempotency + append-only corrections. Never edit the past; add to it.",
       "caption": "A compensating entry books the refund and the gap closes.",
       "focus": [
@@ -596,7 +596,7 @@
     {
       "tag": "RECAP",
       "title": "Four layers of safety",
-      "body": "Idempotency keys make client retries safe. A PENDING, UNKNOWN, CAPTURED state machine makes timeouts safe. The double-entry, append-only ledger makes the books self-checking. Deduped webhooks and daily reconciliation catch whatever still slips through. Each layer assumes the one before it will sometimes fail, and that mindset is the whole design.",
+      "body": "Four layers of safety. Idempotency keys make client retries safe. A PENDING, UNKNOWN, CAPTURED state machine makes timeouts safe. The double-entry, append-only ledger makes the books check themselves. Deduplicated webhooks and daily reconciliation catch whatever still slips through. Each layer assumes the one before it will sometimes fail, and that mindset is the whole design.",
       "idea": "Assume every step can repeat or fail; build each layer so repeating it changes nothing.",
       "caption": "Safe retries, balanced books, and an independent audit.",
       "focus": [
@@ -659,10 +659,10 @@
       "options": [
         "It uses less disk space than updating rows",
         "It lets the database skip transactions",
-        "Corrections are new opposite entries, so history is auditable and total debits always equal credits",
-        "It removes the need for reconciliation"
+        "It removes the need for reconciliation",
+        "Corrections are new opposite entries, so history is auditable and total debits always equal credits"
       ],
-      "answer": 2,
+      "answer": 3,
       "why": "Never editing rows preserves the audit trail, and balanced transactions make any bug show up as a nonzero sum. It does not replace reconciliation, which compares against outside parties."
     },
     {

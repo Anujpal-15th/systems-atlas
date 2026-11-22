@@ -141,9 +141,9 @@
     {
       "tag": "QUESTION",
       "title": "Which cache holds this key?",
-      "body": "Your site keeps 30 million cached items on three cache servers, A, B and C, because no single machine has the memory. Every client must agree, with no coordination, on which server owns which key. If two clients disagree, one will write a value the other can never find. How do you split keys so everyone agrees, and so growing the cluster later does not hurt?",
+      "body": "Your site keeps 30 million cached items on three cache servers, A, B and C, because no single machine has enough memory. Every client must agree on which server owns which key, without talking to each other. If two clients disagree, one writes a value the other can never find. How do you split keys so everyone agrees, and so that adding a server later does not hurt? Server D is waiting to be added.",
       "idea": "Partitioning needs a rule that every client computes identically, and that survives the cluster changing size.",
-      "caption": "Three caches in use; D is waiting to be added.",
+      "caption": "Three caches are in use; Cache D is waiting to be added.",
       "focus": [
         "client",
         "a",
@@ -161,9 +161,9 @@
     {
       "tag": "FLOW",
       "title": "The simple rule: hash mod N",
-      "body": "The obvious answer is server = hash(key) mod 3. A good hash spreads keys evenly, so each server gets about a third, and every client computes the same answer. The key user:42 might hash to 7, and 7 mod 3 is 1, so it lives on B. This works well for as long as the number of servers never changes.",
+      "body": "The obvious rule is server = hash(key) mod 3. A hash function turns any key into a number, and mod 3 takes the remainder after dividing by 3. A good hash spreads keys evenly, so each server gets about a third, and every client computes the same answer. Example: user:42 hashes to 7, and 7 mod 3 is 1, so it lives on B (A is 0, B is 1, C is 2). The animation shows a hit on B. This works well as long as the number of servers never changes.",
       "idea": "hash(key) mod N is stateless and even, but it bakes the server count into every key's address.",
-      "caption": "user:42 hashes to B; hit rate is a healthy 95%.",
+      "caption": "user:42 hashes to Cache B, and the hit rate is a healthy 95%.",
       "focus": [
         "client",
         "ring",
@@ -215,9 +215,9 @@
     {
       "tag": "PROBLEM",
       "title": "Add one server, lose most of the cache",
-      "body": "Traffic grows, so you add Cache D and change the rule to mod 4. Now 7 mod 4 is 3, not 1. A key stays put only if its hash gives the same answer under both moduli, which is about one key in four. Roughly 75% of keys now map to a server that does not hold them. They all miss at once and stampede the database. (Assume a 95% baseline hit rate and that moved keys miss until refilled, so the hit rate drops to about 24%.)",
-      "idea": "With mod N, going from N to N+1 servers remaps about N/(N+1) of all keys, so scaling out causes a cache wipe.",
-      "caption": "75% of lookups miss and fall through to the database.",
+      "body": "Traffic grows, so you add Cache D and change the rule to mod 4. Now 7 mod 4 is 3, which is D, not B, and D is empty, so the lookup misses and goes to the database. A key stays put only if its hash gives the same answer under both rules, about one key in four. So roughly 75% of keys now point at a server that does not hold them. They all miss at once and stampede the database. (Assume a 95% baseline hit rate and that moved keys miss until refilled, so the hit rate falls to about 24%.)",
+      "idea": "With mod N, going from N to N+1 servers remaps about N/(N+1) of all keys, so scaling out wipes most of the cache.",
+      "caption": "75% of lookups now miss the cache and fall through to the database.",
       "focus": [
         "ring",
         "d",
@@ -263,7 +263,7 @@
     {
       "tag": "CONCEPT",
       "title": "Put servers and keys on a ring",
-      "body": "Start over with servers A, B and C. Consistent hashing hashes both servers and keys into the same range, say 0 to 2^32, and bends that range into a circle. Each server sits at the point where its name hashes. To find a key's owner, hash the key, then walk clockwise until you hit the first server. Each client holds this ring lookup locally, not on a separate server. Every client that has the same server list builds the same ring, so no per-key coordination is needed.",
+      "body": "Start over with servers A, B and C. Consistent hashing hashes both servers and keys onto the same number range, say 0 to 2^32, then bends that range into a circle called the ring. Each server sits where its name hashes. To find a key's owner, hash the key, then walk clockwise until you reach the first server. Each client does this lookup locally, and clients with the same server list build the same ring, so no per-key coordination is needed.",
       "idea": "A key belongs to the first node clockwise from its hash, so ownership depends on neighbours, not on the total count.",
       "caption": "user:42 lands between A and B and walks clockwise to B.",
       "focus": [
@@ -321,7 +321,7 @@
     {
       "tag": "ADD NODE",
       "title": "A new node steals one arc",
-      "body": "Cache D joins and hashes to a point on the ring, between C and A. Only the keys on the arc just before D, which used to walk past to A, now stop at D. Every other key still reaches the same server as before. With four nodes that arc covers, on average, about a quarter of the keys (arcs are random, which step 7 returns to), so 25% move. A is the node that loses them, and D can fetch them from A or let them refill.",
+      "body": "Cache D joins and hashes to a point on the ring, between C and A. Only the keys on the arc just before D now stop at D. Those keys used to walk past D to A. Every other key still reaches the same server as before. With four nodes that arc covers on average about a quarter of the keys (arcs are random; step 7 returns to this), so 25% move and the hit rate dips to about 71% until they refill. D can fetch those keys from A or just let them refill from the database.",
       "idea": "Adding a node moves only the keys it takes over, about 1/N of the total, and they all come from one neighbour.",
       "caption": "D takes over the arc just before it; those keys came from A.",
       "focus": [
@@ -369,7 +369,7 @@
     {
       "tag": "REMOVE NODE",
       "title": "A failed node hands off to its successor",
-      "body": "Now Cache B crashes. Its keys do not scatter everywhere. Walking clockwise from B's old arc, the next node, C, becomes the owner. Keys owned by A, C and D are untouched, so their cached data stays warm. Only B's share of about a quarter misses once, then refills from the database.",
+      "body": "Now Cache B crashes. Its keys do not scatter everywhere. Walking clockwise from B's old arc, the next node, C, becomes the owner. Keys owned by A, C and D are untouched, so their cached data stays warm. Only B's share, about a quarter of all keys, misses once and then refills from the database. The hit rate dips to about 71% meanwhile.",
       "idea": "Removing a node affects only the keys it owned; every other node keeps its data.",
       "caption": "B's keys fall to C; A and D are unaffected.",
       "focus": [
@@ -428,7 +428,7 @@
     {
       "tag": "PROBLEM",
       "title": "Random arcs are uneven",
-      "body": "Hashing four server names onto a circle gives arcs of random length, so one node can easily own 40% of the ring while another owns 10%. Worse, when a node dies its whole arc lands on one successor, which may double its load and then also fail. With one point per server and unlucky arcs, a hot node can run close to twice the average.",
+      "body": "Hashing four server names onto a circle gives arcs of random length. One node can easily own 40% of the ring while another owns 10%. Worse, when a node dies its whole arc lands on one successor, which may double that node's load and make it fail too. In this unlucky example C ends up at 190% of the average load, close to twice the average.",
       "idea": "With one point per server, ring positions are luck, and a dead node's load goes to a single neighbour.",
       "caption": "C absorbs all of B's load and runs far above average.",
       "focus": [
@@ -469,9 +469,9 @@
     {
       "tag": "FIX",
       "title": "Virtual nodes smooth the load",
-      "body": "Instead of one point, each physical server gets many virtual nodes (vnodes), for example 128 points, each hashed from a name like C#17. The server owns many small arcs scattered around the ring. As a rule of thumb, load lands within roughly 10% of equal, and when a server dies its arcs pass to many different neighbours. A bigger machine can simply be given more vnodes. The trade-off: more vnodes means a bigger ring to store and more peers involved in rebuilds.",
+      "body": "Instead of one point, each physical server gets many virtual nodes (vnodes), for example 128 points, each hashed from a name like C#17. The server owns many small arcs scattered around the ring. As a rule of thumb, load then lands within roughly 10% of equal (the busiest node drops to 110% of average), and when a server dies its arcs pass to many different neighbours. A bigger machine can simply be given more vnodes. The trade-off: more vnodes means a bigger ring to store and more peers involved in rebuilds.",
       "idea": "Many small arcs per server turn random imbalance into a near-even split, and spread a failure across all survivors.",
-      "caption": "Each server owns many scattered arcs; load is nearly even.",
+      "caption": "Each server owns many scattered arcs, so load is nearly even.",
       "focus": [
         "ring",
         "a",
@@ -530,9 +530,9 @@
     {
       "tag": "IN PRACTICE",
       "title": "Caches and Dynamo-style stores",
-      "body": "Cache clients such as memcached libraries use a ring so adding a server does not flush everything. Dynamo-style databases, such as Cassandra and Riak, follow the design of Amazon's original Dynamo paper (the managed DynamoDB service works differently). A key is stored on the next several distinct physical servers clockwise, typically 3, giving replication on top of partitioning. With vnodes, the next points clockwise may belong to the same machine, so the walk skips them until it has 3 different physical servers. Nodes share ring membership by gossip, so any node can route a request.",
+      "body": "Cache clients such as memcached libraries use a ring so adding a server does not flush everything. Dynamo-style databases such as Cassandra and Riak follow the design of Amazon's original Dynamo paper (the managed DynamoDB service works differently). There, a key is stored on the next several distinct physical servers clockwise, typically 3. That adds replication on top of partitioning. With vnodes the next points may belong to the same machine, so the walk skips them until it has 3 different servers. Nodes share ring membership by gossip, so any node can route a request.",
       "idea": "The same ring that places keys also picks replicas: the next few distinct nodes clockwise.",
-      "caption": "A key is copied to the next nodes clockwise.",
+      "caption": "A key is copied to the next distinct nodes clockwise.",
       "focus": [
         "a",
         "b",
@@ -576,7 +576,7 @@
     {
       "tag": "RECAP",
       "title": "Stable ownership under change",
-      "body": "Mod N is simple but remaps about N/(N+1) of keys when the count changes. A hash ring maps keys and nodes to one circle, so a key belongs to the next node clockwise and a topology change moves only about one node's share (1/N) of the keys. Virtual nodes fix uneven arcs and let big machines carry more. Rebalancing is limited, not free: moved keys still need to be copied or refilled.",
+      "body": "Mod N is simple but remaps about N/(N+1) of keys when the server count changes. A hash ring puts keys and nodes on one circle, so a key belongs to the next node clockwise, and a change moves only about one node's share (1/N) of the keys. Virtual nodes fix uneven arcs and let big machines carry more. Rebalancing is limited, not free: moved keys still need to be copied or refilled.",
       "idea": "Consistent hashing makes cluster membership changes local instead of global.",
       "caption": "Ring plus vnodes: small, even, local moves.",
       "focus": [
@@ -626,12 +626,12 @@
     {
       "q": "On a hash ring with 5 equal nodes (one ring point each), a sixth is added. Roughly what share of keys move, and where do they come from?",
       "options": [
+        "About 1/6 of keys, all taken from the new node's clockwise neighbour",
         "About 5/6 of keys, from every node equally",
         "About 1/6 of keys, taken evenly from all five existing nodes",
-        "About 1/6 of keys, all from the new node's clockwise successor",
         "About 1/6 of keys, from the new node's own old data"
       ],
-      "answer": 2,
+      "answer": 0,
       "why": "With one point per node, the new node claims the arc just before it, roughly 1/6 of the ring, and every key in that arc previously belonged to the next node clockwise. All other keys keep their owner. Virtual nodes spread this donation across many nodes instead of one."
     },
     {

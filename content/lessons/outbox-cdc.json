@@ -124,7 +124,7 @@
     {
       "tag": "QUESTION",
       "title": "The order exists, the search does not",
-      "body": "A customer places an order. The Orders service saves it in its database and also needs to tell the rest of the system: the search index, the cache, the email service. Those live in other systems. How do you make sure the database row and the announcement both happen, or neither does? Assume about 1,000 orders per second in this lesson.",
+      "body": "A customer places an order. The Orders service saves it in its database. It also needs to tell the rest of the system: the search index, the cache, the email service. Those live in other systems. How do you make sure the database row and the announcement both happen, or neither does? We assume about 1,000 orders per second in this lesson.",
       "idea": "One business action must change the database and notify others, and those are two different systems.",
       "caption": "An order arrives and is saved in the database.",
       "focus": [
@@ -161,8 +161,8 @@
     {
       "tag": "PROBLEM",
       "title": "The dual write",
-      "body": "The naive fix: save to the database, then publish to the broker. These are two separate writes with no shared transaction. If the service crashes or the broker is unreachable between them, the order is saved but the event is gone, and search never learns about it. Swapping the order is no better: you may announce an order that then fails to save. If even 0.1 percent of publishes fail at 1,000 per second, that is about 3,600 lost events per hour.",
-      "idea": "Two independent writes cannot be made atomic by ordering them carefully; one of them can always fail alone.",
+      "body": "The naive fix: save to the database, then publish to the broker (the message system). These are two separate writes with no shared transaction. If the service crashes, or the broker is unreachable, between them, the order is saved but the event is gone, and search never learns of it. Swapping the order does not help: you may announce an order that then fails to save. If even 0.1 percent of publishes fail at 1,000 per second, that is 1 per second, about 3,600 lost events per hour.",
+      "idea": "Two separate writes cannot be made atomic just by ordering them carefully. One of them can always fail alone.",
       "caption": "The row is saved but the publish fails, so the event is lost.",
       "focus": [
         "orders",
@@ -214,9 +214,9 @@
     {
       "tag": "CONCEPT",
       "title": "Transactional outbox",
-      "body": "Instead of calling the broker, the service writes the event into an outbox table in the same database, inside the same transaction as the order row. The database guarantees both rows commit together or neither does. Now the event is durable the moment the order is. Publishing becomes a separate, retryable job that reads the outbox, so a broker outage can delay events but never lose them.",
+      "body": "Instead of calling the broker, the service writes the event into an outbox table in the same database, inside the same transaction as the order row. A transaction means both rows commit together or neither does. So the event is durable the moment the order is. Publishing becomes a separate, retryable job that reads the outbox. A broker outage can delay events but never lose them. In the HUD, lost stays 0 and one unsent row waits.",
       "idea": "Use the one thing you already trust, a single local transaction, to make the data and the event inseparable.",
-      "caption": "Order row and outbox row commit in one transaction.",
+      "caption": "The order row and the outbox row commit in one transaction.",
       "focus": [
         "orders",
         "db"
@@ -260,9 +260,9 @@
     {
       "tag": "CONCEPT",
       "title": "Who moves rows to the broker?",
-      "body": "Something must read the outbox and publish. The simple way is a polling publisher: every few hundred milliseconds it runs SELECT on rows not yet sent, publishes them, and marks them sent. It works, but it adds constant query load, adds latency up to the poll interval, and needs care to keep per-order ordering with several pollers. The alternative is to read the database's own change log, which is next. We draw the relay on the connector box; in step 4 it is replaced by a log reader.",
-      "idea": "Polling the outbox is correct and simple; its costs are query load and added delay.",
-      "caption": "A polling relay (the same box that becomes CDC next) reads unsent rows and publishes",
+      "body": "Something must read the outbox and publish it. The simple way is a polling publisher. Every few hundred milliseconds it runs a SELECT for unsent rows, publishes them and marks them sent. It works, but it adds constant query load, adds delay up to the poll interval (HUD: 500 ms until the event reaches the log), and needs care to keep per-order ordering when several pollers run. The alternative is to read the database's own change log, which is next. Here the connector box plays the polling relay.",
+      "idea": "Polling the outbox is correct and simple. Its costs are query load and added delay.",
+      "caption": "A polling relay reads unsent rows, publishes them and marks them sent.",
       "focus": [
         "db",
         "cdc",
@@ -295,7 +295,7 @@
         }
       ],
       "metrics": {
-        "unsent": "1",
+        "unsent": "0",
         "lag": "500"
       },
       "chips": [
@@ -305,7 +305,7 @@
         },
         {
           "node": "db",
-          "text": "1 unsent row"
+          "text": "1 row marked sent"
         },
         {
           "node": "cdc",
@@ -317,7 +317,7 @@
     {
       "tag": "CDC",
       "title": "Change data capture from the log",
-      "body": "Every database already records committed changes in its write-ahead log (the WAL in Postgres, the binlog in MySQL) for crash recovery and replication. A CDC connector such as Debezium reads that log, turns each new outbox insert into an event, and publishes it. It never queries your tables, sees changes in commit order, and typically delivers in tens to a few hundred milliseconds. It remembers its log position so it can resume after a restart.",
+      "body": "Every database already writes committed changes to a log for crash recovery and replication: the write-ahead log (WAL) in Postgres, the binlog in MySQL. A CDC (change data capture) connector such as Debezium reads that log, turns each new outbox insert into an event and publishes it. It never queries your tables, sees changes in commit order, and typically delivers in tens to a few hundred milliseconds (HUD: 300 ms to reach the log). It remembers its log position so it can resume after a restart.",
       "idea": "CDC turns the database's own commit log into an event stream, with no polling and no extra queries.",
       "caption": "The connector tails the log and publishes the new event.",
       "focus": [
@@ -363,9 +363,9 @@
     {
       "tag": "FLOW",
       "title": "Keeping cache and search in sync",
-      "body": "A sync consumer reads OrderPlaced from the event log. It updates the search index with the new document and deletes or refreshes the cached entry for that customer's order list. The source of truth stays the database; the cache and index are derived copies fed by the stream. They are eventually consistent: a search for the order may miss it for the first second or so.",
-      "idea": "Derived stores follow the stream, so they are slightly behind the database but cannot drift forever.",
-      "caption": "Consumer updates the index and invalidates the cache.",
+      "body": "A sync consumer reads OrderPlaced from the event log. It adds the order to the search index and deletes or refreshes the cached entry for that customer's order list. The database stays the source of truth. The cache and index are derived copies fed by the stream. They are eventually consistent: a search may miss the new order for a moment. The HUD shows 800 ms in total: about 300 ms to reach the log plus about 500 ms for the consumer to apply it.",
+      "idea": "Derived stores follow the stream, so they run slightly behind the database but cannot drift apart forever.",
+      "caption": "The consumer updates the index and invalidates the cache.",
       "focus": [
         "broker",
         "updater",
@@ -414,8 +414,8 @@
     {
       "tag": "WHAT IF",
       "title": "The connector crashes mid-publish",
-      "body": "Suppose the connector publishes an event, then dies before saving its log position. On restart it resumes from the old position and publishes that event again. So delivery is at-least-once, not exactly-once. The fix lives in the consumer: each event carries a unique ID, and the consumer treats a repeat as a no-op, for example by upserting the document by order ID.",
-      "idea": "Expect duplicates and make consumers idempotent; do not hope for exactly-once.",
+      "body": "Suppose the connector publishes an event, then dies before saving its log position. On restart it resumes from the old position and publishes that event again. So delivery is at-least-once, not exactly-once. The fix lives in the consumer. Each event carries a unique id, and a repeat is treated as a no-op, for example by upserting the search document by order id. In the animation, id 7f3a arrives twice and the second copy changes nothing.",
+      "idea": "Expect duplicates and make consumers idempotent. Do not count on exactly-once.",
       "caption": "A republished event arrives twice; the consumer ignores the repeat.",
       "focus": [
         "cdc",
@@ -485,8 +485,8 @@
     {
       "tag": "WHAT IF",
       "title": "The broker is down for 90 seconds",
-      "body": "Orders keep committing because the service only talks to its own database. Outbox rows pile up unread: about 1,000 per second means roughly 90,000 pending after 90 seconds, and lag grows to match. When the broker returns, the connector resumes from its saved position and drains the backlog in order. One real risk: the database must retain log segments for the connector while it is behind, so a long outage can fill disk. Monitor lag and cap retention.",
-      "idea": "The outbox decouples availability: writes survive broker outages, at the cost of delayed sync and retained log.",
+      "body": "Orders keep committing because the service only talks to its own database. Events pile up unsent: at 1,000 per second, about 90,000 are waiting after 90 seconds, and lag grows to match (90 s). When the broker returns, the connector resumes from its saved position and drains the backlog in order. One real risk: the database must keep its log segments for the connector while it is behind, so a long outage can fill the disk. Monitor lag and cap retention.",
+      "idea": "The outbox keeps writes working through a broker outage, at the cost of delayed sync and a longer-retained log.",
       "caption": "Events queue up in the database, then drain after recovery.",
       "focus": [
         "orders",
@@ -541,7 +541,7 @@
       "tag": "RECAP",
       "title": "Atomic write, then reliable fan-out",
       "body": "The dual write loses events because two systems cannot commit together. The outbox puts the event in the same transaction as the data. CDC (or a poller) then moves it to the event log at least once, and idempotent consumers update caches and search indexes. You trade a little freshness and some operational care for never losing a change.",
-      "idea": "Commit the event with the data, ship it from the log, and dedupe on the consumer.",
+      "idea": "Commit the event with the data, ship it from the log, and remove duplicates at the consumer.",
       "caption": "Order, outbox, log, consumer: no event is lost.",
       "focus": [
         "orders",
@@ -603,11 +603,11 @@
       "q": "A CDC connector restarts and re-reads a few events it had already published. What should the consumer do?",
       "options": [
         "Crash so the operator notices",
-        "Treat repeats as no-ops using the event ID or an upsert",
         "Process them again, since duplicates are harmless by default",
-        "Ask the connector to delete them from the log"
+        "Ask the connector to delete them from the log",
+        "Treat repeats as no-ops using the event ID or an upsert"
       ],
-      "answer": 1,
+      "answer": 3,
       "why": "CDC and outbox relays give at-least-once delivery, so duplicates are normal. Idempotent handling makes repeated events safe."
     },
     {

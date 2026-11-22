@@ -153,9 +153,9 @@
     {
       "tag": "QUESTION",
       "title": "Two jobs, very different load",
-      "body": "A URL shortener does two things: turn a long URL into a short one (a write), and turn the short one back into a redirect (a read). Assume 100 million new links a month, which is about 40 writes per second. People click far more than they create, say 100 clicks per link, so reads run near 4,000 per second on average and maybe 12,000 at peak. Those are assumptions, but the shape is real: reads dominate. With no cache yet, every read hits the store.",
+      "body": "A URL shortener does two jobs. Create: turn a long URL into a short one (a write). Redirect: turn a short link back into the long URL (a read). Assume 100 million new links a month, which is about 40 writes per second. If each link is clicked about 100 times, reads average about 4,000 per second and may reach 12,000 at peak. These are assumptions, but the shape is real: reads far outnumber writes. Right now there is no cache, so every read hits the database.",
       "idea": "Design for the read path first; the write path is small and can afford to be slower.",
-      "caption": "Two paths share one store: rare writes, constant reads.",
+      "caption": "Rare writes (40/s) and constant reads (4,000/s) share one database.",
       "focus": [
         "client",
         "create",
@@ -188,9 +188,9 @@
     {
       "tag": "WRITE",
       "title": "Create a short link",
-      "body": "The client sends POST /links with the long URL. The load balancer hands it to a create service, which validates the URL (scheme, length, not on a blocklist) and picks the short key. It then stores one row mapping key to long URL, plus the owner and an optional expiry. At 40 writes per second the write rate is trivial; it is total storage, sized at the end (around 3 TB), that decides how the store is partitioned.",
+      "body": "You submit a long URL and the client sends POST /links (a request to create a link). The load balancer, which spreads traffic across servers, passes it to the create service. That service checks the URL (valid scheme, sensible length, not on a blocklist), picks a short key, and saves one row: key to long URL, plus owner and optional expiry. It then replies 201 with the short URL. Writes are only 40 per second, so speed is easy; total storage (about 3 TB over 5 years) is the real challenge.",
       "idea": "Writes are low volume, so correctness (unique keys, valid URLs) matters more than raw speed here.",
-      "caption": "A POST reaches the create service, which stores one row (responses are drawn as direct edges for clarity).",
+      "caption": "The request passes the load balancer; the reply is drawn straight back to the client.",
       "focus": [
         "client",
         "lb",
@@ -245,9 +245,9 @@
     {
       "tag": "KEYS",
       "title": "Generating the short key",
-      "body": "A 7-character key from 62 symbols (a-z, A-Z, 0-9) gives 62^7, about 3.5 trillion keys. 6 characters (56.8B) would already cover 6B links, but 7 gives about 600x headroom, so random guesses rarely hit a live link. Hashing the URL or picking random keys risks collisions you must detect and retry. Better: the create service leases a block of numbers (say 1 million) from a key allocator, hands them out locally as a counter, and encodes each in base62, left-padded to 7 characters. The allocator keeps one durable counter (a database row or a replicated store such as etcd or ZooKeeper), is called once per million links, and servers keep issuing from their block while it is briefly down.",
+      "body": "Each link needs a unique short key. A 7-character key from 62 symbols (a-z, A-Z, 0-9) gives 62^7, about 3.5 trillion keys, so random guessing rarely hits a real link. Hashing the URL or picking random keys can collide (two links get the same key), so you must detect and retry. Cleaner: the create service leases a block of 1 million numbers from a key allocator, then hands them out locally as a counter. Each number is converted to base62 text and padded to 7 characters. The allocator is called once per million links, and servers keep working from their block if it is briefly down.",
       "idea": "Allocating ID blocks from a counter avoids collisions and makes key creation a local, constant-time step.",
-      "caption": "Once per million links, the create service leases a block; every other write is local.",
+      "caption": "Once per million links the create service leases a block; every other write is local.",
       "focus": [
         "create",
         "keygen",
@@ -299,9 +299,9 @@
     {
       "tag": "TRADE-OFF",
       "title": "Sequential keys leak",
-      "body": "Plain counters give keys that are guessable and enumerable: anyone can walk through links one by one. To stop that, scramble the number across the whole 62^7 space with format-preserving encryption (a keyed shuffle that maps each number to a unique number of the same size and can be reversed), then encode and left-pad to 7 characters. Output looks random but stays unique. Scrambling is obfuscation, not access control: random guessing can still find live links. A block lost in a crash just leaves gaps, which cost nothing. When a block runs out, the create service leases the next one from the allocator (shown); the scramble runs locally in the create service.",
+      "body": "A plain counter gives keys in order (aaaaaab, aaaaaac...), so anyone could walk through every link. To hide the order, the create service scrambles each number locally with format-preserving encryption: a keyed, reversible shuffle that turns each number into a different, unique number of the same size. The result looks random but is still unique. This is obfuscation, not security, because keys can still be guessed. When a block runs out, the service leases the next one (shown). A block lost in a crash just leaves unused gaps.",
       "idea": "A counter plus a reversible scramble keeps keys unique and stops people walking them in order, but short keys are still guessable, so truly private links need auth or long random tokens.",
-      "caption": "Create service scrambles keys locally; allocator only hands out next blocks.",
+      "caption": "The scramble runs inside the create service; the allocator only hands out new blocks.",
       "focus": [
         "create",
         "keygen"
@@ -335,9 +335,9 @@
     {
       "tag": "READ",
       "title": "A redirect, served from cache",
-      "body": "Someone opens short.example/aZ3kQ9x. The redirect service looks the key up in Redis first. For popular links this is a hit: a sub-millisecond lookup returns the long URL, and the service answers with an HTTP redirect. Link popularity is heavily skewed, so assume the hottest 1 to 2 percent of keys serve about 90 percent of reads, so a modest cache absorbs most traffic. Cache-aside means the app, not the cache, loads missing entries.",
+      "body": "Someone opens short.example/aZ3kQ9x. The redirect service first asks Redis, an in-memory cache, for that key. For a popular link this is a hit: the long URL comes back in under a millisecond and the service replies with an HTTP redirect, which tells the browser to go to the long URL. A few links get most clicks (assume the hottest 1 to 2 percent serve about 90 percent of reads), so a small cache absorbs most traffic. This pattern is cache-aside: the app, not the cache, loads missing entries.",
       "idea": "A small cache in front of the store absorbs almost all redirect traffic.",
-      "caption": "Cache hit at peak load: redirect returned without touching the database.",
+      "caption": "Cache hit at peak load: the redirect is answered without touching the database.",
       "focus": [
         "client",
         "lb",
@@ -403,9 +403,9 @@
     {
       "tag": "MISS",
       "title": "A cache miss falls to the store",
-      "body": "A rare link is not in Redis. The redirect service reads the row from the URL store by primary key, a single indexed lookup of a few milliseconds, then writes the result back to the cache with a TTL so the next click is a hit. Keys that do not exist, or were deleted or expired, are cached as a short-lived \"not found\" marker (say 30 to 60 seconds), so repeated lookups of the same bad key skip the database. A flood of distinct random keys still misses, so put a Bloom filter of existing keys in front of the store or rate-limit clients. On edit or delete the service removes the cache key, and the cache TTL is capped by the link's expiry, so changes and expired links stop redirecting quickly.",
+      "body": "A rare link is not in Redis (a miss). The redirect service reads its row from the URL store by key, one indexed lookup of a few milliseconds, then saves it in the cache with a TTL (time to live: how long before the entry expires) so the next click is a hit. Keys that do not exist are cached briefly as \"not found\" (30 to 60 seconds), so repeated bad lookups skip the database. A flood of random keys still misses, so add a Bloom filter (a compact check for \"definitely not stored\") or rate-limit clients. Edits and deletes remove the cache key, and the TTL never outlasts the link's expiry.",
       "idea": "Misses cost one indexed read plus a cache fill; negative caching absorbs repeated bad keys, and a Bloom filter or rate limit handles random ones.",
-      "caption": "Miss: read from the store, then refill the cache.",
+      "caption": "Miss: read from the store, then refill the cache so the next click is a hit.",
       "focus": [
         "redirect",
         "cache",
@@ -467,9 +467,9 @@
     {
       "tag": "TRADE-OFF",
       "title": "301 or 302?",
-      "body": "A 301 says the move is permanent. Browsers cache it by default, which cuts load but hides later clicks from your analytics and makes edits slow to take effect. A 302 (temporary) is sent every time, so you keep counting and can change the target. Services that need accurate stats or editable targets usually send a 302 (or 307). A 301 with Cache-Control: no-store or max-age=0 stops browsers caching it, but then you have the cost of a 302 with a misleading status.",
+      "body": "After finding the long URL, the service must pick a redirect status code. A 301 means moved permanently: browsers remember it and skip your service next time. That saves load, but hides repeat clicks from your analytics and makes edits slow to take effect. A 302 means temporary: the browser asks you every time, so you keep counting and can change the target. Services that need stats or editable links usually send 302 (or 307). A 301 with Cache-Control: no-store also works, but you pay the 302 cost with a misleading status.",
       "idea": "The redirect status code decides whether you keep control and visibility, or save load.",
-      "caption": "A 302 forces every click back through the service.",
+      "caption": "With a 302, every click comes back through the redirect service.",
       "focus": [
         "client",
         "lb",
@@ -512,9 +512,9 @@
     {
       "tag": "ANALYTICS",
       "title": "Count clicks off the hot path",
-      "body": "Writing a count on every redirect would turn 12,000 reads per second into 12,000 writes per second. Instead, the redirect service drops a small event (key, time, country) onto a queue and returns immediately; if the queue is briefly down, the redirect still works and that click goes uncounted. A worker takes batches and upserts one row per (key, minute, country). Queues deliver at least once, so a crashed batch can be counted twice; for click stats that small overcount is usually accepted, and where exact counts matter you dedupe by event or batch ID. Counts lag by seconds.",
+      "body": "Updating a counter on every redirect would turn 12,000 reads per second into 12,000 writes per second. Instead, the redirect service drops a small event (key, time, country) on a queue, a waiting line for messages, and replies at once. A worker takes events in batches and updates one row per key, minute and country. If the queue is briefly down, the redirect still works and that click goes uncounted. Queues deliver at least once, so a crashed batch may count twice; for click stats that is usually fine, or dedupe by event ID. Counts lag by seconds.",
       "idea": "Fire-and-forget events plus batch aggregation keep analytics from slowing redirects.",
-      "caption": "Click events flow through a queue to a batching worker.",
+      "caption": "Click events flow through a queue to a worker that writes them in batches.",
       "focus": [
         "redirect",
         "queue",
@@ -553,7 +553,7 @@
         },
         {
           "node": "db",
-          "text": "1 row / key·min",
+          "text": "1 row/key/min/country",
           "at": "bottom"
         }
       ]
@@ -561,9 +561,9 @@
     {
       "tag": "WHAT IF",
       "title": "The cache goes cold",
-      "body": "Suppose the Redis cluster restarts and every key is gone. All 12,000 reads per second now miss and land on the store, and the store sized for about 1,200 reads/s may fall over. Latency spikes. Defences: replicate the cache, warm it from recent hot keys before taking traffic, coalesce concurrent misses for the same key into one database read, add jitter to TTLs so keys do not expire together, and shed or rate-limit load while it warms.",
+      "body": "Now imagine the Redis cluster restarts and every cached key is gone (a cold cache). All 12,000 reads per second miss and land on the database, which is sized for about 1,200 reads per second, so it may fall over and latency spikes. Defences: replicate the cache, warm it with recent hot keys before taking traffic, merge simultaneous misses for the same key into one database read, add random jitter to TTLs so keys do not expire together, and shed load while it warms.",
       "idea": "A cache that hides load also hides your real capacity, so plan for the day it is empty.",
-      "caption": "Cold cache: nearly every redirect hits the database.",
+      "caption": "Cold cache: nearly every redirect lands on the database.",
       "focus": [
         "redirect",
         "cache",
@@ -609,7 +609,7 @@
     {
       "tag": "RECAP",
       "title": "Numbers that hold it together",
-      "body": "Napkin math: 100 million links a month for 5 years is 6 billion rows; at about 500 bytes each that is roughly 3 TB, so shard by key or use a store that scales out. Link traffic is concentrated on recent links; if the hottest 1 to 2 percent of the 6B keys (60 to 120M keys at about 200 bytes) serve about 90 percent of reads, that is only about 12 to 24 GB, so a small Redis cluster is enough. Blocks of IDs make writes cheap, cache-aside makes reads cheap, and queues keep analytics out of the way.",
+      "body": "Napkin math: 100 million links a month for 5 years is 6 billion rows. At about 500 bytes each that is roughly 3 TB, so shard by key (split data across servers) or use a store that scales out. The hot 1 to 2 percent of keys (60 to 120 million at about 200 bytes) is only 12 to 24 GB, so a small Redis cluster is enough. Summary: ID blocks make writes cheap, cache-aside makes reads cheap, and a queue keeps analytics out of the way.",
       "idea": "Read-heavy design: cache the hot keys, allocate IDs in blocks, and push counting off the critical path.",
       "caption": "Healthy again at average load: 90 percent of reads never reach the store.",
       "focus": [

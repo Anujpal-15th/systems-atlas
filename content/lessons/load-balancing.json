@@ -119,7 +119,7 @@
     {
       "tag": "QUESTION",
       "title": "One server is not enough",
-      "body": "Your API gets about 6,000 requests per second at peak, but one server tops out near 2,500. You run three servers, yet clients only know one address. Something must sit in front, accept every connection, and decide which server handles it. That something is a load balancer, and it also decides what happens when a server dies.",
+      "body": "Your API gets about 6,000 requests per second at peak, but one server tops out near 2,500. So you run three servers. The problem: clients only know one address. Something has to sit in front, accept every connection, and decide which server handles it. That something is a load balancer. It also decides what happens when a server dies.",
       "idea": "A load balancer gives many servers one front door and chooses who answers each request.",
       "caption": "Three servers, one entry point, and a choice to make.",
       "focus": [
@@ -155,9 +155,9 @@
     {
       "tag": "LAYER 4",
       "title": "L4: route by connection",
-      "body": "A Layer 4 balancer works on TCP or UDP. It sees addresses and ports, picks a server when the connection opens, and then passes bytes through without reading them. It is very fast and protocol-agnostic, so it suits databases, message brokers, and raw TLS passthrough. The catch: it cannot see URLs, headers, or cookies, and with long-lived multiplexed connections such as gRPC over HTTP/2 it pins every request on that connection to one server, so those need L7.",
-      "idea": "L4 decides once per connection using only IPs and ports, so it is fast but blind to content.",
-      "caption": "A TCP connection is pinned to one server.",
+      "body": "A Layer 4 balancer works at the TCP/UDP level, the plain network connection. It sees only addresses and ports. When a connection opens it picks a server, then passes the bytes through without reading them. It is very fast and works with any protocol, so it suits databases, message brokers and raw TLS passthrough. The catch: it cannot see URLs, headers or cookies. With long-lived connections that carry many requests, such as gRPC over HTTP/2, every request on that connection sticks to one server, so those need Layer 7.",
+      "idea": "L4 picks a server once per connection using only IP addresses and ports, so it is fast but blind to content.",
+      "caption": "One TCP connection is pinned to one server (A).",
       "focus": [
         "clients",
         "lb1",
@@ -195,9 +195,9 @@
     {
       "tag": "LAYER 7",
       "title": "L7: route by request",
-      "body": "A Layer 7 balancer terminates the connection, reads the HTTP request, and routes on what it finds: path, host, header, or cookie. So /api can go to one pool and /images to another, and it can safely retry idempotent requests such as GETs on a different server. It costs more CPU per request, since it parses HTTP and often decrypts TLS.",
-      "idea": "L7 understands requests, enabling smart routing and retries, at the price of more work per request.",
-      "caption": "The path /api/orders picks the API pool.",
+      "body": "A Layer 7 balancer ends the connection itself, reads the HTTP request, and routes on what it finds: the path, host name, header or cookie. So /api can go to one pool of servers and /images to another. It can also safely retry idempotent requests (ones that are safe to repeat, like GET) on a different server. The cost is more CPU per request, because it parses HTTP and often decrypts TLS.",
+      "idea": "L7 understands requests, which allows smart routing and retries, at the price of more work per request.",
+      "caption": "The path /api/orders sends this request to the API pool (server B).",
       "focus": [
         "clients",
         "lb1",
@@ -230,7 +230,7 @@
         }
       ],
       "metrics": {
-        "ca": "1",
+        "ca": "0",
         "cb": "1"
       },
       "chips": [
@@ -253,8 +253,8 @@
     {
       "tag": "ALGORITHM",
       "title": "Round robin: take turns",
-      "body": "The simplest policy sends request 1 to A, request 2 to B, request 3 to C, then starts over. It needs no state beyond a counter and works well when requests cost about the same and servers are equal. It breaks down when a few requests are very heavy, because the rotation keeps sending new work to a server that is already buried.",
-      "idea": "Round robin is fair in count, not in load, so it assumes similar requests and similar servers.",
+      "body": "The simplest policy is taking turns: request 1 to A, request 2 to B, request 3 to C, then start again. It needs nothing but a counter and works well when requests cost about the same and servers are equal. It struggles when a few requests are very heavy, because the rotation keeps handing new work to a server that is already swamped.",
+      "idea": "Round robin is fair in the number of requests, not in the amount of work, so it assumes similar requests and similar servers.",
       "caption": "Requests rotate A, B, C evenly.",
       "focus": [
         "lb1",
@@ -310,9 +310,9 @@
     {
       "tag": "ALGORITHM",
       "title": "Least connections: pick the idlest",
-      "body": "Now Server B is stuck on slow report exports and holds 48 open connections, while A has 12 and C has 10. Least connections sends the next request to the server with the fewest active ones, here C. Because it reacts to real load, it copes with uneven request cost far better than round robin. The catch: connection count is only a proxy for load, and a freshly added server with zero connections can get flooded. Weights can handle servers of different sizes.",
+      "body": "Now Server B is stuck on slow report exports and holds 48 open connections, while A has 12 and C has 10. Least connections sends the next request to the server with the fewest active ones, here C. Because it reacts to real load, it copes with uneven request cost far better than round robin. The catch: connection count is only a rough measure of load, and a brand-new server with zero connections can get flooded. Weights can account for servers of different sizes.",
       "idea": "Least connections follows actual load, so slow requests naturally steer new work elsewhere.",
-      "caption": "New request goes to C, the least busy.",
+      "caption": "The new request goes to C, the least busy server.",
       "focus": [
         "lb1",
         "a",
@@ -357,9 +357,9 @@
     {
       "tag": "ALGORITHM",
       "title": "Consistent hash: same key, same server",
-      "body": "Sometimes you want a given user or cache key to land on the same server every time, for example because that server holds a warm in-memory cache. The balancer hashes the key onto a ring of servers. Adding or removing a server moves only about 1/N of the keys, instead of nearly all with plain hash modulo N. The catch: it ignores load, so a hot key can overload one server, and with few servers the split is uneven unless each gets many virtual points on the ring.",
-      "idea": "Consistent hashing gives stickiness by key while keeping reshuffling small when the pool changes.",
-      "caption": "User 42 always hashes to B, even though B is busy.",
+      "body": "Sometimes you want the same user or cache key to reach the same server every time, for example because that server keeps a warm in-memory cache. The balancer hashes the key onto a ring of servers. When a server is added or removed, only about 1/N of the keys move, instead of nearly all of them with plain hash-modulo-N. The catch: it ignores load, so a hot key can overload one server, and with few servers the split is uneven unless each gets many virtual points on the ring.",
+      "idea": "Consistent hashing gives key-based stickiness while keeping reshuffling small when the pool changes.",
+      "caption": "User 42 always maps to B, even though B is already busy.",
       "focus": [
         "lb1",
         "b"
@@ -369,19 +369,19 @@
           "from": "lb1",
           "to": "b",
           "kind": "request",
-          "label": "hash(user 42)"
+          "label": "user 42"
         },
         {
           "from": "lb1",
           "to": "b",
           "kind": "request",
-          "label": "hash(user 42)"
+          "label": "user 42 again"
         }
       ],
       "metrics": {
         "ca": "12",
-        "cb": "49",
-        "cc": "10"
+        "cb": "50",
+        "cc": "11"
       },
       "chips": [
         {
@@ -403,9 +403,9 @@
     {
       "tag": "HEALTH",
       "title": "Health checks find the dead",
-      "body": "Server C crashes. The balancer probes every server on a schedule, for example GET /healthz every 5 seconds, and marks a server out after 3 straight failures. That means up to roughly 15 seconds of bad traffic before removal. Passive checks help: real requests that time out count too. Keep the probe cheap and honest: check that the app can do its own work, but avoid failing on a shared dependency, or one blip can pull every server at once.",
-      "idea": "Detection takes time: probe interval times failure threshold sets how long users may hit a dead server.",
-      "caption": "Probes to C time out and C is pulled.",
+      "body": "Server C crashes. The balancer checks every server on a schedule, for example GET /healthz every 5 seconds, and marks a server out after 3 failures in a row. That means up to about 15 seconds of bad traffic before C is removed. Passive checks help too: real requests that time out also count. Keep the check cheap and honest: test that the app can do its own work, but do not fail on a shared dependency, or one blip could pull every server out at once.",
+      "idea": "Detection takes time: the check interval times the failure threshold is how long users may hit a dead server.",
+      "caption": "Checks to C time out, so C is pulled out of rotation.",
       "focus": [
         "lb1",
         "c"
@@ -454,9 +454,9 @@
     {
       "tag": "FAILOVER",
       "title": "Traffic reroutes around C",
-      "body": "With C out of rotation, A and B carry about 3,000 requests per second each at peak, above the 2,500 each can sustain, so headroom matters. N+1 here means four servers for 6,000 req/s: lose one and the other three give 3 x 2,500 = 7,500, which still covers peak. The balancer keeps probing C so it rejoins once it passes again.",
-      "idea": "Removing a server shifts its load to the rest, so capacity planning must leave room for failure.",
-      "caption": "Only A and B receive requests now.",
+      "body": "With C out, A and B must each carry about 3,000 requests per second at peak (6,000 divided by 2). That is above the 2,500 each can sustain, so they overload. This is why spare capacity matters. N+1 means one more server than you need: with four servers, losing one still leaves three, and 3 x 2,500 = 7,500 covers the 6,000 peak. The balancer keeps checking C and lets it back in once it passes again.",
+      "idea": "When a server is removed its load shifts to the rest, so plan capacity to survive a failure.",
+      "caption": "Only A and B receive requests now, and each is over its limit.",
       "focus": [
         "lb1",
         "a",
@@ -477,8 +477,8 @@
         }
       ],
       "metrics": {
-        "ca": "25",
-        "cb": "26",
+        "ca": "58",
+        "cb": "64",
         "cc": "0",
         "healthy": "2"
       },
@@ -508,9 +508,9 @@
     {
       "tag": "WHAT IF",
       "title": "The load balancer dies",
-      "body": "A load balancer in front of the servers is itself a single point of failure: if the only one dies, everything is down. So you run two. The active one sends heartbeats to a standby; when they stop for a few seconds, the standby takes over the shared virtual IP (for example with VRRP). In-flight connections usually drop and clients retry. Larger setups run several balancers active-active behind DNS or anycast instead. Managed cloud balancers do this across zones for you.",
-      "idea": "Run the load balancer as a redundant pair or managed multi-zone service so it is not the weak link.",
-      "caption": "Heartbeat stops, standby takes the traffic.",
+      "body": "The balancer is itself a single point of failure: if the only one dies, everything is down. So you run two. The active one sends heartbeats (regular \"I am alive\" signals) to a standby. When they stop for a few seconds, the standby takes over the shared virtual IP address (for example using VRRP), so clients keep using the same address. Connections in flight usually drop and clients retry. Larger setups run several balancers at once behind DNS or anycast, and managed cloud balancers do this across zones for you.",
+      "idea": "Run the load balancer as a redundant pair or a managed multi-zone service so it is not the weak link.",
+      "caption": "Heartbeats stop, so the standby takes over the traffic.",
       "focus": [
         "lb1",
         "lb2",
@@ -562,9 +562,9 @@
     {
       "tag": "RECAP",
       "title": "What to remember",
-      "body": "L4 balances connections quickly; L7 balances requests intelligently. Round robin suits uniform work, least connections suits uneven work, and consistent hashing suits key-based affinity. Health checks remove dead servers after a delay you can tune, and the balancer needs its own redundancy. Keep spare capacity so a lost server does not overload the survivors.",
-      "idea": "Pick the layer and algorithm for your traffic, check health, and make the balancer redundant.",
-      "caption": "Pool, policy, health, and redundancy together.",
+      "body": "L4 balances connections quickly; L7 balances individual requests intelligently. Round robin suits uniform work, least connections suits uneven work, and consistent hashing suits key-based affinity. Health checks remove dead servers after a delay you can tune, and the balancer needs its own redundancy. Keep spare capacity so a lost server does not overload the survivors.",
+      "idea": "Pick the layer and the algorithm for your traffic, check health, and make the balancer redundant.",
+      "caption": "Pool, policy, health checks and redundancy working together.",
       "focus": [
         "clients",
         "lb1",
@@ -592,7 +592,7 @@
           "tone": "green"
         },
         {
-          "node": "lb1",
+          "node": "a",
           "text": "N+1 spare capacity",
           "at": "bottom"
         }

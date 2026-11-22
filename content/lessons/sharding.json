@@ -122,7 +122,7 @@
     {
       "tag": "QUESTION",
       "title": "One database is not enough",
-      "body": "Picture an orders table with 300 million rows, about 6 TB, taking 20,000 writes per second at peak. One machine runs out of disk, memory and write throughput. Read replicas help reads, but each copy still holds all 6 TB and every write still hits one leader. Sharding splits the rows themselves: here three shards hold about 2 TB and 6,700 writes per second each.",
+      "body": "Picture an orders table with 3 billion rows, about 6 TB, taking 20,000 writes per second at peak. One machine runs out of disk, memory and write speed. Read replicas help with reads, but each copy still holds all 6 TB and every write still hits one leader. Sharding fixes this by splitting the rows themselves across machines. Here three shards each hold about 2 TB and take about 6,700 writes per second (a third of the load each).",
       "idea": "Replication copies the whole dataset; sharding divides it so each machine owns only a slice.",
       "caption": "Three shards, each owning about a third of the rows.",
       "focus": [
@@ -142,7 +142,7 @@
     {
       "tag": "CONCEPT",
       "title": "Route by shard key",
-      "body": "Every row carries a shard key, here user_id. A router looks the key up in a shard map and sends the query to the one shard that owns it. The app never needs to know how many shards exist. The map is tiny, so routers cache it and refresh it only when it changes.",
+      "body": "Every row carries a shard key, here user_id. A router (a small service in front) looks the key up in the shard map, a table of who owns what, and sends the query to the one shard that owns it. In the animation, user 8841 goes to Shard B and nowhere else. The app never needs to know how many shards exist. The map is tiny, so routers cache it and refresh it only when it changes.",
       "idea": "The shard key decides where a row lives, so every query is routed by it.",
       "caption": "User 8841 is routed to Shard B and nowhere else.",
       "focus": [
@@ -212,9 +212,9 @@
     {
       "tag": "CONCEPT",
       "title": "Hash partitioning spreads load",
-      "body": "With hash partitioning the shard is chosen from hash(user_id), so neighbouring ids land on unrelated shards. Inserts and reads spread almost evenly across all three. The price is order: a range scan such as user ids 1000 to 2000 now touches every shard, because adjacent keys are deliberately scattered.",
-      "idea": "Hashing buys even spread by giving up range scans on the key.",
-      "caption": "Writes fan out evenly across A, B and C.",
+      "body": "With hash partitioning, the shard is chosen from hash(user_id), a scrambled number made from the key. Neighbouring ids land on unrelated shards, so inserts and reads spread almost evenly across all three (about 34 percent on the busiest). The price is order. A range scan, such as user ids 1000 to 2000, now touches every shard, because adjacent keys are deliberately scattered.",
+      "idea": "Hashing buys an even spread by giving up range scans on the key.",
+      "caption": "Writes fan out evenly across Shards A, B and C.",
       "focus": [
         "router",
         "a",
@@ -265,7 +265,7 @@
     {
       "tag": "TRADE-OFF",
       "title": "Range partitioning keeps order",
-      "body": "Range partitioning gives each shard a contiguous slice of keys, for example order dates by month. Scanning one month, or the newest 100 orders, hits one shard and is cheap. But if the key is a timestamp, every new insert lands in the newest range. That one shard takes nearly all the writes while the older shards sit almost idle.",
+      "body": "Range partitioning gives each shard a contiguous slice of keys, for example order dates by month. Scanning one month, or the newest 100 orders, hits one shard and is cheap. The catch: if the key is a timestamp, every new insert lands in the newest range. That one shard takes nearly all the writes (about 90 percent here) while older shards sit almost idle.",
       "idea": "Ranges make scans cheap but concentrate writes whenever the key grows over time.",
       "caption": "Today's writes all pile onto the newest range, Shard C.",
       "focus": [
@@ -316,9 +316,9 @@
     {
       "tag": "CONCEPT",
       "title": "Choosing the shard key",
-      "body": "A good key has many distinct values, spreads traffic evenly, and appears in your most common queries. Sharding orders by user_id makes the query show me my orders hit exactly one shard. Sharding by country would give only about 200 values, wildly uneven sizes, and a few giant shards. Pick the key from your access pattern, not from the schema.",
-      "idea": "Pick a high-cardinality key that your hottest queries already filter on.",
-      "caption": "A query that carries the key touches one shard.",
+      "body": "A good shard key has many distinct values, spreads traffic evenly, and appears in your most common queries. Sharding orders by user_id means 'show me my orders' hits exactly one shard (the animation shows this). Sharding by country would give only about 200 values, wildly uneven sizes, and a few giant shards. Pick the key from your access pattern (how the app actually reads data), not from the schema.",
+      "idea": "Pick a key with many distinct values that your hottest queries already filter on.",
+      "caption": "A query that carries the shard key touches just one shard.",
       "focus": [
         "client",
         "router",
@@ -368,7 +368,7 @@
     {
       "tag": "WHAT IF",
       "title": "A hot partition",
-      "body": "Now one tenant, say a viral store, generates 40 percent of all traffic. Hashing cannot help: every request carries the same key, so they all land on the same shard. That shard saturates while the others idle. Fixes include a cache in front, giving the big tenant a dedicated shard, or splitting its key with a small suffix so its rows spread over several shards.",
+      "body": "Now one tenant, say a viral store, generates 40 percent of all traffic. Hashing cannot help, because every request carries the same key and so lands on the same shard. That shard takes the tenant's 40 percent plus its normal third of the remaining 60 percent (20 percent), about 60 percent of all load, while the other two coast at about 20 percent each. Fixes include a cache in front, a dedicated shard for the big tenant, or adding a small suffix to its key so its rows spread over several shards.",
       "idea": "Hashing spreads different keys evenly, but it cannot spread one key that is itself hot.",
       "caption": "One hot key overloads Shard A while B and C coast.",
       "focus": [
@@ -390,7 +390,7 @@
         }
       ],
       "metrics": {
-        "hot": "62"
+        "hot": "60"
       },
       "chips": [
         {
@@ -407,15 +407,15 @@
         {
           "node": "a",
           "kind": "progress",
-          "value": 62,
-          "text": "62%"
+          "value": 60,
+          "text": "60%"
         }
       ]
     },
     {
       "tag": "WHAT IF",
       "title": "A query without the key",
-      "body": "Someone asks for all orders from merchant 77. The merchant is not the shard key, so the router cannot tell which shard holds them. It sends the query to every shard and merges the answers, called scatter-gather. The result is only as fast as the slowest shard. Cross-shard joins and transactions are harder still, so design schemas to avoid them.",
+      "body": "Someone asks for all orders from merchant 77. The merchant is not the shard key, so the router cannot tell which shard holds them. It sends the query to every shard and merges the answers. This is called scatter-gather. The result arrives only when the slowest shard replies. Cross-shard joins and transactions are harder still, so design schemas to avoid them.",
       "idea": "A query missing the shard key fans out to every shard, and the slowest shard sets the latency.",
       "caption": "The router asks all three shards and waits for the last reply.",
       "focus": [
@@ -486,9 +486,9 @@
     {
       "tag": "CONCEPT",
       "title": "Resharding: add a fourth shard",
-      "body": "Growth means adding Shard D. With plain hash mod N, going from 3 to 4 shards changes the owner of about 75 percent of keys, which is a huge copy. The standard fix is many fixed buckets, say 256, mapped to shards by the shard map. Adding D moves only whole buckets, roughly one quarter of the data, taken evenly from A, B and C.",
+      "body": "Growth means adding Shard D. With plain hash mod N (the remainder after dividing by the shard count), going from 3 to 4 shards changes the owner of about 75 percent of keys. That is a huge copy. The standard fix is many fixed buckets, say 256, mapped to shards by the shard map. Adding D moves only whole buckets, roughly one quarter of the data, taken evenly from A, B and C, as the animation shows.",
       "idea": "Hash into fixed buckets and move buckets, so a new shard takes only its fair share of the data.",
-      "caption": "A, B and C each hand some buckets to D.",
+      "caption": "A, B and C each hand some buckets to the new Shard D.",
       "focus": [
         "a",
         "b",
@@ -540,9 +540,9 @@
     {
       "tag": "CONCEPT",
       "title": "Switching over safely",
-      "body": "Live traffic keeps writing while buckets copy. The usual pattern is: bulk copy, replay the changes made during the copy until D is almost caught up, briefly pause writes to those buckets, then update the shard map so the router points them at D. Old copies are deleted later. Clients see at most a short blip, never a stop.",
+      "body": "Live traffic keeps writing while buckets copy. The usual pattern: bulk copy the buckets, replay the changes made during the copy until D is almost caught up, briefly pause writes to those buckets, then update the shard map so the router points them at D. Old copies are deleted later. Clients see at most a short blip, never a stop. With four shards, the busiest now carries about 25 percent.",
       "idea": "Copy, catch up, flip the map, then clean up; the map change is the moment ownership moves.",
-      "caption": "The router receives a new shard map and routes to D.",
+      "caption": "The router fetches the new shard map and starts routing those buckets to D.",
       "focus": [
         "router",
         "map",
@@ -592,9 +592,9 @@
     {
       "tag": "RECAP",
       "title": "What to remember",
-      "body": "Sharding splits rows across machines by a shard key. Hash partitioning spreads load but loses range scans; range partitioning keeps order but can create a hot newest shard. Pick a key that is high-cardinality and present in your main queries. Expect hot keys and scatter-gather as costs, and reshard by moving fixed buckets. Shard last: indexes, caching and replicas are cheaper first.",
+      "body": "Sharding splits rows across machines by a shard key. Hash partitioning spreads load but loses range scans. Range partitioning keeps order but can create a hot newest shard. Pick a key with many distinct values that your main queries use. Expect hot keys and scatter-gather as costs, and reshard by moving fixed buckets. Shard last: indexes, caching and replicas are cheaper to try first.",
       "idea": "Shard only when one machine truly cannot cope, and choose the key for your queries.",
-      "caption": "Four shards, one router, one map.",
+      "caption": "Four shards, one router, one shard map.",
       "focus": [
         "client",
         "router",

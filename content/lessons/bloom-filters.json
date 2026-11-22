@@ -106,9 +106,9 @@
     {
       "tag": "QUESTION",
       "title": "Asking for things that are not there",
-      "body": "A lookup service gets 1,000 requests for user IDs that do not exist: typos, scrapers guessing IDs, stale links. Without help, each one misses the cache (or has none), then reads the disk to learn there is nothing to find. Every one of those reads is wasted work. Can we answer 'not here' cheaply, without storing every key in memory?",
+      "body": "Picture a lookup service that gets 1,000 requests for user IDs that do not exist: typos, scrapers guessing IDs, stale links. Without help, each request misses the cache (or there is none), then reads the disk only to learn there is nothing there. Each of those reads is wasted work. Can we answer 'not here' cheaply, without keeping every key in memory?",
       "idea": "Lookups for absent keys are pure waste: they pay the full read path and return nothing.",
-      "caption": "Every absent key still costs a disk read.",
+      "caption": "Every request for a missing key still costs a disk read.",
       "focus": [
         "app",
         "db"
@@ -147,7 +147,7 @@
     {
       "tag": "CONCEPT",
       "title": "A Bloom filter: bits and hashes",
-      "body": "A Bloom filter is an array of bits, all 0 at the start. To add a key, run it through k different hash functions and set the k bits they point to. For 1 million keys we use about 10 million bits, roughly 1.25 MB, and k = 7. The keys themselves are never stored, only their fingerprints in the bits. The filter lives in memory next to the caller or inside the database engine, so checking it costs nanoseconds, not a network call. It must be loaded with every key that exists and updated on every insert, or a real key will be wrongly rejected.",
+      "body": "A Bloom filter is a long row of bits, all 0 at the start. To add a key, run it through k different hash functions (each turns the key into a bit position) and set those k bits to 1. For 1 million keys we use about 10 million bits, roughly 1.25 MB, with k = 7. The keys are never stored, only their bit pattern. The filter sits in memory next to the app or inside the database, so a check takes nanoseconds, not a network call. It must hold every existing key and be updated on every insert, or a real key will be wrongly rejected.",
       "idea": "Adding a key flips k bits to 1; the filter stores no keys, only bit patterns.",
       "caption": "Each new key sets 7 bits in the filter.",
       "focus": [
@@ -179,7 +179,7 @@
     {
       "tag": "CONCEPT",
       "title": "A 'no' is always true",
-      "body": "To check a key, hash it the same k ways and look at those bits. If even one bit is 0, the key was never added, because adding it would have set that bit. The filter says 'definitely not present' and the app skips the disk entirely. Bits are never cleared, so this answer can never be wrong.",
+      "body": "To check a key, hash it the same k ways and look at those bits. If even one bit is 0, the key was never added, because adding it would have set that bit. The filter answers 'definitely not here' and the app skips the disk read entirely. Bits are never cleared, so this 'no' can never be wrong.",
       "idea": "One zero bit proves absence: Bloom filters have no false negatives.",
       "caption": "A zero bit means: skip the disk read.",
       "focus": [
@@ -217,9 +217,9 @@
     {
       "tag": "CONCEPT",
       "title": "A 'yes' only means maybe",
-      "body": "If all k bits are 1, the key may have been added, or other keys may have set those same bits by coincidence. The filter says 'maybe present', so the app must still check the real store. When that check finds nothing, we have a false positive. It costs one wasted read, which is the price of the whole scheme.",
+      "body": "If all k bits are 1, the key may have been added, or other keys may have set those same bits by coincidence. The filter can only say 'maybe here', so the app still checks the real store. If that check finds nothing, the filter gave a false positive. It costs one wasted read, which is the price of the whole scheme: a few extra reads in exchange for skipping thousands.",
       "idea": "All-ones means 'maybe': the filter can wrongly say yes, never wrongly say no.",
-      "caption": "A false positive costs one wasted disk read.",
+      "caption": "The filter said maybe, the disk had nothing: one wasted read.",
       "focus": [
         "app",
         "bloom",
@@ -248,7 +248,7 @@
           "from": "db",
           "to": "app",
           "kind": "fail",
-          "label": "false positive"
+          "label": "not found"
         }
       ],
       "metrics": {},
@@ -258,16 +258,20 @@
           "text": "maybe"
         },
         {
-          "node": "db",
+          "node": "bloom",
           "text": "false positive",
           "tone": "red"
+        },
+        {
+          "node": "db",
+          "text": "wasted read"
         }
       ]
     },
     {
       "tag": "TRADE-OFF",
       "title": "Sizing the filter",
-      "body": "Error rate depends on bits per key. As a rule of thumb with the best k, about 5 bits per key gives roughly 10% false positives, 10 bits gives about 1%, and 14 to 15 bits gives about 0.1%. At 10 bits per key, our 1,000 absent lookups drop from 1,000 disk reads to about 10. Memory is paid once; every lookup for an absent key then skips the disk. If most lookups find their key, the filter helps little. The same filter in front of a cache stops absent-key lookups falling through to the database on every request (cache penetration).",
+      "body": "How often does the filter wrongly say 'maybe'? That depends on bits per key. As a rule of thumb, with the best k: about 5 bits per key gives roughly 10% false positives, 10 bits gives about 1%, and 14 to 15 bits gives about 0.1%. At 10 bits per key, our 1,000 absent lookups drop from 1,000 disk reads to about 10. You pay the memory once, then every absent-key lookup skips the disk. If most lookups find their key, the filter helps little. In front of a cache, it also stops absent-key lookups from falling through to the database every time (cache penetration).",
       "idea": "Each extra 5 bits per key cuts false positives roughly ten-fold, at linear memory cost.",
       "caption": "10 bits per key: about 1 in 100 slips through.",
       "focus": [
@@ -298,9 +302,9 @@
     {
       "tag": "LIMIT",
       "title": "What a Bloom filter cannot do",
-      "body": "You cannot delete a key, because clearing its bits could erase bits shared with other keys and create false negatives. You cannot list the keys or read a value back. And if you add far more keys than you sized for, more bits fill up and false positives climb. Variants such as counting Bloom filters or cuckoo filters add deletion, and many systems simply rebuild the filter periodically.",
+      "body": "A Bloom filter has limits. You cannot delete a key, because clearing its bits could erase bits shared with other keys and create false negatives. You cannot list the keys or read a value back. And if you add far more keys than you sized for, more bits fill up and false positives climb. Variants such as counting Bloom filters or cuckoo filters add deletion, and many systems simply rebuild the filter from time to time.",
       "idea": "Size for the expected key count; a filter only grows more wrong as it fills, and it cannot forget.",
-      "caption": "Deleting a key is not supported.",
+      "caption": "A delete is refused: its bits may be shared with other keys.",
       "focus": [
         "app",
         "bloom"
@@ -322,7 +326,7 @@
         },
         {
           "node": "bloom",
-          "text": "more keys, more fp",
+          "text": "more keys, more errors",
           "tone": "red"
         }
       ]
@@ -330,9 +334,9 @@
     {
       "tag": "CONCEPT",
       "title": "Count-Min sketch: how often?",
-      "body": "A different question: how many times did each video get viewed? A Count-Min sketch is a small grid, say 5 rows by 2,719 counters. The app publishes each view to an event stream, and for every event the sketch hashes the item once per row and adds 1 to one counter in each row. With those dimensions, memory is about 54 KB of 4-byte counters, no matter how many distinct videos exist.",
+      "body": "A different question: how many times was each video viewed? A Count-Min sketch is a small grid of counters, say 5 rows by 2,719 columns. Each view goes onto an event stream (a queue of events). For every event, the sketch hashes the video ID once per row and adds 1 to one counter in each row. Memory is about 54 KB (5 x 2,719 four-byte counters), no matter how many different videos exist.",
       "idea": "A Count-Min sketch keeps approximate counts for unlimited items in fixed memory.",
-      "caption": "Each event increments one counter per row.",
+      "caption": "Each event adds 1 to one counter in every row.",
       "focus": [
         "app",
         "events",
@@ -371,9 +375,9 @@
     {
       "tag": "CONCEPT",
       "title": "Reading a count: take the minimum",
-      "body": "To estimate a count, hash the item in each row and take the smallest of the 5 counters. Other items collide into the same counters and only ever add to them, so every counter is at least the true count. The minimum is the least inflated one. The estimate can be too high but never too low, by at most about 0.1% of total events with 99% confidence (the grid is sized for that), so rare items can look far more popular than they are; Count-Min is best for finding frequent items.",
+      "body": "To estimate a count, hash the item in each row and take the smallest of the 5 counters it points to. Other items collide into the same counters and only ever add to them, so every counter is at least the true count, and the smallest is the least inflated. The estimate can be too high but never too low. With this grid, the overshoot is at most about 0.1% of all events counted, with 99% confidence. So rare items can look far more popular than they are; Count-Min is best for finding frequent items.",
       "idea": "Count-Min overestimates, never underestimates; the minimum across rows trims the damage.",
-      "caption": "Estimate = smallest counter across rows.",
+      "caption": "Estimate = the smallest counter across the rows.",
       "focus": [
         "app",
         "cms"
@@ -405,14 +409,14 @@
         },
         {
           "node": "cms",
-          "text": "over by ≤ 0.1%"
+          "text": "over ≤ 0.1% of total"
         }
       ]
     },
     {
       "tag": "CONCEPT",
       "title": "HyperLogLog: how many different?",
-      "body": "Counting unique visitors exactly needs a set of every ID: a billion 8-byte IDs is about 8 GB before any set overhead. HyperLogLog hashes each ID and watches for rare patterns such as many leading zero bits; seeing one with 20 zeros suggests about a million distinct items were hashed. It splits items into 16,384 buckets and combines them with a harmonic mean (a plain average would be thrown off by outliers), giving about 0.8% error in 12 KB. Two HyperLogLogs from different servers merge by taking the max of each bucket when both use the same hash and bucket count.",
+      "body": "A third question: how many different users? Counting exactly needs a set of every ID: a billion 8-byte IDs is about 8 GB before overhead. HyperLogLog hashes each ID and watches for rare patterns, like a hash starting with many 0 bits. Seeing 20 leading zeros suggests about a million different items were hashed, like a streak of 20 heads in coin flips. It splits items into 16,384 buckets and combines them with a harmonic mean (which resists outliers better than a plain average). Result: about 0.8% error in 12 KB. Two HyperLogLogs from different servers merge by taking the max of each bucket, if they use the same hash and bucket count.",
       "idea": "HyperLogLog estimates unique counts in about 12 KB and merges cleanly across machines.",
       "caption": "Unique users counted in 12 KB.",
       "focus": [
@@ -450,7 +454,7 @@
     {
       "tag": "RECAP",
       "title": "Pick the sketch by the question",
-      "body": "Is this key in the set? Use a Bloom filter: no is certain, yes is maybe. How many times did this item occur? Use Count-Min: counts can be high, never low. How many distinct items were there? Use HyperLogLog: a small relative error. All three trade a little accuracy for far less memory than storing every key or count. Bloom and Count-Min err in one direction; HyperLogLog can err either way. Use them where an approximate answer is acceptable, never where you need exactness.",
+      "body": "Is this key in the set? Use a Bloom filter: 'no' is certain, 'yes' is only maybe. How many times did this item occur? Use Count-Min: counts can be too high, never too low. How many different items were there? Use HyperLogLog: a small error that can go either way. All three trade a little accuracy for far less memory than storing every key or count. Use them where an approximate answer is fine, never where you need exactness.",
       "idea": "Sketches trade a small, bounded error for far less memory than exact structures: Count-Min and HyperLogLog stay fixed in size, and a Bloom filter needs only about 10 bits per key.",
       "caption": "Three questions, three small structures.",
       "focus": [

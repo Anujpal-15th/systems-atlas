@@ -141,7 +141,7 @@
     {
       "tag": "PROBLEM",
       "title": "The naive scan",
-      "body": "The simplest answer computes the distance to every driver and sorts. That is 200,000 distance calculations per request. An ordinary B-tree index on latitude does not rescue you: it narrows one axis to a long horizontal stripe across the whole city, and you still filter the rest. Even a composite (lat, lon) index only narrows well on the first column. Real databases ship spatial indexes (PostGIS uses an R-tree, a tree of nested bounding rectangles; Redis GEO uses geohash). The next steps show the cell-based idea. Assume the full scan costs roughly 400 ms; that is slow at thousands of requests per second.",
+      "body": "The simplest answer computes the distance to every driver and sorts. That is 200,000 distance calculations per request. An ordinary B-tree index on latitude does not rescue you: it narrows only one axis, to a long stripe across the whole city, and you still filter the rest. Even a composite (lat, lon) index narrows well only on the first column. Real databases ship spatial indexes (PostGIS uses an R-tree, a tree of nested bounding rectangles; Redis GEO uses geohash). The next steps show the cell-based idea. Assume the full scan costs roughly 400 ms, which is too slow at thousands of requests per second.",
       "idea": "A one-dimensional index cannot answer a two-dimensional 'nearby' question efficiently.",
       "caption": "Scanning every driver takes about 400 ms.",
       "focus": [
@@ -182,7 +182,7 @@
     {
       "tag": "GEOHASH",
       "title": "Geohash: space as a string",
-      "body": "Geohash repeatedly halves the map, alternating longitude and latitude, and writes the resulting bits as a short string such as 'tdr1v7'. Points in the same box share the same prefix. At 6 characters a cell is roughly 1.2 km by 0.6 km; at 7 it is about 150 m square. Now 'nearby' becomes an ordinary lookup: fetch the drivers stored under the rider's cell key. Assume an in-memory index answers in a few ms (about 4 here).",
+      "body": "Geohash repeatedly halves the map, alternating longitude and latitude, and writes the result as a short string such as 'tdr1v9'. Points in the same box share the same prefix. At 6 characters a cell is roughly 1.2 km by 0.6 km; at 7 it is about 150 m square. Now 'nearby' becomes an ordinary lookup: fetch the drivers stored under the rider's cell key. Here that returns 14 drivers instead of 200,000, and an in-memory index answers in about 4 ms.",
       "idea": "Geohash turns a 2D position into a string key, so a plain key lookup or prefix scan finds a neighbourhood.",
       "caption": "Look up one cell key, not every driver.",
       "focus": [
@@ -194,7 +194,7 @@
           "from": "search",
           "to": "cache",
           "kind": "request",
-          "label": "cell tdr1v7"
+          "label": "cell tdr1v9"
         },
         {
           "from": "cache",
@@ -232,7 +232,7 @@
     {
       "tag": "TRADE-OFF",
       "title": "The boundary problem",
-      "body": "A rider standing at the edge of a cell may have the closest driver just across the line, in the next cell with a completely different prefix. Close points can have completely different hashes, so a shared prefix guarantees nearness but a different prefix does not mean far away. The standard fix is to query the rider's cell plus its 8 neighbours, then compute exact distances on those few results. Pick a cell at least as wide as the distance you care about. If you get fewer than 5 candidates, widen to the next ring of cells.",
+      "body": "A rider standing at the edge of a cell may have the closest driver just across the line, in the next cell with a completely different prefix. A shared prefix guarantees nearness, but a different prefix does not mean far away. The standard fix is to query the rider's cell plus its 8 neighbours (9 cells, about 60 candidates here), then compute exact distances on those few results. Pick a cell at least as wide as the distance you care about. If you get fewer than 5 candidates, widen to the next ring of cells.",
       "idea": "Cells are a coarse filter: search the cell and its neighbours, then rank by exact distance.",
       "caption": "Query 9 cells, get a short candidate list.",
       "focus": [
@@ -277,9 +277,9 @@
     {
       "tag": "QUADTREE",
       "title": "Quadtree: cells that adapt",
-      "body": "A quadtree starts with the whole map as one box. Whenever a box holds more than a set number of points, say 100, it splits into four children, and so on. Dense downtown ends up in tiny boxes while an empty suburb stays one big box. Lookups descend the tree. The catch is that it usually lives in memory on one node, and moving drivers mean constant inserts and removals. A quadtree has the same edge problem, so you also read the neighbouring leaves. Count a leaf plus 4 adjacent leaves for simplicity; neighbouring leaves are quieter.",
+      "body": "A quadtree starts with the whole map as one box. Whenever a box holds more than a set number of points, say 100, it splits into four children, and so on. Dense downtown ends up in tiny boxes while an empty suburb stays one big box. Lookups descend the tree. The catch: it usually lives in memory on one node, and moving drivers mean constant inserts and removals. It has the same edge problem too, so you also read neighbouring leaves. Here we count a leaf plus 4 adjacent leaves (5 cells).",
       "idea": "A quadtree splits only where data is dense, so every leaf holds a similar number of points.",
-      "caption": "Tree descends to a small leaf box.",
+      "caption": "The tree descends to a small leaf box.",
       "focus": [
         "search",
         "cache"
@@ -323,9 +323,9 @@
     {
       "tag": "S2 / H3",
       "title": "S2 and H3: cells on a sphere",
-      "body": "Flat grids distort near the poles. Google's S2 maps the globe onto a cube and orders cells along a space-filling curve (a path that visits every cell while keeping neighbours close in order), so each cell is a single 64-bit id and nearby cells get nearby ids. Uber's H3 uses hexagons, whose 6 neighbours are all the same distance away, which makes 'rings' of cells simple. H3 resolution runs 0 to 15, and a higher number means smaller hexagons; at resolution 8 a hexagon is about 0.7 square km.",
-      "idea": "S2 and H3 are geohash's idea done on the sphere: fixed ids per cell, with cheap neighbour and ring lookups.",
-      "caption": "Search the rider's hexagon plus a ring.",
+      "body": "Flat grids distort near the poles. Google's S2 maps the globe onto a cube and orders cells along a space-filling curve (a path that visits every cell while keeping neighbours close in order), so each cell is a single 64-bit id and nearby cells get nearby ids. Uber's H3 uses hexagons, whose 6 neighbours are all the same distance away, which makes 'rings' of cells simple. H3 resolution runs 0 to 15, higher meaning smaller hexagons; at resolution 8 a hexagon is about 0.7 square km. A hexagon plus one ring is 7 cells.",
+      "idea": "S2 and H3 are geohash's idea done on a sphere: fixed ids per cell, with cheap neighbour and ring lookups.",
+      "caption": "Search the rider's hexagon plus one ring of neighbours.",
       "focus": [
         "search",
         "cache"
@@ -368,9 +368,9 @@
     {
       "tag": "UPDATES",
       "title": "Keeping drivers fresh",
-      "body": "Each driver app sends a GPS ping every 4 seconds, so 200,000 drivers produce about 50,000 writes per second. Pings go onto a stream, and an updater reads them. The updater refreshes the driver's last-seen time on every ping, a cheap in-memory write. It moves the id between cell sets only when the driver crosses into a new cell. Each entry carries a last-seen time, and a periodic sweep (or a per-driver key with a TTL, time to live) drops anything not refreshed within about 30 seconds, so offline drivers disappear on their own. The latest coordinates are written to the driver store too (a key-value store handles this rate, or you can batch or throttle writes).",
+      "body": "Each driver app sends a GPS ping every 4 seconds, so 200,000 drivers produce about 50,000 writes per second. Pings go onto a stream, and an updater reads them. On every ping it refreshes the driver's last-seen time, a cheap in-memory write. It moves the id between cell sets only when the driver crosses into a new cell. A periodic sweep (or a per-driver key with a TTL, time to live) drops anything not refreshed within about 30 seconds, so offline drivers disappear on their own. The latest coordinates also go to the driver store (a key-value store handles this rate, or you can batch writes).",
       "idea": "Refresh last-seen on every ping, move cell membership only on a cell change, and let stale entries expire.",
-      "caption": "Pings refresh; cell changes move the id.",
+      "caption": "Pings refresh the driver; a cell change moves the id.",
       "focus": [
         "driver",
         "queue",
@@ -430,7 +430,7 @@
     {
       "tag": "FLOW",
       "title": "Rank and answer",
-      "body": "With about 60 candidate ids in hand, the service loads each driver's current coordinates, rating, and availability from the driver store. It computes true distance, drops anyone who is busy or too far, sorts, and returns the top 5. The cell lookup shrank 200,000 drivers to a few dozen, so the expensive exact work runs on almost nothing. The 12 ms here is the cell lookup plus loading 60 rows.",
+      "body": "With about 60 candidate ids in hand, the service loads each driver's current coordinates, rating and availability from the driver store. It computes the true distance, drops anyone who is busy or too far, sorts, and returns the top 5. The cell lookup shrank 200,000 drivers to a few dozen, so the expensive exact work runs on almost nothing. The 12 ms here is the cell lookup plus loading 60 rows.",
       "idea": "Two phases win: a cheap cell filter to shortlist, then exact math on the shortlist.",
       "caption": "Shortlist, exact distance, top 5 back.",
       "focus": [
@@ -533,7 +533,7 @@
     {
       "tag": "RECAP",
       "title": "From 200,000 to a few dozen",
-      "body": "Proximity search is hard because 'near' is two-dimensional. Geohash, quadtrees, S2, and H3 all map space to cells so that a lookup replaces a scan. Usually search the cell plus its neighbours, then rank by exact distance. Keep the index in memory, update it only when a driver changes cell, and choose cell size to match how crowded the area is.",
+      "body": "Proximity search is hard because 'near' is two-dimensional. Geohash, quadtrees, S2 and H3 all map space to cells so that a lookup replaces a scan. Usually you search the cell plus its neighbours, then rank by exact distance. Keep the index in memory, update it only when a driver changes cell, and choose the cell size to match how crowded the area is.",
       "idea": "Index space as cells, shortlist by cell and neighbours, then rank exactly.",
       "caption": "Cells turn a scan into a lookup.",
       "focus": [

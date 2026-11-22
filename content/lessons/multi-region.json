@@ -118,7 +118,7 @@
     {
       "tag": "QUESTION",
       "title": "A whole region goes dark",
-      "body": "Your shop runs in region A, a cluster of data centers in one metro area. Today a power and networking failure takes the entire region offline. Not one server: everything, including the database. Multi-region design is the plan for that day. Two questions decide it: how much recent data can you afford to lose, and how long can you afford to be down?",
+      "body": "Your shop runs in region A, a cluster of data centers in one metro area. Today a power and network failure takes the whole region offline: every server, including the database. Multi-region design is the plan for that day, by keeping a second copy of the system in another region. Two questions decide the plan. How much recent data can you afford to lose? And how long can you afford to be down?",
       "idea": "Disaster recovery starts with two business questions, not with technology.",
       "caption": "All traffic flows to region A today.",
       "focus": [
@@ -166,8 +166,8 @@
     {
       "tag": "CONCEPT",
       "title": "RPO and RTO",
-      "body": "RPO, the recovery point objective, is how much data you can lose, measured as time: an RPO of 5 minutes means the newest 5 minutes of writes may vanish. RTO, the recovery time objective, is how long the service may stay down. RTO includes the time to notice and decide, not just to repair. Both are targets the business picks. Tighter targets cost more, so a payments ledger and a recommendations cache should not share the same numbers.",
-      "idea": "RPO is data lost, RTO is time lost; pushing either toward zero gets steeply more expensive.",
+      "body": "RPO (recovery point objective) is how much data you can lose, measured as time. An RPO of 5 minutes means the newest 5 minutes of writes may vanish. RTO (recovery time objective) is how long the service may stay down, including the time to notice and decide, not just to repair. The business picks both targets. Tighter targets cost more, so a payments ledger and a recommendations cache should not share the same numbers.",
+      "idea": "RPO is data lost, RTO is time lost. Pushing either toward zero gets steeply more expensive.",
       "caption": "Two clocks start ticking when the region fails.",
       "focus": [],
       "flows": [],
@@ -186,8 +186,8 @@
     {
       "tag": "FLOW",
       "title": "A standby copy in region B",
-      "body": "Region B keeps a replica of the database. Writes commit in region A, then stream to B asynchronously as the write-ahead log (WAL) of changes, because waiting for a cross-region acknowledgment on every write would add roughly 60 to 150 ms. The cost is replication lag, typically under a second but spiking under load. Anything not yet shipped when A dies is lost, so lag is your real RPO.",
-      "idea": "Asynchronous replication is fast but its lag is exactly the data you can lose.",
+      "body": "Region B keeps a replica (a live copy) of the database. Writes commit in region A, then stream to B asynchronously as the write-ahead log (WAL), the ordered list of changes. We do not wait for B to confirm each write, because that would add roughly 60 to 150 ms to every write. The cost is replication lag, the delay before B catches up. It is typically under a second, but can spike under load. Anything not yet shipped when A dies is lost, so lag is your real RPO.",
+      "idea": "Asynchronous replication is fast, but its lag is exactly the data you can lose.",
       "caption": "Writes stream to B about one second behind.",
       "focus": [
         "appa",
@@ -226,8 +226,8 @@
     {
       "tag": "CONCEPT",
       "title": "A replica is not a backup",
-      "body": "A replica copies every change, including your mistakes. If a bad deploy runs DELETE without a WHERE clause, the replica faithfully deletes the same rows a moment later. Backups are point-in-time copies kept separately, with logs so you can restore to just before the mistake. Replicas fight hardware loss; backups fight human error, corruption, and ransomware, so keep at least one copy immutable or in a separate account, and remember a big restore can take hours.",
-      "idea": "Replicas give availability; backups give history. You need both.",
+      "body": "A replica copies every change, including your mistakes. If a bad deploy runs DELETE without a WHERE clause, the replica faithfully deletes the same rows a moment later. A backup is a separate point-in-time copy, kept with logs so you can restore to just before the mistake. Replicas guard against hardware loss. Backups guard against human error, corruption and ransomware. Keep at least one copy immutable or in a separate account, and remember a big restore can take hours.",
+      "idea": "Replicas give availability. Backups give history. You need both.",
       "caption": "The bad write replicates, but the vault keeps history.",
       "focus": [
         "dba",
@@ -270,8 +270,8 @@
     {
       "tag": "WHAT IF",
       "title": "Region A fails",
-      "body": "Region A is now unreachable. The router's health checks fail, and requests to region A time out. The replica in B holds everything up to about one second ago, so roughly that much data is stranded in A. If you promote B while A is only partitioned, not dead, both sides might accept writes (split-brain). Teams guard against it by fencing the old primary and often by requiring a human to confirm.",
-      "idea": "The failure itself is easy to see; deciding that it is real is the hard part.",
+      "body": "Now region A is unreachable. The router's health checks fail and requests to A time out; noticing takes about a minute here. The replica in B holds everything up to about one second ago, so roughly that much data is stranded in A. The danger: if you promote B while A is only cut off, not dead, both sides might accept writes (split-brain). Teams prevent this by fencing the old primary (blocking it from accepting writes), and often by requiring a human to confirm.",
+      "idea": "The failure is easy to see. Deciding that it is real is the hard part.",
       "caption": "Region A stops answering; B has a copy.",
       "focus": [
         "router",
@@ -317,7 +317,7 @@
     {
       "tag": "FLOW",
       "title": "Active-passive failover",
-      "body": "In active-passive, B is a warm standby: running at reduced size and ready to scale. An engineer promotes the replica to primary, scales up the app tier, and flips the router so users go to B. With a rehearsed runbook, the written step-by-step recovery procedure, this commonly takes 5 to 30 minutes; a cold standby, not running until needed, takes hours. Pilot light keeps only the data tier running and scales the rest on failure. The outcome here: RPO of about 1 second, RTO of about 10 minutes.",
+      "body": "In active-passive, B is a warm standby: running at reduced size and ready to scale up. An engineer promotes the replica to primary, scales up the app servers and flips the router so users go to B, as the animation shows. With a rehearsed runbook (the written step-by-step recovery plan) this commonly takes 5 to 30 minutes. A cold standby, not running until needed, takes hours. A pilot light keeps only the data tier running. The outcome here: RPO of about 1 second and RTO of about 10 minutes.",
       "idea": "Active-passive is cheaper and simpler, but you pay in minutes of downtime and an idle region.",
       "caption": "Traffic shifts to B after the replica is promoted.",
       "focus": [
@@ -374,8 +374,8 @@
     {
       "tag": "TRADE-OFF",
       "title": "Active-active",
-      "body": "In active-active, both regions serve users all the time, so losing one just means the router sends everyone to the other, which must already have spare capacity, each region sized to carry the full load alone (so each runs at 50% or less normally). RTO is seconds to about a minute, depending on how fast the router detects failure and clients stop using cached answers. With asynchronous replication RPO is still about the lag; a globally consistent store can reach near zero at the cost of commit latency. The price is write conflicts: two regions can change the same record at once, so you need conflict rules or per-user home regions.",
-      "idea": "Active-active buys near-zero RTO at the cost of conflict handling, double capacity, and complexity.",
+      "body": "In active-active, both regions serve users all the time. Losing one just means the router sends everyone to the other. That one must already have spare room: each region is sized to carry the full load alone, so each runs at 50% or less normally. RTO is seconds to about a minute, depending on how fast the router notices and clients stop using cached answers. With asynchronous replication RPO is still about the lag. The price is write conflicts, where two regions change the same record at once, so you need conflict rules or a home region per user.",
+      "idea": "Active-active buys near-zero RTO at the cost of conflict handling, double capacity and complexity.",
       "caption": "Both regions serve traffic and sync.",
       "focus": [
         "router",
@@ -433,8 +433,8 @@
     {
       "tag": "CONCEPT",
       "title": "Data residency",
-      "body": "Laws such as the GDPR restrict transfers of personal data outside the European Economic Area unless safeguards apply, and some national data-localization rules require data to stay in-country. Suppose EU data lives in region A and region B is outside the EEA, so B is not an approved copy. Recovery then uses backups in a second region inside the same jurisdiction, not region A. Assume logs are archived every 5 minutes and a restore takes about 90 minutes, so RPO and RTO are both much worse than with a live replica.",
-      "idea": "Where recovery data may live is a legal constraint, so check it before choosing the failover region.",
+      "body": "Laws such as the GDPR limit moving personal data outside the European Economic Area unless safeguards apply, and some countries require data to stay in-country. Suppose EU data lives in region A and region B is outside the EEA, so B may not hold a copy. Recovery then uses backups in another region inside the same jurisdiction. Assume logs are archived every 5 minutes and a restore takes about 90 minutes. Both RPO (up to 5 minutes) and RTO (90 minutes) are far worse than with a live replica.",
+      "idea": "Where recovery data may live is a legal limit. Check it before choosing the failover region.",
       "caption": "EU data may not be copied to B; recovery uses backups in another EU region.",
       "focus": [
         "router",
@@ -492,8 +492,8 @@
     {
       "tag": "TRADE-OFF",
       "title": "Failover drills",
-      "body": "A plan nobody has run is a guess. Real failures expose stale credentials, missing capacity in region B, DNS caches that ignore your short TTL (how long resolvers may cache an answer), and runbooks that depend on a tool living in the dead region. Teams run drills: shift a small share of traffic, then a full game day that fails over for real, and measure actual RPO and RTO against the targets. Fail back, too, since going home is its own migration. Also drill the backup path: restore from the vault into region B and time it.",
-      "idea": "Only a measured drill tells you your real RTO; practice turns a guess into a number.",
+      "body": "A plan nobody has run is a guess. Real failures expose stale credentials, too little capacity in region B, DNS caches that ignore your short TTL (how long resolvers may keep an answer), and runbooks that depend on a tool living in the dead region. Teams run drills: first shift a small share of traffic, then a full game day that really fails over, and measure the actual RPO and RTO against the targets. Practise failing back too, and restore from the vault into region B to time that path.",
+      "idea": "Only a measured drill tells you your real RTO. Practice turns a guess into a number.",
       "caption": "A drill shifts traffic to B and measures the clock.",
       "focus": [
         "router",
@@ -537,7 +537,7 @@
     {
       "tag": "RECAP",
       "title": "Pick the cheapest design that meets the targets",
-      "body": "Set RPO and RTO per system from the cost of downtime and data loss. Use replicas for fast failover and backups for history, because they solve different problems. Active-passive is simpler and slower, active-active is faster and harder. Check data residency before copying data anywhere, and drill regularly so the numbers on paper are the numbers you actually get.",
+      "body": "Set RPO and RTO for each system from the cost of downtime and data loss. Use replicas for fast failover and backups for history, because they solve different problems. Active-passive is simpler and slower. Active-active is faster and harder. Check data residency before copying data anywhere, and drill regularly so the numbers on paper are the numbers you really get.",
       "idea": "Replicas for speed, backups for history, drills for truth.",
       "caption": "Targets, copies, and drills together form the plan.",
       "focus": [

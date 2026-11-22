@@ -118,9 +118,9 @@
     {
       "tag": "QUESTION",
       "title": "The balance says 70. Why?",
-      "body": "A normal database keeps one row per account and overwrites it: balance = 70. The row cannot tell you how it got there, what it was last Tuesday, or whether a bug changed it. Event sourcing flips this. We store what happened (opened, deposited 100, withdrew 30) and treat the balance as something we compute. Here the store already holds three events for one account.",
-      "idea": "Keep the facts that happened; derive the current state from them.",
-      "caption": "Three events are stored; their sum is 70.",
+      "body": "A normal database keeps one row per account and overwrites it: balance = 70. The row cannot tell you how it got there, what it was last Tuesday, or whether a bug changed it. Event sourcing flips this. We store what happened (account opened, deposited 100, withdrew 30) and compute the balance from those facts: 100 - 30 = 70. Here the store already holds three events for one account.",
+      "idea": "Keep the facts that happened, and derive the current state from them.",
+      "caption": "Three events are stored; together they add up to 70.",
       "focus": [
         "store"
       ],
@@ -144,9 +144,9 @@
     {
       "tag": "WRITE",
       "title": "Commands append events",
-      "body": "The client sends a command: deposit 50. The command service loads this account's events and replays them to get the current state (three events, balance 70), checks its rules, then appends a new Deposited event. The append says 'only if the stream is still at version 3'. If another writer got there first, the append is rejected and the command retries. Events are not edited in place; fixes are new events.",
-      "idea": "A command is validated against replayed state, then appends an immutable event with an expected version.",
-      "caption": "Command loads the stream, then appends event number 4.",
+      "body": "The client sends a command (a request to do something): deposit 50. In the animation the command service first loads this account's events and replays them to get the current state (3 events, balance 70). It checks its rules, then appends a new Deposited event as event 4. The append says 'only if the stream is still at version 3'. If another writer got there first, the append is rejected and the command retries. Events are never edited in place. A fix is a new event.",
+      "idea": "A command is checked against replayed state, then appends an unchangeable event with an expected version.",
+      "caption": "The command loads the stream, then appends event number 4.",
       "focus": [
         "client",
         "cmd",
@@ -218,8 +218,8 @@
     {
       "tag": "WHAT IF",
       "title": "The gap before the read side",
-      "body": "The write is committed, but the screen your user reads from is a separate store. Asked for the balance right now, the read model has not heard about event 4 and still says 70. This is eventual consistency. With a push subscription the lag is often tens of milliseconds (our 40 ms is illustrative); a polling projector or a backlog can stretch it to seconds. To cope, the command can return the new stream version and the read waits until the read model reaches it, or the UI can show the new balance optimistically.",
-      "idea": "CQRS trades immediate read-after-write consistency for a separate, scalable read side; cope by waiting for the command's version or updating the UI optimistically.",
+      "body": "The write is committed, but the screen reads from a separate store, the read model. Asked for the balance right now, the read model has not heard about event 4 yet, so it still says 70. This is eventual consistency: the read side catches up a moment later. With a push subscription the lag is often tens of milliseconds (our 40 ms is illustrative). A polling projector or a backlog can stretch it to seconds. To cope, the command can return the new version and the read waits until the read model reaches it, or the UI can show the new balance at once (optimistically).",
+      "idea": "CQRS trades instant read-after-write for a separate, scalable read side. Cope by waiting for the command's version or updating the UI optimistically.",
       "caption": "A read sent right now returns the old balance.",
       "focus": [
         "client",
@@ -276,8 +276,8 @@
     {
       "tag": "PROJECT",
       "title": "A projector builds the read model",
-      "body": "A projector subscribes to the event store, reads new events in order, and updates a table shaped for the screen. Deposited 50 becomes balance = 120 in the read model. The projector is just a consumer of the log. It remembers the last event number it applied, so after a crash it resumes from there and must be safe to re-apply an event it already saw.",
-      "idea": "A projection is a function over the event stream; it must be idempotent and restartable.",
+      "body": "A projector is a small worker that subscribes to the event store and reads new events in order. It uses them to update a table shaped for the screen. In the animation, Deposited 50 turns into balance = 120 in the read model. The projector remembers the last event number it applied, so after a crash it resumes from there. It must also be safe to re-apply an event it already saw.",
+      "idea": "A projection is a function over the event stream. It must be idempotent and restartable.",
       "caption": "Event 4 flows to the projector and updates the read model.",
       "focus": [
         "store",
@@ -316,9 +316,9 @@
     {
       "tag": "QUERY",
       "title": "Queries never touch the events",
-      "body": "Now the same read returns 120. The query service reads one prepared row, with no replaying and no joins across event streams. The read model can sit in whatever store suits the question: a SQL table for account screens, a search index for transactions, a cache for dashboards. You can scale reads separately from writes, and add more read models without touching the write side.",
-      "idea": "Command Query Responsibility Segregation (CQRS) lets each side use the model and storage that fits its job.",
-      "caption": "Query service answers from the prepared read model.",
+      "body": "Now the same read returns 120. The query service reads one prepared row, with no replaying and no joins. CQRS (Command Query Responsibility Segregation) means writes and reads use separate models. The read model can sit in whatever store suits the question: a SQL table for account screens, a search index for transactions, a cache for dashboards. You can scale reads separately from writes, and add read models without touching the write side.",
+      "idea": "CQRS lets each side use the model and storage that fits its job.",
+      "caption": "The query service answers from the prepared read model.",
       "focus": [
         "client",
         "qry",
@@ -372,9 +372,9 @@
     {
       "tag": "REBUILD",
       "title": "New question, new projection",
-      "body": "Product asks for monthly deposits per account, covering the last three years. With overwritten rows that data is gone. With events, you write a new projector and replay the whole history into a fresh read model while the old one keeps serving. Assume the whole store holds 50 million events across all accounts and the projector handles 20,000 per second: the rebuild takes about 40 minutes, then, once it catches up with events that arrived meanwhile, you switch traffic over.",
-      "idea": "Because events are the source of truth, any read model can be thrown away and rebuilt from scratch.",
-      "caption": "Whole history replayed into a brand new read model.",
+      "body": "Product asks for monthly deposits per account over the last three years. With overwritten rows that history is gone. With events, you write a new projector and replay the whole history into a fresh read model, while the old one keeps serving. Assume the store holds 50 million events and the projector handles 20,000 per second. 50,000,000 / 20,000 = 2,500 s, about 40 minutes. Once it catches up with events that arrived meanwhile, you switch traffic to the new view.",
+      "idea": "Events are the source of truth, so any read model can be thrown away and rebuilt from scratch.",
+      "caption": "The whole history is replayed into a brand new read model.",
       "focus": [
         "store",
         "proj",
@@ -421,8 +421,8 @@
     {
       "tag": "WHAT IF",
       "title": "A very long stream",
-      "body": "Replaying everything is fine for a projection that runs in the background. It is a problem on the write path. A busy account, say a merchant with 12,150 events, would have all of them loaded and folded on every command. At roughly 1 KB per event that is about 12 MB read per deposit, which turns a few-millisecond command into a slow one. Most streams are short; the long ones hurt.",
-      "idea": "Command latency grows with stream length unless you shorten what has to be replayed.",
+      "body": "Replaying everything is fine for a background projector, but it is a problem on the write path. Take a busy account, say a merchant with 12,150 events. Every command would load and replay all of them. At roughly 1 KB per event, that is about 12 MB read per deposit, which turns a few-millisecond command into a slow one. Most streams are short, but the long ones hurt.",
+      "idea": "Command time grows with stream length, unless you shorten what has to be replayed.",
       "caption": "Each command now replays 12,150 events.",
       "focus": [
         "cmd",
@@ -456,9 +456,9 @@
     {
       "tag": "SNAPSHOT",
       "title": "Snapshots shorten the replay",
-      "body": "Every so often (say every 500 events) the service saves a snapshot: the aggregate's state plus the version it reflects. On the next command it loads the latest snapshot, then only the events after it. With a snapshot at version 12,000 it replays 150 events instead of 12,150. A snapshot is a cache, not the truth. If it is lost or its format changes, you rebuild it from the events.",
-      "idea": "A snapshot is saved state plus a version; load it, then replay only the tail.",
-      "caption": "Snapshot plus 150 newer events replaces 12,150.",
+      "body": "The fix is a snapshot: a saved copy of the account's state plus the version it reflects. Every so often (say every 500 events) the service saves one. On the next command it loads the latest snapshot, then only the events after it. With a snapshot at version 12,000, it replays 150 events instead of 12,150. A snapshot is just a cache, not the truth. If it is lost or its format changes, rebuild it from the events.",
+      "idea": "A snapshot is saved state plus a version. Load it, then replay only the newer events.",
+      "caption": "A snapshot plus 150 newer events replaces 12,150.",
       "focus": [
         "cmd",
         "snap",
@@ -514,9 +514,9 @@
     {
       "tag": "TRADE-OFF",
       "title": "What you pay for this",
-      "body": "You gain history, audit, and rebuildable views. You pay in complexity. Old events live forever, so their shape must evolve carefully (versioned events, upcasters that translate old ones). Mistakes are fixed by appending a correcting event, not by editing. Personal data in immutable events complicates deletion requests; a common answer is encrypting per user and discarding the key. For plain CRUD screens, this is usually overkill.",
-      "idea": "Use event sourcing where history and audit matter; CQRS alone can be used without it.",
-      "caption": "Power of history versus cost of immutability.",
+      "body": "You gain history, audit and rebuildable views. You pay in complexity. Old events live forever, so their shape must change carefully (versioned events, plus upcasters that translate old ones). Mistakes are fixed by appending a correcting event, not by editing. Personal data in unchangeable events complicates deletion requests. A common answer is to encrypt each user's data and throw away the key. For plain CRUD screens, this is usually overkill.",
+      "idea": "Use event sourcing where history and audit matter. CQRS alone can be used without it.",
+      "caption": "The power of history against the cost of immutability.",
       "focus": [],
       "flows": [],
       "metrics": {},
@@ -525,9 +525,9 @@
     {
       "tag": "RECAP",
       "title": "Facts in, views out",
-      "body": "Commands append immutable events guarded by an expected version. State is a fold over those events, shortened by snapshots. Projectors turn the log into read models shaped for queries, always slightly behind, so design screens and APIs for eventual consistency. Need a new view? Replay. Scaling reads? Add read models. Keep event sourcing for domains that benefit from history.",
-      "idea": "Write the truth once as events; derive every view from it.",
-      "caption": "Write side appends; read side projects and answers.",
+      "body": "Commands append unchangeable events, guarded by an expected version. State is a fold over those events (a running total built by applying them one by one), shortened by snapshots. Projectors turn the log into read models shaped for queries. They are always slightly behind, so design screens and APIs for eventual consistency. Need a new view? Replay. Need more read capacity? Add read models. Keep event sourcing for domains that benefit from history.",
+      "idea": "Write the truth once as events, and derive every view from it.",
+      "caption": "The write side appends; the read side projects and answers.",
       "focus": [
         "client",
         "cmd",

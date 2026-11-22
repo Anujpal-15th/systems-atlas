@@ -138,8 +138,8 @@
     {
       "tag": "QUESTION",
       "title": "Where is Payments right now?",
-      "body": "Orders must call Payments. In a fixed setup you would write payments-1's address into a config file. But in a cloud setup instances are replaced on every deploy, added when traffic grows, and removed when they crash, and each new one gets a new IP address. A config file cannot keep up. Service discovery is how callers find the current, healthy instances by name.",
-      "idea": "Instances are temporary, so callers need a live lookup from a stable name to current addresses.",
+      "body": "Orders must call Payments. In a fixed setup you would write Payments' address into a config file. In the cloud that breaks: instances are replaced on every deploy, added when traffic grows and removed when they crash, and each new one gets a new IP address. Service discovery is how callers find the current, healthy instances by name. Here Orders knows only the name 'payments' and needs a live lookup.",
+      "idea": "Instances come and go, so callers need a live lookup from a stable name to current addresses.",
       "caption": "Orders knows a name, not any address.",
       "focus": [
         "orders"
@@ -154,8 +154,8 @@
     {
       "tag": "REGISTER",
       "title": "Instances announce themselves",
-      "body": "When an instance finishes starting and is ready for traffic, it tells the registry its service name and address, such as payments at 10.0.1.4:8080. Some systems have the instance register itself; others have a platform agent do it for it. Registering only when ready matters: an instance still loading its cache should not get traffic yet.",
-      "idea": "A registry is a live map from service name to the addresses that are ready right now.",
+      "body": "When an instance finishes starting and is ready for traffic, it tells the registry its service name and address, such as payments at 10.0.1.4:8080. The registry is a live phone book of who is available. Some systems have the instance register itself, and others have a platform agent do it. Register only when ready: an instance still loading its cache should not get traffic yet. In the animation, three Payments instances register.",
+      "idea": "A registry is a live map from a service name to the addresses that are ready right now.",
       "caption": "Three Payments instances register.",
       "focus": [
         "pay1",
@@ -209,8 +209,8 @@
     {
       "tag": "HEALTH",
       "title": "Staying registered means proving you are alive",
-      "body": "A crashed instance cannot politely deregister, so the registry needs another way to know. Each instance sends a heartbeat every 5 seconds, or the registry polls a health endpoint instead. After 3 missed beats (15 seconds here, a typical choice) the entry is removed. On a clean shutdown, instances deregister themselves first; heartbeats and timeouts are the safety net for crashes. Short intervals detect failure faster but add load and risk flapping on a brief network blip.",
-      "idea": "Heartbeats with a timeout turn silence into a removal, so dead instances age out automatically.",
+      "body": "A crashed instance cannot say goodbye, so the registry needs another way to know. Each instance sends a heartbeat (a tiny 'I am alive' message) every 5 seconds. Or the registry checks a health endpoint instead. After 3 missed beats (15 seconds here, a typical choice) the entry is removed. On a clean shutdown, instances deregister first, so heartbeats are the safety net for crashes. Short intervals detect failure faster but add load, and can wrongly drop a healthy instance after a brief network blip (flapping).",
+      "idea": "Heartbeats plus a timeout turn silence into removal, so dead instances age out on their own.",
       "caption": "Healthy instances keep sending heartbeats.",
       "focus": [
         "pay1",
@@ -256,8 +256,8 @@
     {
       "tag": "CLIENT-SIDE",
       "title": "The caller picks the instance",
-      "body": "In client-side discovery, Orders asks the registry for the list of healthy Payments addresses, keeps it in memory, and chooses one itself, for example round-robin. The call then goes straight to that instance with no middle hop. The cost is that every client in every language needs this lookup, caching and balancing logic, and each one needs to be kept up to date.",
-      "idea": "Client-side discovery saves a network hop but spreads discovery logic into every caller.",
+      "body": "In client-side discovery, Orders asks the registry for the list of healthy Payments addresses, keeps it in memory and picks one itself, for example round-robin (taking turns). In the animation it calls payments-2 directly, with no middle hop. The cost: every client, in every language, needs this lookup, caching and balancing code, and all of it must be kept up to date.",
+      "idea": "Client-side discovery saves a network hop but spreads discovery code into every caller.",
       "caption": "Orders looks up the list, then calls payments-2 directly.",
       "focus": [
         "orders",
@@ -318,7 +318,7 @@
     {
       "tag": "SERVER-SIDE",
       "title": "A proxy picks for the caller",
-      "body": "In server-side discovery, Orders calls one stable address: a load balancer or proxy. That proxy reads the registry, picks a healthy instance and forwards the request. Callers stay simple and need no discovery code. The trade-off is an extra hop, often around 1 ms inside one data center, and the proxy becomes something you must keep highly available.",
+      "body": "In server-side discovery, Orders calls one stable address: a load balancer or proxy. The proxy keeps a fresh copy of the healthy list from the registry (it syncs in the background, not on every call), picks an instance and forwards the request. Callers stay simple and need no discovery code. The trade-off is an extra hop, often around 1 ms inside one data center, and the proxy itself must stay highly available.",
       "idea": "Server-side discovery keeps callers simple but adds a hop and a component that must not fail.",
       "caption": "Orders calls the load balancer, which routes to a healthy instance.",
       "focus": [
@@ -338,7 +338,7 @@
           "from": "lb",
           "to": "registry",
           "kind": "request",
-          "label": "healthy?"
+          "label": "sync healthy list"
         },
         {
           "from": "registry",
@@ -387,7 +387,7 @@
     {
       "tag": "DNS",
       "title": "Using DNS as the registry",
-      "body": "The simplest discovery tool is DNS. Payments gets a name such as payments.internal, and the platform keeps it pointing at the healthy addresses as A records, which give only IPs, so you need a fixed port or SRV records to learn the port. Every language already resolves names, so no client library is needed. The weakness is caching: answers live for their TTL (say 30 seconds), so a dead instance can stay in use for about 15 s (registry) plus 30 s (TTL), roughly 45 s worst case.",
+      "body": "The simplest discovery tool is DNS. Payments gets a name such as payments.internal, and the platform keeps it pointing at the healthy addresses. A records give only IPs, so you need a fixed port or SRV records to learn the port. Every language already resolves names, so no client library is needed. The weakness is caching: an answer lives for its TTL (time to live, say 30 seconds). So a dead instance can stay in use for about 15 s (registry timeout) plus 30 s (TTL), roughly 45 s in the worst case.",
       "idea": "DNS discovery works everywhere, but caching makes it slow to notice change.",
       "caption": "DNS returns the current addresses, valid for the TTL.",
       "focus": [
@@ -445,8 +445,8 @@
     {
       "tag": "WHAT IF",
       "title": "An instance dies",
-      "body": "Now payments-3 crashes without warning. It stops sending heartbeats, but the registry only removes it after 15 seconds, and a client that cached the list may keep it even longer. During that window, about one call in three, the share that round-robin sends to the dead instance, fails. Retrying on a different instance hides most of this when the request never reached the dead one (a connect failure) or the call is idempotent; for a charge, send an idempotency key so a retry cannot bill twice.",
-      "idea": "Detection is never instant, so callers need timeouts and retries to cover the stale window.",
+      "body": "Now payments-3 crashes without warning. It stops sending heartbeats, but the registry removes it only after 15 seconds, and a client with a cached list may keep it even longer. During that window about one call in three fails, because with 3 instances round-robin sends a third of the calls to the dead one. A retry on another instance hides most of this when the request never reached the dead one (a connect failure) or the call is idempotent. For a charge, send an idempotency key so a retry cannot bill twice.",
+      "idea": "Failure is never noticed instantly, so callers need timeouts and retries to cover the stale window.",
       "caption": "Calls to the dead instance fail until it is removed.",
       "focus": [
         "orders",
@@ -493,8 +493,8 @@
     {
       "tag": "WHAT IF",
       "title": "The registry itself is down",
-      "body": "By now payments-3 has been removed from the list. What if the registry becomes unreachable? A client that cached the last good list can keep calling instances, which is why caches are a feature and not just a shortcut. New instances will not be found and dead ones will not be removed until the registry returns, but existing traffic keeps flowing. Registries are therefore built as replicated clusters, and callers should keep serving from their last known list (serve stale) and retry the registry in the background.",
-      "idea": "Run the registry as a cluster and let callers keep serving from their last known list.",
+      "body": "By now payments-3 has been removed from the list. What if the registry itself becomes unreachable? A client that cached the last good list can keep calling instances, which is why caches are a feature, not a shortcut. New instances will not be found and dead ones will not be removed until the registry returns, but existing traffic keeps flowing. So registries run as replicated clusters, and callers keep serving from their last known list (serve stale) while retrying the registry in the background.",
+      "idea": "Run the registry as a cluster, and let callers keep serving from their last known list.",
       "caption": "Orders keeps calling payments-2 from its cached list.",
       "focus": [
         "orders",
@@ -547,8 +547,8 @@
     {
       "tag": "RECAP",
       "title": "Name in, healthy address out",
-      "body": "Instances register when ready and prove they are alive with heartbeats. Callers find them through the registry directly (client-side), through a proxy (server-side), or through DNS. Every approach has a delay between a failure and everyone noticing, so timeouts, retries and caches that survive a registry outage are part of the design. Kubernetes, for instance, gives each Service a stable DNS name and virtual IP, and only routes to pods that pass their readiness checks. You still need timeouts and retries in callers.",
-      "idea": "Discovery maps names to healthy addresses; the real design work is handling staleness.",
+      "body": "Instances register when ready and prove they are alive with heartbeats. Callers find them through the registry directly (client-side), through a proxy (server-side), or through DNS. Every approach has a delay between a failure and everyone noticing, so timeouts, retries and caches that survive a registry outage are part of the design. Kubernetes, for instance, gives each Service a stable DNS name and virtual IP, and routes only to pods that pass their readiness checks. Callers still need timeouts and retries.",
+      "idea": "Discovery maps names to healthy addresses. The real design work is handling stale answers.",
       "caption": "Register, heartbeat, look up, call, retry.",
       "focus": [
         "orders",

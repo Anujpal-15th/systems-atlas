@@ -152,7 +152,7 @@
     {
       "tag": "QUESTION",
       "title": "Is checkout healthy right now?",
-      "body": "A checkout system handles about 400 requests per second. It works today, but at 2 a.m. something will break and nobody will be watching. You usually cannot attach a debugger to production, so the only way to know what happened is what the system recorded about itself. Observability is how well you can answer new questions about a running system from its outputs.",
+      "body": "Checkout handles about 400 requests per second and works today. But at 2 a.m. something will break and nobody will be watching. You usually cannot attach a debugger to production, so the only way to know what happened is what the system recorded about itself. Observability means how well you can answer new questions about a running system just from its outputs. The animation follows one healthy checkout request, and the tiles show today's baseline.",
       "idea": "You cannot fix what you cannot see, and in production the only thing you can see is what the system emitted.",
       "caption": "A healthy baseline: 400 req/s, 0.1% errors, p99 of 220 ms.",
       "focus": [
@@ -226,9 +226,9 @@
     {
       "tag": "CONCEPT",
       "title": "Three signals, three questions",
-      "body": "Each service sends telemetry to a collector. Metrics are numbers over time, such as requests per second: cheap, and good for \"is something wrong?\". Logs are timestamped event records: detailed, and good for \"what exactly happened?\". Traces follow one request across services: good for \"where did the time go?\". No single signal answers all three.",
+      "body": "Each service sends its telemetry (the data it reports about itself) to a collector, a middleman that forwards it to storage. There are three kinds. Metrics are numbers over time, such as requests per second: cheap, and good for 'is something wrong?'. Logs are timestamped event records: detailed, and good for 'what exactly happened?'. Traces follow one request across services: good for 'where did the time go?'. No single signal answers all three questions.",
       "idea": "Metrics tell you that something is wrong, traces tell you where, and logs tell you why.",
-      "caption": "Services push metrics, logs, and spans to a collector.",
+      "caption": "Services push metrics, logs, and spans (timed steps of a trace) to a collector.",
       "focus": [
         "api",
         "pay",
@@ -259,9 +259,9 @@
     {
       "tag": "METRICS",
       "title": "Metrics: RED for services, USE for resources",
-      "body": "Services are instrumented with a library such as OpenTelemetry, and a collector (for example the OpenTelemetry Collector) forwards metrics to the metrics store, which keeps them as time series, sampled every 15 seconds or so. For anything that serves requests, watch RED: Rate (requests per second), Errors (share that fail), and Duration (latency, as percentiles like p99 (the latency 99% of requests beat), not averages). For resources such as a database host or queue, watch USE: Utilization, Saturation (work waiting), and Errors. Keep labels low in variety: a user_id label creates millions of series and makes storage and queries very costly.",
+      "body": "Services are instrumented (given code that reports on themselves) with a library such as OpenTelemetry. A collector forwards the numbers to the metrics store, which keeps them as time series, sampled about every 15 seconds. For anything that serves requests, watch RED: Rate (requests per second), Errors (share that fail), and Duration (latency, shown as a percentile like p99, the time that 99% of requests beat, not an average). For resources such as a database host or queue, watch USE: Utilization (how busy), Saturation (work waiting), and Errors. Keep label values few: a user_id label would create millions of separate series and make storage and queries very costly.",
       "idea": "RED asks how users are served; USE asks how machines are coping. Avoid high-cardinality labels.",
-      "caption": "Aggregated numbers land in the metrics store.",
+      "caption": "The collector forwards aggregated numbers to the metrics store.",
       "focus": [
         "collector",
         "tsdb"
@@ -294,9 +294,9 @@
     {
       "tag": "LOGS",
       "title": "Logs: detailed, but expensive",
-      "body": "Each service also writes one structured JSON line per event: timestamp, level, order id, and the trace ID. Structured fields can be searched and filtered, unlike free text. The cost adds up. At about 2 KB of logs per request and 400 requests per second, that is roughly 70 GB a day, so teams log at the right level and sample noisy debug lines.",
+      "body": "Each service also writes one structured JSON line per event: timestamp, level, order id, and the trace ID. Structured fields can be searched and filtered, unlike free text. The cost adds up. At about 2 KB of logs per request and 400 requests per second, that is roughly 70 GB a day. So teams log at the right level and sample noisy debug lines.",
       "idea": "Log structured events with a trace ID, and budget for volume, since it grows with traffic.",
-      "caption": "Structured log lines flow to the logs store.",
+      "caption": "Structured log lines flow to the logs store, about 70 GB a day.",
       "focus": [
         "collector",
         "logs"
@@ -330,9 +330,9 @@
     {
       "tag": "TRACING",
       "title": "Traces: one ID across every hop",
-      "body": "The Checkout API creates a trace ID for the incoming request and passes it to every downstream call in a header (the W3C traceparent standard). Each service records a span: its name, start time, duration, and parent span. Spans that share a trace ID assemble into one timeline of the whole request (the ID 4bf9 is shown shortened; real IDs are 32 hex characters, and an instrumented client can start the trace instead). Tracing every request is costly, so teams sample. Sampling up front (say 1%) is cheap but can miss the bad request; sampling after the trace finishes lets you keep every slow or failed one.",
+      "body": "The Checkout API creates a trace ID for the incoming request and passes it on every downstream call in a header (the W3C traceparent standard). Each service records a span: its name, start time, duration and parent span. Spans that share a trace ID join into one timeline of the whole request. The ID 4bf9 is shortened here; real IDs are 32 hex characters, and an instrumented client can start the trace instead. Tracing every request is costly, so teams sample. Sampling up front (say 1%) is cheap but can miss the bad request. Sampling after the trace finishes lets you keep every slow or failed one.",
       "idea": "A propagated trace ID turns separate service logs into one story per request.",
-      "caption": "The trace ID travels with the request; spans go to the collector.",
+      "caption": "The trace ID travels with the request, and each service sends its span to the collector.",
       "focus": [
         "client",
         "api",
@@ -396,9 +396,9 @@
     {
       "tag": "WHAT IF",
       "title": "The database slows down",
-      "body": "A batch update runs in one long transaction and holds row locks in the orders database. Most writes still take about 20 ms, but those that wait on a locked row now take over 2 seconds, and about 5% wait past the payment call's 3 second timeout and fail. Nothing crashed, no server is down, and CPU looks fine. From the user's side, checkout is slow and 4.8% of attempts fail.",
+      "body": "A batch update runs in one long transaction and holds row locks in the orders database. Most writes still take about 20 ms, but writes that wait on a locked row take over 2 seconds. Payments gives up on a database write after 3 seconds, and about 5% of writes wait that long and fail. Nothing crashed, no server is down, and CPU looks fine. From the user's side, checkout is slow and 4.8% of attempts fail.",
       "idea": "Many real outages are slowness, not crashes, so you must measure latency and errors, not just uptime.",
-      "caption": "The database answers slowly; payments time out.",
+      "caption": "The database answers slowly, so payments time out and checkouts fail.",
       "focus": [
         "api",
         "pay",
@@ -454,9 +454,9 @@
     {
       "tag": "ALERTING",
       "title": "Page on symptoms, not causes",
-      "body": "An alert rule reads the metrics store and pages a human only for something users feel, such as \"checkout errors above 2% for 5 minutes\". Alerting on causes like \"CPU above 80%\" fires on harmless spikes and stays silent on this lock problem. A good version uses SLO burn rate. An SLO is a reliability target; a 99.9% target leaves an error budget of 0.1% failures, and burn rate is how many times faster than budgeted you are spending it. Here 4.8% errors burns the budget about 48 times too fast. Causes mostly belong on dashboards, not on pagers, unless they predict imminent user impact (for example, disk full within hours).",
+      "body": "An alert rule reads the metrics store and pages a human only for something users feel, such as checkout errors above 2% for 5 minutes. Alerting on causes like CPU above 80% fires on harmless spikes and stays silent on this lock problem. A good version uses SLO burn rate. An SLO is a reliability target; a 99.9% target leaves an error budget of 0.1% failures, and burn rate is how many times faster than budgeted you are spending it. Here 4.8% errors burns the budget about 48 times too fast. Causes mostly belong on dashboards, not pagers, unless they predict imminent user impact (for example, disk full within hours).",
       "idea": "Every page should mean users are hurting and a human must act now; everything else is a dashboard or a ticket.",
-      "caption": "The rule fires and one page reaches the on-call engineer.",
+      "caption": "The rule fires, and one page reaches the on-call engineer.",
       "focus": [
         "tsdb",
         "alert",
@@ -511,9 +511,9 @@
     {
       "tag": "DIAGNOSE",
       "title": "From symptom to cause",
-      "body": "Paged at 2 a.m., the engineer opens the dashboard, which shows RED going bad: errors up and p99 up at the Checkout API, with rate unchanged. That locates the problem but not the cause. Opening a slow but successful trace shows a 2.1 second span inside the orders database call, and the log lines with that trace ID reveal lock waits. USE on the database confirms it: saturation is high while CPU is low.",
+      "body": "Paged at 2 a.m., the engineer opens the dashboard, which shows RED going bad: errors and p99 are up at the Checkout API while the rate is unchanged. That shows the symptom but not the cause. Opening a slow trace shows a 2.1 second span inside the orders database call, and the log lines with that trace ID reveal lock waits. USE on the database confirms it: saturation is high while CPU is low.",
       "idea": "Work top-down: a metric finds the symptom, a trace finds the slow hop, a log explains it.",
-      "caption": "Metrics point to the symptom; traces and logs find the cause.",
+      "caption": "Metrics show the symptom; traces and logs lead to the cause.",
       "focus": [
         "oncall",
         "tsdb",
@@ -579,7 +579,7 @@
     {
       "tag": "RECAP",
       "title": "See, locate, explain, wake someone",
-      "body": "Metrics show that users are hurting, using RED for services and USE for resources. Traces carrying one ID show which hop is slow, and structured logs explain why. Alerts watch user-facing symptoms so a page means real impact. Instrument before you need it: the outage you cannot see is the one you cannot fix.",
+      "body": "Metrics show that users are hurting, using RED for services and USE for resources. Traces carrying one ID show which hop is slow, and structured logs explain why. Alerts watch user-facing symptoms, so a page means real impact. Instrument before you need it: the outage you cannot see is the one you cannot fix.",
       "idea": "Metrics detect, traces locate, logs explain, and symptom-based alerts decide who gets woken up.",
       "caption": "The full path from request to telemetry to a page.",
       "focus": [
