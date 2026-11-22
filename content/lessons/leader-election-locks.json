@@ -216,7 +216,7 @@
         }
       ],
       "metrics": {
-        "pause": "15"
+        "pause": "0"
       }
     },
     {
@@ -342,7 +342,7 @@
       "title": "What this costs",
       "body": "The lock service must itself survive failures, so real ones (etcd, ZooKeeper) replicate through a consensus protocol and need a majority up, which is covered in the Raft lesson. Every grant needs a round trip to a majority, so lock operations take milliseconds, and without a majority the service cannot grant or renew anything. Fencing also needs storage that can compare tokens, and not every system can; the check and the write must be one atomic step, for example a conditional write. A lock that is only an efficiency hint, like avoiding duplicate emails, can skip fencing. A lock that protects correctness cannot.",
       "idea": "Use fencing when correctness depends on the lock; accept a plain TTL lock only when a rare double run is harmless.",
-      "caption": "The lock service replicates its own state for safety.",
+      "caption": "The lock service itself needs a replicated majority (not drawn).",
       "focus": [
         "lock",
         "store"

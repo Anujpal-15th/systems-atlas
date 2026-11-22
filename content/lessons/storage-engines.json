@@ -129,7 +129,7 @@
     {
       "tag": "B-TREE",
       "title": "B-tree: edit the page in place",
-      "body": "A B-tree stores sorted rows in fixed-size pages (8 KiB in Postgres, 16 KiB in InnoDB). To change one row, the engine finds its leaf page, edits it, and eventually writes the whole page back, even for a 100-byte change. That is up to roughly 160x page-level write amplification, though several changes to one page often share a flush. This is a worst case for one lone small change; real numbers are lower when changes share a page. Write amplification means bytes physically written divided by bytes the app asked to write. With the upper tree levels cached in RAM, a lookup usually costs about 1 disk read. Pages sit at scattered disk locations, so these are random writes.",
+      "body": "A B-tree stores sorted rows in fixed-size pages (8 KiB in Postgres, 16 KiB in InnoDB). To change one row, the engine finds its leaf page, edits it, and eventually writes the whole page back, even for a 100-byte change. With 16 KiB InnoDB pages that is up to roughly 160x page-level write amplification (about 80x for Postgres 8 KiB pages), though several changes to one page often share a flush. Write amplification means bytes physically written divided by bytes the app asked to write. With the upper tree levels cached in RAM, a lookup usually costs about 1 disk read. Pages sit at scattered disk locations, so these are random writes.",
       "idea": "B-trees make reads cheap and predictable but pay for random, page-sized writes.",
       "caption": "Whole page rewritten for one small row.",
       "focus": [
@@ -247,6 +247,12 @@
           "from": "app",
           "to": "mem",
           "kind": "request",
+          "label": "check memtable"
+        },
+        {
+          "from": "mem",
+          "to": "app",
+          "kind": "response",
           "label": "miss"
         },
         {
@@ -260,6 +266,12 @@
           "to": "deep",
           "kind": "request",
           "label": "maybe L1..L4"
+        },
+        {
+          "from": "deep",
+          "to": "sst",
+          "kind": "response",
+          "label": "found / skip"
         },
         {
           "from": "sst",
@@ -311,6 +323,8 @@
       "idea": "LSM trades smooth latency for throughput; a lagging compaction shows up as slow reads and write stalls.",
       "caption": "Backlog: L0 files accumulate, reads get slower.",
       "focus": [
+        "app",
+        "mem",
         "sst",
         "comp"
       ],
@@ -320,6 +334,12 @@
           "to": "comp",
           "kind": "fail",
           "label": "backlog"
+        },
+        {
+          "from": "app",
+          "to": "mem",
+          "kind": "fail",
+          "label": "write stall"
         }
       ],
       "metrics": {
@@ -330,7 +350,7 @@
     {
       "tag": "RECAP",
       "title": "Pick by workload",
-      "body": "B-trees update pages in place: strong, predictable reads and range scans, pricier random writes. LSM trees buffer writes in memory and merge sorted files later: very high write throughput and compact storage, but read amplification and compaction work. Both use a WAL for crash safety. Write-heavy ingest favors LSM; read-heavy transactional workloads usually favor B-trees. B-tree page rewrites can reach ~100x for isolated tiny updates, leveled LSM compaction ~10-30x; both are rules of thumb. Postgres and InnoDB use B-trees; RocksDB, Cassandra and HBase use LSM trees.",
+      "body": "B-trees update pages in place: strong, predictable reads and range scans, pricier random writes. LSM trees buffer writes in memory and merge sorted files later: very high write throughput and compact storage, but read amplification and compaction work. Both use a WAL for crash safety. Write-heavy ingest favors LSM; read-heavy transactional workloads usually favor B-trees. B-tree page rewrites can reach roughly 80-160x for isolated tiny updates, leveled LSM compaction ~10-30x; both are rules of thumb. Postgres and InnoDB use B-trees; RocksDB, Cassandra and HBase use LSM trees.",
       "idea": "No free lunch: you choose where to pay, at write time (B-tree) or in the background (LSM).",
       "caption": "Two engines, same goal, different cost placement.",
       "focus": [

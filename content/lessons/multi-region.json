@@ -366,7 +366,7 @@
     {
       "tag": "TRADE-OFF",
       "title": "Failover drills",
-      "body": "A plan nobody has run is a guess. Real failures expose stale credentials, missing capacity in region B, DNS caches that ignore your short TTL (how long resolvers may cache an answer), and runbooks that depend on a tool living in the dead region. Teams run drills: shift a small share of traffic, then a full game day that fails over for real, and measure actual RPO and RTO against the targets. Fail back, too, since going home is its own migration.",
+      "body": "A plan nobody has run is a guess. Real failures expose stale credentials, missing capacity in region B, DNS caches that ignore your short TTL (how long resolvers may cache an answer), and runbooks that depend on a tool living in the dead region. Teams run drills: shift a small share of traffic, then a full game day that fails over for real, and measure actual RPO and RTO against the targets. Fail back, too, since going home is its own migration. Also drill the backup path: restore from the vault into region B and time it.",
       "idea": "Only a measured drill tells you your real RTO; practice turns a guess into a number.",
       "caption": "A drill shifts traffic to B and measures the clock.",
       "focus": [

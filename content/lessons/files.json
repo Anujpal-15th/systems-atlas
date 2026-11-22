@@ -303,6 +303,18 @@
         },
         {
           "from": "worker",
+          "to": "store",
+          "kind": "request",
+          "label": "read object"
+        },
+        {
+          "from": "store",
+          "to": "worker",
+          "kind": "response",
+          "label": "bytes"
+        },
+        {
+          "from": "worker",
           "to": "meta",
           "kind": "request",
           "label": "status=ready"

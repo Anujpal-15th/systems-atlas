@@ -11,48 +11,475 @@
     "How HTTP/2 multiplexing and HTTP/3 over QUIC each remove one kind of blocking"
   ],
   "nodes": [
-    {"id": "browser", "label": "Browser", "kind": "client", "x": 10, "y": 50},
-    {"id": "edge", "label": "Edge proxy (TLS)", "kind": "gateway", "x": 40, "y": 50},
-    {"id": "app", "label": "App server", "kind": "server", "x": 74, "y": 24},
-    {"id": "api", "label": "Auth service", "kind": "service", "x": 74, "y": 76}
+    {
+      "id": "browser",
+      "label": "Browser",
+      "kind": "client",
+      "x": 10,
+      "y": 50
+    },
+    {
+      "id": "edge",
+      "label": "Edge proxy (TLS)",
+      "kind": "gateway",
+      "x": 40,
+      "y": 50
+    },
+    {
+      "id": "app",
+      "label": "App server",
+      "kind": "server",
+      "x": 74,
+      "y": 24
+    },
+    {
+      "id": "api",
+      "label": "Auth service",
+      "kind": "service",
+      "x": 74,
+      "y": 76
+    }
   ],
   "edges": [
-    {"from": "browser", "to": "edge", "label": "50 ms RTT"},
-    {"from": "edge", "to": "app"},
-    {"from": "edge", "to": "api"}
+    {
+      "from": "browser",
+      "to": "edge",
+      "label": "50 ms RTT"
+    },
+    {
+      "from": "edge",
+      "to": "app"
+    },
+    {
+      "from": "edge",
+      "to": "api"
+    }
   ],
   "metrics": [
-    {"id": "setup", "label": "Setup RTTs", "unit": "RTT"},
-    {"id": "conns", "label": "Connections", "unit": ""},
-    {"id": "load", "label": "Page load", "unit": "ms"}
+    {
+      "id": "setup",
+      "label": "Setup RTTs",
+      "unit": "RTT"
+    },
+    {
+      "id": "conns",
+      "label": "Connections",
+      "unit": ""
+    },
+    {
+      "id": "load",
+      "label": "Page load",
+      "unit": "ms"
+    }
   ],
   "steps": [
-    {"tag": "QUESTION", "title": "31 files, one slow wire", "body": "A page needs one HTML file plus 30 small assets (CSS, scripts, images). The user is 50 ms away by round trip (round-trip time, RTT), and we will ignore download time so only round trips and waiting matter. The question: how should the browser and server talk so those 31 requests finish fast? Each protocol answers differently, and the numbers show why.", "idea": "With small files, the cost is mostly round trips, not bandwidth.", "caption": "One browser, one edge proxy, 31 resources to fetch.", "focus": ["browser", "edge"], "flows": [], "metrics": {"setup": "0", "conns": "0", "load": "0"}},
-    {"tag": "CONNECT", "title": "A new connection is not free", "body": "Before any HTTP byte moves, the browser opens a TCP connection: SYN, SYN-ACK, ACK, which costs one round trip. Then TLS encrypts it. With TLS 1.3 that is one more round trip, so the first request cannot leave until about 100 ms have passed. Older TLS 1.2 needed two round trips for TLS, making it 150 ms.", "idea": "TCP plus TLS 1.3 costs 2 RTTs before the first request; TLS 1.2 costs 3.", "caption": "Two round trips of setup, zero page data.", "focus": ["browser", "edge"], "flows": [{"from": "browser", "to": "edge", "kind": "handshake", "label": "SYN"}, {"from": "edge", "to": "browser", "kind": "handshake", "label": "SYN-ACK"}, {"from": "browser", "to": "edge", "kind": "handshake", "label": "ACK"}], "metrics": {"setup": "2", "conns": "1"}},
-    {"tag": "CONCEPT", "title": "Inside the TLS 1.3 handshake", "body": "In TLS 1.3 the client's first message already carries its key-exchange share. The server replies with its share, its certificate and a Finished message, and both sides can derive keys; the certificate proves the server really owns the domain, so the keys are shared with the right party and not an impostor. The client then sends its own Finished together with the first HTTP request. On a repeat visit, a resumption ticket can allow 0-RTT early data, but that data can be replayed by an attacker, so it should carry only safe, idempotent requests (ones that are harmless to repeat, like GET).", "idea": "TLS 1.3 needs one round trip; resumption can skip it but only for replay-safe requests.", "caption": "Keys agreed in a single round trip.", "focus": ["browser", "edge"], "flows": [{"from": "browser", "to": "edge", "kind": "handshake", "label": "ClientHello+key"}, {"from": "edge", "to": "browser", "kind": "handshake", "label": "ServerHello+cert"}, {"from": "browser", "to": "edge", "kind": "request", "label": "Finished + GET /"}], "metrics": {}},
-    {"tag": "KEEP-ALIVE", "title": "HTTP/1.1 reuses the connection", "body": "HTTP/1.1 keeps the TCP connection open after a response (keep-alive), so later requests skip the handshakes. But a connection carries one request at a time: the next request waits for the previous response. With 31 requests at 50 ms each on one connection, the page needs about 100 ms setup plus 31 x 50 ms, roughly 1650 ms.", "idea": "Keep-alive removes repeated handshakes, but HTTP/1.1 still handles one request per connection at a time.", "caption": "31 requests queue one after another.", "focus": ["browser", "edge"], "flows": [{"from": "browser", "to": "edge", "kind": "request", "label": "GET /app.css"}, {"from": "edge", "to": "browser", "kind": "response", "label": "200 app.css"}, {"from": "browser", "to": "edge", "kind": "request", "label": "GET /app.js"}], "metrics": {"conns": "1", "load": "1650"}},
-    {"tag": "HOL BLOCKING", "title": "Head-of-line blocking and the six-connection hack", "body": "Head-of-line blocking means one slow item holds up everything queued behind it. On an HTTP/1.1 connection, a 2-second API call stalls every request after it, because the connection handles one request at a time and responses must come back in order (HTTP/1.1 pipelining exists on paper but browsers do not use it). Browsers work around it by opening about six parallel connections per host. That gives roughly 100 ms setup, 50 ms for the HTML, then the 30 assets in 5 rounds of 6 requests (250 ms), so about 400 ms (assuming the extra connections are opened early), at the price of six handshakes and six sets of server memory.", "idea": "HTTP/1.1 fights head-of-line blocking by multiplying connections, which is costly.", "caption": "Six connections share the 31 requests.", "focus": ["browser", "edge"], "flows": [{"from": "browser", "to": "edge", "kind": "handshake", "label": "6 connections"}, {"from": "browser", "to": "edge", "kind": "request", "label": "6 requests at once"}, {"from": "edge", "to": "browser", "kind": "response", "label": "6 responses"}], "metrics": {"conns": "6", "load": "400"}},
-    {"tag": "POOLING", "title": "Pools behind the proxy", "body": "The same idea applies server side. The edge proxy keeps a pool of already-open, already-encrypted connections to the app server and the auth service, and borrows one per request instead of dialing fresh. Inside a data center a round trip is only about 0.5 ms, so a TCP + TLS handshake costs roughly 1 ms plus CPU for the cryptography, but at thousands of requests per second it still burns CPU and can exhaust ports. Pools need a size limit and an idle timeout shorter than the server's, or you get requests sent on connections the server already closed.", "idea": "A connection pool pays the setup cost once and shares it; size it and expire it deliberately.", "caption": "Proxy reuses warm connections to backends.", "focus": ["edge", "app", "api"], "flows": [{"from": "edge", "to": "app", "kind": "request", "label": "reused conn"}, {"from": "edge", "to": "api", "kind": "request", "label": "reused conn"}, {"from": "app", "to": "edge", "kind": "response", "label": "200"}, {"from": "api", "to": "edge", "kind": "response", "label": "200"}], "metrics": {}},
-    {"tag": "HTTP/2", "title": "HTTP/2 multiplexes streams", "body": "HTTP/2 splits traffic into small frames tagged with a stream ID, so many requests and responses interleave on one TCP connection. The browser sends all 30 asset requests at once without waiting. Cost: 100 ms setup, 50 ms for the HTML, 50 ms for the burst of assets, about 200 ms, using a single connection and header compression. This fixes head-of-line blocking at the HTTP layer.", "idea": "Multiplexing lets one connection carry many independent requests at the same time.", "caption": "31 streams interleave on one connection.", "focus": ["browser", "edge"], "flows": [{"from": "browser", "to": "edge", "kind": "request", "label": "30 streams"}, {"from": "edge", "to": "browser", "kind": "response", "label": "interleaved frames"}], "metrics": {"conns": "1", "load": "200"}},
-    {"tag": "WHAT IF", "title": "One lost packet stalls every stream", "body": "HTTP/2 still rides on TCP, which delivers bytes strictly in order. If one packet is lost, TCP holds back everything after it, including frames for streams that were not affected, until the retransmission arrives. On a clean wired network this is rare, but on lossy mobile links with 1 to 2 percent loss, on lossy links HTTP/2 can lose most of its advantage and even fall behind six HTTP/1.1 connections. Six separate HTTP/1.1 connections lose less, because a drop stalls only the one connection it hit. Time here is illustrative and assumes one stall costing roughly one extra round trip: 200 + 50 = 250 ms.", "idea": "HTTP/2 removes blocking in HTTP, but TCP's in-order delivery brings it back at the transport layer.", "caption": "A dropped packet freezes all streams.", "focus": ["browser", "edge"], "flows": [{"from": "edge", "to": "browser", "kind": "fail", "label": "packet lost"}, {"from": "browser", "to": "edge", "kind": "request", "label": "dup ACKs"}, {"from": "edge", "to": "browser", "kind": "replicate", "label": "retransmit"}], "metrics": {"load": "250"}},
-    {"tag": "HTTP/3", "title": "HTTP/3 and QUIC", "body": "HTTP/3 runs over QUIC, which uses UDP (a bare-bones transport with no built-in ordering or retransmission) and builds reliability, encryption and streams into one protocol. Transport and TLS 1.3 handshakes are combined, so setup takes 1 round trip instead of 2, and resumption can send data in the first flight. Each stream recovers losses on its own, so a lost packet only delays the streams whose data was in it. Once the browser knows the server speaks HTTP/3, setup takes 1 round trip; a first visit usually starts on TCP and learns about HTTP/3 from Alt-Svc. Browsers fall back to TCP if UDP is blocked.", "idea": "QUIC cuts setup to 1 RTT and gives each stream independent loss recovery.", "caption": "One-round-trip setup, streams recover separately.", "focus": ["browser", "edge"], "flows": [{"from": "browser", "to": "edge", "kind": "handshake", "label": "QUIC Initial+TLS"}, {"from": "edge", "to": "browser", "kind": "handshake", "label": "keys + cert"}, {"from": "browser", "to": "edge", "kind": "request", "label": "30 streams"}, {"from": "edge", "to": "browser", "kind": "response", "label": "independent"}], "metrics": {"setup": "1", "conns": "1", "load": "150"}},
-    {"tag": "RECAP", "title": "Fewer round trips, less blocking", "body": "Every new connection costs round trips, so reuse them: keep-alive for clients, pools behind the proxy. HTTP/1.1 sends one request at a time per connection, HTTP/2 multiplexes streams over one TCP connection, and HTTP/3 uses QUIC to drop TCP-level blocking. TLS 1.3 is the modern default for all of them (and mandatory for HTTP/3). The numbers here are idealized, but on healthy networks the ordering usually holds.", "idea": "Reuse connections, multiplex requests, and avoid a single in-order pipe shared by unrelated streams.", "caption": "Same page: 1650 ms, 400 ms, 200 ms, 150 ms.", "focus": ["browser", "edge", "app", "api"], "flows": [], "metrics": {"setup": "1", "conns": "1", "load": "150"}}
+    {
+      "tag": "QUESTION",
+      "title": "31 files, one slow wire",
+      "body": "A page needs one HTML file plus 30 small assets (CSS, scripts, images). The user is 50 ms away by round trip (round-trip time, RTT), and we will ignore download time so only round trips and waiting matter. The question: how should the browser and server talk so those 31 requests finish fast? Each protocol answers differently, and the numbers show why.",
+      "idea": "With small files, the cost is mostly round trips, not bandwidth.",
+      "caption": "One browser, one edge proxy, 31 resources to fetch.",
+      "focus": [
+        "browser",
+        "edge"
+      ],
+      "flows": [],
+      "metrics": {
+        "setup": "0",
+        "conns": "0",
+        "load": "0"
+      }
+    },
+    {
+      "tag": "CONNECT",
+      "title": "A new connection is not free",
+      "body": "Before any HTTP byte moves, the browser opens a TCP connection: SYN, SYN-ACK, ACK, which costs one round trip. Then TLS encrypts it. With TLS 1.3 that is one more round trip, so the first request cannot leave until about 100 ms have passed. Older TLS 1.2 needed two round trips for TLS, making it 150 ms. This step animates the TCP half; the TLS half follows next.",
+      "idea": "TCP plus TLS 1.3 costs 2 RTTs before the first request; TLS 1.2 costs 3.",
+      "caption": "TCP handshake shown: round trip 1 of 2 (TLS is next).",
+      "focus": [
+        "browser",
+        "edge"
+      ],
+      "flows": [
+        {
+          "from": "browser",
+          "to": "edge",
+          "kind": "handshake",
+          "label": "SYN"
+        },
+        {
+          "from": "edge",
+          "to": "browser",
+          "kind": "handshake",
+          "label": "SYN-ACK"
+        },
+        {
+          "from": "browser",
+          "to": "edge",
+          "kind": "handshake",
+          "label": "ACK"
+        }
+      ],
+      "metrics": {
+        "setup": "2",
+        "conns": "1"
+      }
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "Inside the TLS 1.3 handshake",
+      "body": "In TLS 1.3 the client's first message already carries its key-exchange share. The server replies with its share, its certificate and a Finished message, and both sides can derive keys; the certificate proves the server really owns the domain, so the keys are shared with the right party and not an impostor. The client then sends its own Finished together with the first HTTP request. On a repeat visit, a resumption ticket can allow 0-RTT early data, but that data can be replayed by an attacker, so it should carry only safe, idempotent requests (ones that are harmless to repeat, like GET).",
+      "idea": "TLS 1.3 needs one round trip; resumption can skip it but only for replay-safe requests.",
+      "caption": "Keys agreed in a single round trip.",
+      "focus": [
+        "browser",
+        "edge"
+      ],
+      "flows": [
+        {
+          "from": "browser",
+          "to": "edge",
+          "kind": "handshake",
+          "label": "ClientHello+key"
+        },
+        {
+          "from": "edge",
+          "to": "browser",
+          "kind": "handshake",
+          "label": "ServerHello+cert"
+        },
+        {
+          "from": "browser",
+          "to": "edge",
+          "kind": "request",
+          "label": "Finished + GET /"
+        }
+      ],
+      "metrics": {}
+    },
+    {
+      "tag": "KEEP-ALIVE",
+      "title": "HTTP/1.1 reuses the connection",
+      "body": "HTTP/1.1 keeps the TCP connection open after a response (keep-alive), so later requests skip the handshakes. But a connection carries one request at a time: the next request waits for the previous response. With 31 requests at 50 ms each on one connection, the page needs about 100 ms setup plus 31 x 50 ms, roughly 1650 ms.",
+      "idea": "Keep-alive removes repeated handshakes, but HTTP/1.1 still handles one request per connection at a time.",
+      "caption": "31 requests queue one after another.",
+      "focus": [
+        "browser",
+        "edge"
+      ],
+      "flows": [
+        {
+          "from": "browser",
+          "to": "edge",
+          "kind": "request",
+          "label": "GET /app.css"
+        },
+        {
+          "from": "edge",
+          "to": "browser",
+          "kind": "response",
+          "label": "200 app.css"
+        },
+        {
+          "from": "browser",
+          "to": "edge",
+          "kind": "request",
+          "label": "GET /app.js"
+        }
+      ],
+      "metrics": {
+        "conns": "1",
+        "load": "1650"
+      }
+    },
+    {
+      "tag": "HOL BLOCKING",
+      "title": "Head-of-line blocking and the six-connection hack",
+      "body": "Head-of-line blocking means one slow item holds up everything queued behind it. On an HTTP/1.1 connection, a 2-second API call stalls every request after it, because the connection handles one request at a time and responses must come back in order (HTTP/1.1 pipelining exists on paper but browsers do not use it). Browsers work around it by opening about six parallel connections per host. That gives roughly 100 ms setup, 50 ms for the HTML, then the 30 assets in 5 rounds of 6 requests (250 ms), so about 400 ms (assuming the extra connections are opened early), at the price of six handshakes and six sets of server memory.",
+      "idea": "HTTP/1.1 fights head-of-line blocking by multiplying connections, which is costly.",
+      "caption": "Six connections share the 31 requests.",
+      "focus": [
+        "browser",
+        "edge"
+      ],
+      "flows": [
+        {
+          "from": "browser",
+          "to": "edge",
+          "kind": "handshake",
+          "label": "6 connections"
+        },
+        {
+          "from": "browser",
+          "to": "edge",
+          "kind": "request",
+          "label": "6 requests at once"
+        },
+        {
+          "from": "edge",
+          "to": "browser",
+          "kind": "response",
+          "label": "6 responses"
+        }
+      ],
+      "metrics": {
+        "conns": "6",
+        "load": "400"
+      }
+    },
+    {
+      "tag": "POOLING",
+      "title": "Pools behind the proxy",
+      "body": "The same idea applies server side. The edge proxy keeps a pool of already-open, already-encrypted connections to the app server and the auth service, and borrows one per request instead of dialing fresh. Inside a data center a round trip is only about 0.5 ms, so a TCP + TLS handshake costs roughly 1 ms plus CPU for the cryptography, but at thousands of requests per second it still burns CPU and can exhaust ports. Pools need a size limit and an idle timeout shorter than the server's, or you get requests sent on connections the server already closed.",
+      "idea": "A connection pool pays the setup cost once and shares it; size it and expire it deliberately.",
+      "caption": "Proxy reuses warm connections to backends.",
+      "focus": [
+        "edge",
+        "app",
+        "api"
+      ],
+      "flows": [
+        {
+          "from": "edge",
+          "to": "app",
+          "kind": "request",
+          "label": "reused conn"
+        },
+        {
+          "from": "edge",
+          "to": "api",
+          "kind": "request",
+          "label": "reused conn"
+        },
+        {
+          "from": "app",
+          "to": "edge",
+          "kind": "response",
+          "label": "200"
+        },
+        {
+          "from": "api",
+          "to": "edge",
+          "kind": "response",
+          "label": "200"
+        }
+      ],
+      "metrics": {}
+    },
+    {
+      "tag": "HTTP/2",
+      "title": "HTTP/2 multiplexes streams",
+      "body": "HTTP/2 splits traffic into small frames tagged with a stream ID, so many requests and responses interleave on one TCP connection. The browser sends all 30 asset requests at once without waiting. Cost: 100 ms setup, 50 ms for the HTML, 50 ms for the burst of assets, about 200 ms, using a single connection and header compression. This fixes head-of-line blocking at the HTTP layer.",
+      "idea": "Multiplexing lets one connection carry many independent requests at the same time.",
+      "caption": "31 streams interleave on one connection.",
+      "focus": [
+        "browser",
+        "edge"
+      ],
+      "flows": [
+        {
+          "from": "browser",
+          "to": "edge",
+          "kind": "request",
+          "label": "30 streams"
+        },
+        {
+          "from": "edge",
+          "to": "browser",
+          "kind": "response",
+          "label": "interleaved frames"
+        }
+      ],
+      "metrics": {
+        "conns": "1",
+        "load": "200"
+      }
+    },
+    {
+      "tag": "WHAT IF",
+      "title": "One lost packet stalls every stream",
+      "body": "HTTP/2 still rides on TCP, which delivers bytes strictly in order. If one packet is lost, TCP holds back everything after it, including frames for streams that were not affected, until the retransmission arrives. On a clean wired network this is rare, but on lossy mobile links with 1 to 2 percent loss, stalls happen constantly, and HTTP/2 can lose most of its advantage and even fall behind six HTTP/1.1 connections. Six separate HTTP/1.1 connections lose less, because a drop stalls only the one connection it hit. The 250 ms shown is only a single-loss example (200 + 50); with repeated losses it grows.",
+      "idea": "HTTP/2 removes blocking in HTTP, but TCP's in-order delivery brings it back at the transport layer.",
+      "caption": "A dropped packet freezes all streams.",
+      "focus": [
+        "browser",
+        "edge"
+      ],
+      "flows": [
+        {
+          "from": "edge",
+          "to": "browser",
+          "kind": "fail",
+          "label": "packet lost"
+        },
+        {
+          "from": "browser",
+          "to": "edge",
+          "kind": "request",
+          "label": "dup ACKs"
+        },
+        {
+          "from": "edge",
+          "to": "browser",
+          "kind": "replicate",
+          "label": "retransmit"
+        }
+      ],
+      "metrics": {
+        "load": "250"
+      }
+    },
+    {
+      "tag": "HTTP/3",
+      "title": "HTTP/3 and QUIC",
+      "body": "HTTP/3 runs over QUIC, which uses UDP (a bare-bones transport with no built-in ordering or retransmission) and builds reliability, encryption and streams into one protocol. Transport and TLS 1.3 handshakes are combined, so setup takes 1 round trip instead of 2, and resumption can send data in the first flight. Each stream recovers losses on its own, so a lost packet only delays the streams whose data was in it. Once the browser knows the server speaks HTTP/3 it uses it directly; a first visit usually starts on TCP and learns about HTTP/3 from Alt-Svc. Browsers fall back to TCP if UDP is blocked. Once HTTP/3 is known: 50 ms setup + 50 ms for the HTML + 50 ms for the burst of assets = 150 ms.",
+      "idea": "QUIC cuts setup to 1 RTT and gives each stream independent loss recovery.",
+      "caption": "One-round-trip setup, streams recover separately.",
+      "focus": [
+        "browser",
+        "edge"
+      ],
+      "flows": [
+        {
+          "from": "browser",
+          "to": "edge",
+          "kind": "handshake",
+          "label": "QUIC Initial+TLS"
+        },
+        {
+          "from": "edge",
+          "to": "browser",
+          "kind": "handshake",
+          "label": "keys + cert"
+        },
+        {
+          "from": "browser",
+          "to": "edge",
+          "kind": "request",
+          "label": "30 streams"
+        },
+        {
+          "from": "edge",
+          "to": "browser",
+          "kind": "response",
+          "label": "independent"
+        }
+      ],
+      "metrics": {
+        "setup": "1",
+        "conns": "1",
+        "load": "150"
+      }
+    },
+    {
+      "tag": "RECAP",
+      "title": "Fewer round trips, less blocking",
+      "body": "Every new connection costs round trips, so reuse them: keep-alive for clients, pools behind the proxy. HTTP/1.1 sends one request at a time per connection, HTTP/2 multiplexes streams over one TCP connection, and HTTP/3 uses QUIC to drop TCP-level blocking. TLS 1.3 is the modern default for all of them (and mandatory for HTTP/3). The numbers here are idealized, but on healthy networks the ordering usually holds.",
+      "idea": "Reuse connections, multiplex requests, and avoid a single in-order pipe shared by unrelated streams.",
+      "caption": "Same page: 1650 ms, 400 ms, 200 ms, 150 ms.",
+      "focus": [
+        "browser",
+        "edge",
+        "app",
+        "api"
+      ],
+      "flows": [],
+      "metrics": {
+        "setup": "1",
+        "conns": "1",
+        "load": "150"
+      }
+    }
   ],
   "quiz": [
-    {"q": "A server is 40 ms away (round trip). How long before the first HTTP request can be sent on a brand-new TCP + TLS 1.3 connection?", "options": ["About 40 ms", "About 80 ms", "About 120 ms", "About 160 ms"], "answer": 1, "why": "TCP needs one round trip and TLS 1.3 needs one more, so 2 x 40 ms = 80 ms. TLS 1.2 would add a third round trip."},
-    {"q": "Why does HTTP/1.1 keep-alive alone not make a 30-asset page fast?", "options": ["Keep-alive only works for HTML", "Keep-alive disables encryption", "The server closes the connection after each response", "Each connection still handles one request at a time, so requests queue"], "answer": 3, "why": "Keep-alive removes repeated handshakes, but responses on a connection come back in order, so requests wait on each other."},
-    {"q": "On a lossy mobile network, one packet is dropped during an HTTP/2 page load. What happens?", "options": ["Only the stream owning that packet waits", "HTTP/2 automatically opens a second connection", "All streams on the TCP connection stall until the retransmission arrives", "The browser switches to HTTP/1.1 immediately"], "answer": 2, "why": "TCP delivers bytes in order, so a gap blocks everything behind it, including unrelated streams. QUIC avoids this with per-stream recovery."},
-    {"q": "Your proxy sometimes fails requests with 'connection reset' right after sitting idle. The app server closes idle connections after 60 s. What is the best fix?", "options": ["Set the proxy's pool idle timeout below 60 s", "Disable the connection pool", "Switch the proxy to HTTP/1.0", "Raise the app server's timeout to 24 hours"], "answer": 0, "why": "If the proxy holds a pooled connection longer than the server does, it can send on a connection already closed. Expiring idle connections first avoids that race."},
-    {"q": "Which statement about HTTP/3 is correct?", "options": ["It runs over TCP with a faster handshake", "It runs over QUIC on UDP and recovers lost packets per stream", "It removes the need for TLS", "It requires one connection per request"], "answer": 1, "why": "HTTP/3 uses QUIC over UDP, with TLS 1.3 built in and independent loss recovery per stream."}
+    {
+      "q": "A server is 40 ms away (round trip). How long before the first HTTP request can be sent on a brand-new TCP + TLS 1.3 connection?",
+      "options": [
+        "About 40 ms",
+        "About 80 ms",
+        "About 120 ms",
+        "About 160 ms"
+      ],
+      "answer": 1,
+      "why": "TCP needs one round trip and TLS 1.3 needs one more, so 2 x 40 ms = 80 ms. TLS 1.2 would add a third round trip."
+    },
+    {
+      "q": "Why does HTTP/1.1 keep-alive alone not make a 30-asset page fast?",
+      "options": [
+        "Keep-alive only works for HTML",
+        "Keep-alive disables encryption",
+        "The server closes the connection after each response",
+        "Each connection still handles one request at a time, so requests queue"
+      ],
+      "answer": 3,
+      "why": "Keep-alive removes repeated handshakes, but responses on a connection come back in order, so requests wait on each other."
+    },
+    {
+      "q": "On a lossy mobile network, one packet is dropped during an HTTP/2 page load. What happens?",
+      "options": [
+        "Only the stream owning that packet waits",
+        "HTTP/2 automatically opens a second connection",
+        "All streams on the TCP connection stall until the retransmission arrives",
+        "The browser switches to HTTP/1.1 immediately"
+      ],
+      "answer": 2,
+      "why": "TCP delivers bytes in order, so a gap blocks everything behind it, including unrelated streams. QUIC avoids this with per-stream recovery."
+    },
+    {
+      "q": "Your proxy sometimes fails requests with 'connection reset' right after sitting idle. The app server closes idle connections after 60 s. What is the best fix?",
+      "options": [
+        "Set the proxy's pool idle timeout below 60 s",
+        "Disable the connection pool",
+        "Switch the proxy to HTTP/1.0",
+        "Raise the app server's timeout to 24 hours"
+      ],
+      "answer": 0,
+      "why": "If the proxy holds a pooled connection longer than the server does, it can send on a connection already closed. Expiring idle connections first avoids that race."
+    },
+    {
+      "q": "Which statement about HTTP/3 is correct?",
+      "options": [
+        "It runs over TCP with a faster handshake",
+        "It runs over QUIC on UDP and recovers lost packets per stream",
+        "It removes the need for TLS",
+        "It requires one connection per request"
+      ],
+      "answer": 1,
+      "why": "HTTP/3 uses QUIC over UDP, with TLS 1.3 built in and independent loss recovery per stream."
+    }
   ],
   "cheatsheet": [
-    {"term": "Handshake cost", "def": "TCP 1 RTT + TLS 1.3 1 RTT = 2 RTTs before the first request. TLS 1.2 adds a third. QUIC combines both into 1 RTT."},
-    {"term": "Keep-alive", "def": "Leaving a connection open for more requests, so later ones skip TCP and TLS setup. Default in HTTP/1.1."},
-    {"term": "Head-of-line blocking", "def": "A slow or lost item delays everything queued behind it. It occurs at the HTTP layer (1.1) and the TCP layer (2)."},
-    {"term": "HTTP/2 multiplexing", "def": "Many request/response streams interleaved as frames on one TCP connection, with header compression (HPACK)."},
-    {"term": "HTTP/3 / QUIC", "def": "HTTP over UDP-based QUIC: built-in TLS 1.3, per-stream loss recovery, connection IDs that survive network changes."},
-    {"term": "Connection pool", "def": "A set of warm connections reused across requests. Tune max size and set idle timeout below the peer's timeout."},
-    {"term": "0-RTT resumption", "def": "Sending data in the first flight on a repeat visit. Replayable by attackers, so use only for idempotent requests."},
-    {"term": "Alt-Svc", "def": "Header (or DNS HTTPS record) telling clients that HTTP/3 is available; clients fall back to TCP if UDP fails."}
+    {
+      "term": "Handshake cost",
+      "def": "TCP 1 RTT + TLS 1.3 1 RTT = 2 RTTs before the first request. TLS 1.2 adds a third. QUIC combines both into 1 RTT."
+    },
+    {
+      "term": "Keep-alive",
+      "def": "Leaving a connection open for more requests, so later ones skip TCP and TLS setup. Default in HTTP/1.1."
+    },
+    {
+      "term": "Head-of-line blocking",
+      "def": "A slow or lost item delays everything queued behind it. It occurs at the HTTP layer (1.1) and the TCP layer (2)."
+    },
+    {
+      "term": "HTTP/2 multiplexing",
+      "def": "Many request/response streams interleaved as frames on one TCP connection, with header compression (HPACK)."
+    },
+    {
+      "term": "HTTP/3 / QUIC",
+      "def": "HTTP over UDP-based QUIC: built-in TLS 1.3, per-stream loss recovery, connection IDs that survive network changes."
+    },
+    {
+      "term": "Connection pool",
+      "def": "A set of warm connections reused across requests. Tune max size and set idle timeout below the peer's timeout."
+    },
+    {
+      "term": "0-RTT resumption",
+      "def": "Sending data in the first flight on a repeat visit. Replayable by attackers, so use only for idempotent requests."
+    },
+    {
+      "term": "Alt-Svc",
+      "def": "Header (or DNS HTTPS record) telling clients that HTTP/3 is available; clients fall back to TCP if UDP fails."
+    }
   ]
 }

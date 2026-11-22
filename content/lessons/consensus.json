@@ -122,7 +122,13 @@
       "body": "You keep a cluster's critical settings, such as which node owns which job, on one server. That server dies and everything stops. So you keep copies on five servers. Now a harder problem appears: if two clients write different values at the same moment, or a server crashes mid-write, how do all five end up agreeing on one history? Making machines agree despite crashes and lost messages is called consensus.",
       "idea": "Replication gives availability; consensus is what keeps the copies from disagreeing.",
       "caption": "Five servers must act like one reliable machine.",
-      "focus": [],
+      "focus": [
+        "s1",
+        "s2",
+        "s3",
+        "s4",
+        "s5"
+      ],
       "flows": [],
       "metrics": {
         "term": "1",
@@ -281,14 +287,13 @@
           "label": "no response"
         },
         {
-          "from": "s3",
-          "to": "s1",
+          "from": "s1",
+          "to": "s3",
           "kind": "fail",
           "label": "no heartbeat"
         }
       ],
       "metrics": {
-        "acks": "0",
         "commit": "1000"
       }
     },

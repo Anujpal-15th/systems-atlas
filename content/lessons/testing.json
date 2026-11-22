@@ -121,7 +121,11 @@
       "body": "Every unit test for the Orders service passes. Yet after deploy, checkout fails because the Payments team renamed a JSON field, and later a slow Payments call freezes the whole service. A single mocked function cannot reveal either problem. Distributed systems fail in the gaps between components, so tests must cover those gaps too.",
       "idea": "Passing unit tests prove your code matches your assumptions, not that your assumptions are true.",
       "caption": "Orders depends on a database and on Payments.",
-      "focus": [],
+      "focus": [
+        "svc",
+        "db",
+        "pay"
+      ],
       "flows": [],
       "metrics": {}
     },
@@ -179,6 +183,12 @@
           "label": "fetch contracts"
         },
         {
+          "from": "broker",
+          "to": "pay",
+          "kind": "response",
+          "label": "consumer contracts"
+        },
+        {
           "from": "pay",
           "to": "broker",
           "kind": "async",
@@ -222,7 +232,7 @@
     {
       "tag": "FAULT",
       "title": "Inject latency and failures",
-      "body": "Payments is replaced by a stub (a fake that returns canned replies) behind a fault proxy that can delay, drop or error on command, and the contract test from step 3 is what keeps that stub honest. The test makes Payments take 5 seconds, then asserts that Orders gives up after its 2 s timeout and returns a clear \"payment pending, we will confirm shortly\" response instead of hanging. A second test replays the retry with the same idempotency key and asserts the customer is charged once. Without these tests, the timeout code is untested and probably wrong. Say 15 fault tests add about 30 seconds. Other faults: connection reset, HTTP 503, duplicate delivery.",
+      "body": "In this test the Payments node on the diagram is a stub (a fake that returns canned replies) placed behind a fault proxy that can delay, drop or error on command, and the contract test from step 3 is what keeps that stub honest. The test makes Payments take 5 seconds, then asserts that Orders gives up after its 2 s timeout and returns a clear \"payment pending, we will confirm shortly\" response instead of hanging. A second test replays the retry with the same idempotency key and asserts the customer is charged once. Without these tests, the timeout code is untested and probably wrong. Say 15 fault tests add about 30 seconds. Other faults: connection reset, HTTP 503, duplicate delivery.",
       "idea": "Failure-handling code only works if you have watched it run against a failure.",
       "caption": "Proxy stalls Payments; Orders must time out at 2 s.",
       "focus": [

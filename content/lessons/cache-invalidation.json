@@ -12,51 +12,572 @@
     "Why a single hot key can overload one cache node, and how to spread it"
   ],
   "nodes": [
-    {"id": "clients", "label": "Clients", "kind": "user", "x": 10, "y": 50},
-    {"id": "app", "label": "App servers", "kind": "server", "x": 36, "y": 50},
-    {"id": "cache", "label": "Cache", "kind": "cache", "x": 62, "y": 20},
-    {"id": "writer", "label": "Writer / admin", "kind": "worker", "x": 62, "y": 84},
-    {"id": "db", "label": "Database", "kind": "db", "x": 88, "y": 50}
+    {
+      "id": "clients",
+      "label": "Clients",
+      "kind": "user",
+      "x": 10,
+      "y": 50
+    },
+    {
+      "id": "app",
+      "label": "App servers",
+      "kind": "server",
+      "x": 36,
+      "y": 50
+    },
+    {
+      "id": "cache",
+      "label": "Cache",
+      "kind": "cache",
+      "x": 62,
+      "y": 20
+    },
+    {
+      "id": "writer",
+      "label": "Writer / admin",
+      "kind": "worker",
+      "x": 62,
+      "y": 84
+    },
+    {
+      "id": "db",
+      "label": "Database",
+      "kind": "db",
+      "x": 88,
+      "y": 50
+    }
   ],
   "edges": [
-    {"from": "clients", "to": "app"},
-    {"from": "app", "to": "cache"},
-    {"from": "app", "to": "db"},
-    {"from": "writer", "to": "db"},
-    {"from": "writer", "to": "cache"}
+    {
+      "from": "clients",
+      "to": "app"
+    },
+    {
+      "from": "app",
+      "to": "cache"
+    },
+    {
+      "from": "app",
+      "to": "db"
+    },
+    {
+      "from": "writer",
+      "to": "db"
+    },
+    {
+      "from": "writer",
+      "to": "cache"
+    }
   ],
   "metrics": [
-    {"id": "rps", "label": "Requests/s", "unit": "req/s"},
-    {"id": "dbq", "label": "DB queries/s", "unit": "qps"},
-    {"id": "hit", "label": "Hit rate", "unit": "%"},
-    {"id": "lat", "label": "p99 latency", "unit": "ms"}
+    {
+      "id": "rps",
+      "label": "Requests/s",
+      "unit": "req/s"
+    },
+    {
+      "id": "dbq",
+      "label": "DB queries/s",
+      "unit": "qps"
+    },
+    {
+      "id": "hit",
+      "label": "Hit rate",
+      "unit": "%"
+    },
+    {
+      "id": "lat",
+      "label": "p99 latency",
+      "unit": "ms"
+    }
   ],
   "steps": [
-    {"tag": "QUESTION", "title": "A cache that works too well", "body": "A shop's home page shows a product feed that takes the database about 200 ms to build. The site serves 5,000 reads per second at a 99.9% hit rate, so the database sees only about 5 queries per second. The home page feed is one hot key among them, rebuilt about once a minute. Everything looks calm. The question is what happens when that one entry goes away, and how it ever gets replaced with fresh data.", "idea": "A cache hides load from the database, so anything that empties it can expose that load all at once.", "caption": "Healthy: nearly every read is a cache hit.", "focus": ["clients", "app", "cache"], "flows": [{"from": "clients", "to": "app", "kind": "request", "label": "GET /home"}, {"from": "app", "to": "cache", "kind": "request", "label": "GET feed"}, {"from": "cache", "to": "app", "kind": "response", "label": "hit"}], "metrics": {"rps": "5000", "dbq": "5", "hit": "99.9", "lat": "5"}},
-    {"tag": "CONCEPT", "title": "TTL: let it expire", "body": "The simplest policy is a time to live (TTL). The app stores the feed with a 60 second TTL, and the cache silently drops it when the time is up. The next reader misses, rebuilds the value from the database, and stores it again. TTL needs no coordination between services, which is why it is the default. Its cost is that data can be up to 60 seconds old.", "idea": "TTL is the cheapest invalidation: no coordination, but a built-in staleness window.", "caption": "A miss rebuilds the entry from the database (about 200 ms for that one request).", "focus": ["app", "cache", "db"], "flows": [{"from": "app", "to": "cache", "kind": "request", "label": "GET feed"}, {"from": "cache", "to": "app", "kind": "response", "label": "miss"}, {"from": "app", "to": "db", "kind": "request", "label": "SELECT feed"}, {"from": "db", "to": "app", "kind": "response", "label": "rows"}, {"from": "app", "to": "cache", "kind": "request", "label": "SET feed, ttl 60s"}], "metrics": {"rps": "5000", "dbq": "5", "hit": "99.9", "lat": "5"}},
-    {"tag": "WHAT IF", "title": "Stale reads", "body": "An admin changes a price in the database. The cache still holds the old feed, so for up to the remaining TTL every shopper sees the old price. For a news site that is fine. For a price, stock count, or permission change, it can mean selling at the wrong price or showing access a user no longer has. Shortening the TTL helps, but it raises database load because entries are rebuilt more often.", "idea": "Staleness is bounded by the TTL; a shorter TTL buys freshness with more database work.", "caption": "Database is updated but the cache still serves the old value.", "focus": ["writer", "db", "cache", "app"], "flows": [{"from": "writer", "to": "db", "kind": "request", "label": "UPDATE price"}, {"from": "app", "to": "cache", "kind": "request", "label": "GET feed"}, {"from": "cache", "to": "app", "kind": "fail", "label": "old price"}], "metrics": {"rps": "5000", "dbq": "5", "hit": "99.9", "lat": "5"}},
-    {"tag": "CONCEPT", "title": "Explicit invalidation", "body": "To avoid waiting, the writer deletes the cache key right after committing the change. The next read misses and loads the new value. Delete, rather than overwrite, is the usual choice because a delete is idempotent and never writes a value itself. It is not airtight: a reader that loaded the old row just before the commit can write it back just after the delete. That is why teams keep a TTL as a safety net even when they also invalidate.", "idea": "Invalidate by deleting after the write commits, and keep a TTL to repair the races you missed.", "caption": "Writer commits, then deletes the key.", "focus": ["writer", "db", "cache"], "flows": [{"from": "writer", "to": "db", "kind": "request", "label": "UPDATE price"}, {"from": "db", "to": "writer", "kind": "response", "label": "committed"}, {"from": "writer", "to": "cache", "kind": "request", "label": "DEL feed"}], "metrics": {"rps": "5000", "dbq": "5", "hit": "99.9", "lat": "5"}},
-    {"tag": "WHAT IF", "title": "The stampede", "body": "Now the key disappears, by TTL or by a delete, while 5,000 requests per second arrive. Every request misses, and every one starts its own 200 ms query. In the time the first rebuild takes, about 1,000 identical queries have been sent. If the database comfortably handles around 500 queries per second, it queues, slows down, and requests time out. The failed rebuilds mean the key stays empty, so the pile-on continues. This is a cache stampede, also called a thundering herd.", "idea": "A stampede turns one expired key into thousands of identical database queries, and the overload can prevent the refill that would end it.", "caption": "Every miss goes straight to the database.", "focus": ["app", "cache", "db"], "flows": [{"from": "app", "to": "cache", "kind": "request", "label": "GET feed"}, {"from": "cache", "to": "app", "kind": "response", "label": "miss x 1000"}, {"from": "app", "to": "db", "kind": "fail", "label": "SELECT x 1000"}], "metrics": {"rps": "5000", "dbq": "5000", "hit": "0", "lat": "2000"}},
-    {"tag": "FIX", "title": "Request coalescing", "body": "The first request to miss takes a short lock (in one process, a single-flight map; across servers, a cache entry set with a short expiry only if absent). It alone queries the database. Everyone else waits for that result, or briefly serves the previous value if you kept one. The database sees one query instead of a thousand, and waiters pay at most one rebuild time. Give the lock its own timeout so a crashed leader cannot block the key forever.", "idea": "Coalescing collapses many identical misses into one rebuild; always give the lock an expiry.", "caption": "One query rebuilds the entry; waiters pay up to about 200 ms.", "focus": ["app", "cache", "db"], "flows": [{"from": "app", "to": "cache", "kind": "request", "label": "lock + GET"}, {"from": "app", "to": "db", "kind": "request", "label": "1 x SELECT"}, {"from": "db", "to": "app", "kind": "response", "label": "rows"}, {"from": "app", "to": "cache", "kind": "request", "label": "SET feed"}], "metrics": {"rps": "5000", "dbq": "5", "hit": "99.9", "lat": "5"}},
-    {"tag": "FIX", "title": "Refresh before it expires", "body": "Coalescing still makes someone wait. Probabilistic early expiry avoids even that. Each request that reads the entry may decide to rebuild it early, with a chance that grows as the expiry approaches and grows with how long a rebuild takes. One lucky request refreshes it while everyone else keeps getting the still-valid value. The entry is usually replaced before it expires, so a mass miss becomes very unlikely. Stale-while-revalidate, which serves the old value during a refresh, is a close cousin.", "idea": "Rebuilding slightly early, at random, means the key is never empty when the crowd arrives.", "caption": "One request refreshes early; the rest still hit.", "focus": ["app", "cache", "db"], "flows": [{"from": "app", "to": "cache", "kind": "request", "label": "GET feed"}, {"from": "cache", "to": "app", "kind": "response", "label": "hit"}, {"from": "app", "to": "db", "kind": "async", "label": "early refresh"}, {"from": "app", "to": "cache", "kind": "async", "label": "SET feed"}], "metrics": {"rps": "5000", "dbq": "5", "hit": "99.9", "lat": "5"}},
-    {"tag": "TRADE-OFF", "title": "Many keys, one deadline", "body": "A related trap: if a cache warm-up job or bulk load writes 100,000 keys all with a 60 second TTL, they all expire together and the database faces a stampede across many keys at once. Suppose 40 percent of requests land on keys that have just expired. Coalescing per key only removes duplicates; it cannot shrink 100,000 distinct queries. The cheap fix is jitter: add a random amount, say plus or minus 10 percent, to every TTL so expiries spread out instead of lining up. Make the jitter window wide enough that the rebuild rate stays under what the database can handle.", "idea": "Add random jitter to TTLs so keys written together do not expire together.", "caption": "Keys expiring in the same second overwhelm the database.", "focus": ["app", "cache", "db"], "flows": [{"from": "cache", "to": "app", "kind": "response", "label": "100k misses"}, {"from": "app", "to": "db", "kind": "fail", "label": "many queries"}], "metrics": {"rps": "5000", "dbq": "2000", "hit": "60", "lat": "800"}},
-    {"tag": "CONCEPT", "title": "Hot keys", "body": "Even with no misses, one key can be the problem. Suppose a celebrity's profile is read 150,000 times per second. The key lives on one cache node, and a single node typically serves somewhere around 100,000 simple operations per second (a rule of thumb; large values hit network limits even sooner), so one node cannot keep up while other nodes sit idle. Common fixes are a tiny in-process cache on each app server with a 1 to 5 second TTL, or storing several copies under keys like profile#1 to profile#8 and picking one at random. The cost is that a write must delete every copy, and a local cache can be stale for its TTL.", "idea": "Hot keys are a load-spreading problem: copy the value so reads fan out across nodes.", "caption": "Reads spread across copies of the hot key.", "focus": ["app", "cache"], "flows": [{"from": "app", "to": "cache", "kind": "request", "label": "GET profile#3"}, {"from": "cache", "to": "app", "kind": "response", "label": "hit"}], "metrics": {"rps": "150000", "dbq": "5", "hit": "99.99", "lat": "3"}},
-    {"tag": "RECAP", "title": "Keep the herd away", "body": "TTL is simple but leaves a staleness window. Deleting on write shrinks it, with a TTL kept as a backstop. An empty hot key sends every request to the database at once, so coalesce rebuilds, refresh early at random, and jitter TTLs. For hot keys, replicate the value across nodes or cache it locally for a second or two. Measure miss bursts, not just average hit rate.", "idea": "Plan for the moment the cache is empty, not only for the moment it is full.", "caption": "Healthy again: few DB queries, high hit rate.", "focus": ["clients", "app", "cache", "writer", "db"], "flows": [], "metrics": {"rps": "5000", "dbq": "5", "hit": "99.9", "lat": "5"}}
+    {
+      "tag": "QUESTION",
+      "title": "A cache that works too well",
+      "body": "A shop's home page shows a product feed that takes the database about 200 ms to build. The site serves 5,000 reads per second at a 99.9% hit rate, so the database sees only about 5 queries per second. The home page feed is one hot key among them, rebuilt about once a minute. Everything looks calm. The question is what happens when that one entry goes away, and how it ever gets replaced with fresh data.",
+      "idea": "A cache hides load from the database, so anything that empties it can expose that load all at once.",
+      "caption": "Healthy: nearly every read is a cache hit.",
+      "focus": [
+        "clients",
+        "app",
+        "cache",
+        "db"
+      ],
+      "flows": [
+        {
+          "from": "clients",
+          "to": "app",
+          "kind": "request",
+          "label": "GET /home"
+        },
+        {
+          "from": "app",
+          "to": "cache",
+          "kind": "request",
+          "label": "GET feed"
+        },
+        {
+          "from": "cache",
+          "to": "app",
+          "kind": "response",
+          "label": "hit"
+        },
+        {
+          "from": "app",
+          "to": "clients",
+          "kind": "response",
+          "label": "page"
+        }
+      ],
+      "metrics": {
+        "rps": "5000",
+        "dbq": "5",
+        "hit": "99.9",
+        "lat": "5"
+      }
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "TTL: let it expire",
+      "body": "The simplest policy is a time to live (TTL). The app stores the feed with a 60 second TTL, and the cache silently drops it when the time is up. The next reader misses, rebuilds the value from the database, and stores it again. TTL needs no coordination between services, which is why it is the default. Its cost is that data can be up to 60 seconds old.",
+      "idea": "TTL is the cheapest invalidation: no coordination, but a built-in staleness window.",
+      "caption": "A miss rebuilds the entry from the database (about 200 ms for that one request).",
+      "focus": [
+        "app",
+        "cache",
+        "db"
+      ],
+      "flows": [
+        {
+          "from": "app",
+          "to": "cache",
+          "kind": "request",
+          "label": "GET feed"
+        },
+        {
+          "from": "cache",
+          "to": "app",
+          "kind": "response",
+          "label": "miss"
+        },
+        {
+          "from": "app",
+          "to": "db",
+          "kind": "request",
+          "label": "SELECT feed"
+        },
+        {
+          "from": "db",
+          "to": "app",
+          "kind": "response",
+          "label": "rows"
+        },
+        {
+          "from": "app",
+          "to": "cache",
+          "kind": "request",
+          "label": "SET feed, ttl 60s"
+        }
+      ],
+      "metrics": {
+        "rps": "5000",
+        "dbq": "5",
+        "hit": "99.9",
+        "lat": "5"
+      }
+    },
+    {
+      "tag": "WHAT IF",
+      "title": "Stale reads",
+      "body": "An admin changes a price in the database. The cache still holds the old feed, so for up to the remaining TTL every shopper sees the old price. For a news site that is fine. For a price, stock count, or permission change, it can mean selling at the wrong price or showing access a user no longer has. Shortening the TTL helps, but it raises database load because entries are rebuilt more often.",
+      "idea": "Staleness is bounded by the TTL; a shorter TTL buys freshness with more database work.",
+      "caption": "Database is updated but the cache still serves the old value.",
+      "focus": [
+        "writer",
+        "db",
+        "cache",
+        "app"
+      ],
+      "flows": [
+        {
+          "from": "writer",
+          "to": "db",
+          "kind": "request",
+          "label": "UPDATE price"
+        },
+        {
+          "from": "app",
+          "to": "cache",
+          "kind": "request",
+          "label": "GET feed"
+        },
+        {
+          "from": "cache",
+          "to": "app",
+          "kind": "fail",
+          "label": "old price"
+        }
+      ],
+      "metrics": {
+        "rps": "5000",
+        "dbq": "5",
+        "hit": "99.9",
+        "lat": "5"
+      }
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "Explicit invalidation",
+      "body": "To avoid waiting, the writer deletes the cache key right after committing the change. The next read misses and loads the new value. Delete, rather than overwrite, is the usual choice because a delete is idempotent and never writes a value itself. It is not airtight: a reader that loaded the old row just before the commit can write it back just after the delete. That is why teams keep a TTL as a safety net even when they also invalidate.",
+      "idea": "Invalidate by deleting after the write commits, and keep a TTL to repair the races you missed.",
+      "caption": "Writer commits, then deletes the key.",
+      "focus": [
+        "writer",
+        "db",
+        "cache"
+      ],
+      "flows": [
+        {
+          "from": "writer",
+          "to": "db",
+          "kind": "request",
+          "label": "UPDATE price"
+        },
+        {
+          "from": "db",
+          "to": "writer",
+          "kind": "response",
+          "label": "committed"
+        },
+        {
+          "from": "writer",
+          "to": "cache",
+          "kind": "request",
+          "label": "DEL feed"
+        }
+      ],
+      "metrics": {
+        "rps": "5000",
+        "dbq": "5",
+        "hit": "99.9",
+        "lat": "5"
+      }
+    },
+    {
+      "tag": "WHAT IF",
+      "title": "The stampede",
+      "body": "Now the key disappears, by TTL or by a delete, while 5,000 requests per second arrive. Every request misses, and every one starts its own 200 ms query. In the time the first rebuild takes, about 1,000 identical queries have been sent. If the database comfortably handles around 500 queries per second, it queues, slows down, and requests time out. The failed rebuilds mean the key stays empty, so the pile-on continues. This is a cache stampede, also called a thundering herd.",
+      "idea": "A stampede turns one expired key into thousands of identical database queries, and the overload can prevent the refill that would end it.",
+      "caption": "Every miss goes straight to the database.",
+      "focus": [
+        "app",
+        "cache",
+        "db"
+      ],
+      "flows": [
+        {
+          "from": "app",
+          "to": "cache",
+          "kind": "request",
+          "label": "GET feed"
+        },
+        {
+          "from": "cache",
+          "to": "app",
+          "kind": "response",
+          "label": "miss x 1000"
+        },
+        {
+          "from": "app",
+          "to": "db",
+          "kind": "fail",
+          "label": "SELECT x 1000"
+        }
+      ],
+      "metrics": {
+        "rps": "5000",
+        "dbq": "5000",
+        "hit": "0",
+        "lat": "2000"
+      }
+    },
+    {
+      "tag": "FIX",
+      "title": "Request coalescing",
+      "body": "The first request to miss takes a short lock (in one process, a single-flight map; across servers, a cache entry set with a short expiry only if absent). It alone queries the database. Everyone else waits for that result, or briefly serves the previous value if you kept one. The database sees one query instead of a thousand, and waiters pay at most one rebuild time. Give the lock its own timeout so a crashed leader cannot block the key forever.",
+      "idea": "Coalescing collapses many identical misses into one rebuild; always give the lock an expiry.",
+      "caption": "One query rebuilds the entry; waiters pay up to about 200 ms.",
+      "focus": [
+        "app",
+        "cache",
+        "db"
+      ],
+      "flows": [
+        {
+          "from": "app",
+          "to": "cache",
+          "kind": "request",
+          "label": "lock + GET"
+        },
+        {
+          "from": "app",
+          "to": "db",
+          "kind": "request",
+          "label": "1 x SELECT"
+        },
+        {
+          "from": "db",
+          "to": "app",
+          "kind": "response",
+          "label": "rows"
+        },
+        {
+          "from": "app",
+          "to": "cache",
+          "kind": "request",
+          "label": "SET feed"
+        }
+      ],
+      "metrics": {
+        "rps": "5000",
+        "dbq": "5",
+        "hit": "99.9",
+        "lat": "200"
+      }
+    },
+    {
+      "tag": "FIX",
+      "title": "Refresh before it expires",
+      "body": "Coalescing still makes someone wait. Probabilistic early expiry avoids even that. Each request that reads the entry may decide to rebuild it early, with a chance that grows as the expiry approaches and grows with how long a rebuild takes. One lucky request refreshes it while everyone else keeps getting the still-valid value. The entry is usually replaced before it expires, so a mass miss becomes very unlikely. Stale-while-revalidate, which serves the old value during a refresh, is a close cousin.",
+      "idea": "Rebuilding slightly early, at random, means the key is never empty when the crowd arrives.",
+      "caption": "One request refreshes early; the rest still hit.",
+      "focus": [
+        "app",
+        "cache",
+        "db"
+      ],
+      "flows": [
+        {
+          "from": "app",
+          "to": "cache",
+          "kind": "request",
+          "label": "GET feed"
+        },
+        {
+          "from": "cache",
+          "to": "app",
+          "kind": "response",
+          "label": "hit"
+        },
+        {
+          "from": "app",
+          "to": "db",
+          "kind": "async",
+          "label": "early refresh"
+        },
+        {
+          "from": "db",
+          "to": "app",
+          "kind": "async",
+          "label": "rows"
+        },
+        {
+          "from": "app",
+          "to": "cache",
+          "kind": "async",
+          "label": "SET feed"
+        }
+      ],
+      "metrics": {
+        "rps": "5000",
+        "dbq": "5",
+        "hit": "99.9",
+        "lat": "5"
+      }
+    },
+    {
+      "tag": "TRADE-OFF",
+      "title": "Many keys, one deadline",
+      "body": "A related trap: if a cache warm-up job or bulk load writes 100,000 keys all with a 60 second TTL, they all expire together and the database faces a stampede across many keys at once. Suppose 40 percent of requests land on keys that have just expired. Coalescing per key only removes duplicates; it cannot shrink 100,000 distinct queries. The cheap fix is jitter: add a random amount, say plus or minus 10 percent, to every TTL so expiries spread out instead of lining up. Make the jitter window wide enough that the rebuild rate stays under what the database can handle.",
+      "idea": "Add random jitter to TTLs so keys written together do not expire together.",
+      "caption": "Keys expiring in the same second overwhelm the database.",
+      "focus": [
+        "app",
+        "cache",
+        "db"
+      ],
+      "flows": [
+        {
+          "from": "app",
+          "to": "cache",
+          "kind": "request",
+          "label": "GET many keys"
+        },
+        {
+          "from": "cache",
+          "to": "app",
+          "kind": "response",
+          "label": "2,000 misses/s"
+        },
+        {
+          "from": "app",
+          "to": "db",
+          "kind": "fail",
+          "label": "2,000 queries/s"
+        }
+      ],
+      "metrics": {
+        "rps": "5000",
+        "dbq": "2000",
+        "hit": "60",
+        "lat": "800"
+      }
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "Hot keys",
+      "body": "Even with no misses, one key can be the problem. Suppose a celebrity's profile is read 150,000 times per second. The key lives on one cache node, and a single node typically serves somewhere around 100,000 simple operations per second (a rule of thumb; large values hit network limits even sooner), so one node cannot keep up while other nodes sit idle. Common fixes are a tiny in-process cache on each app server with a 1 to 5 second TTL, or storing several copies under keys like profile#1 to profile#8 and picking one at random. The cost is that a write must delete every copy, and a local cache can be stale for its TTL.",
+      "idea": "Hot keys are a load-spreading problem: copy the value so reads fan out across nodes.",
+      "caption": "Reads spread across copies of the hot key.",
+      "focus": [
+        "app",
+        "cache"
+      ],
+      "flows": [
+        {
+          "from": "app",
+          "to": "cache",
+          "kind": "request",
+          "label": "GET profile#3"
+        },
+        {
+          "from": "cache",
+          "to": "app",
+          "kind": "response",
+          "label": "hit"
+        },
+        {
+          "from": "app",
+          "to": "cache",
+          "kind": "request",
+          "label": "GET profile#7"
+        },
+        {
+          "from": "cache",
+          "to": "app",
+          "kind": "response",
+          "label": "hit"
+        }
+      ],
+      "metrics": {
+        "rps": "150000",
+        "dbq": "5",
+        "hit": "99.99",
+        "lat": "3"
+      }
+    },
+    {
+      "tag": "RECAP",
+      "title": "Keep the herd away",
+      "body": "TTL is simple but leaves a staleness window. Deleting on write shrinks it, with a TTL kept as a backstop. An empty hot key sends every request to the database at once, so coalesce rebuilds, refresh early at random, and jitter TTLs. For hot keys, replicate the value across nodes or cache it locally for a second or two. Measure miss bursts, not just average hit rate.",
+      "idea": "Plan for the moment the cache is empty, not only for the moment it is full.",
+      "caption": "Healthy again: few DB queries, high hit rate.",
+      "focus": [
+        "clients",
+        "app",
+        "cache",
+        "writer",
+        "db"
+      ],
+      "flows": [],
+      "metrics": {
+        "rps": "5000",
+        "dbq": "5",
+        "hit": "99.9",
+        "lat": "5"
+      }
+    }
   ],
   "quiz": [
-    {"q": "A key with a 60 s TTL is read 2,000 times per second and takes 500 ms to rebuild. It expires with no protection. Roughly how many database queries fire for it before the first rebuild finishes?", "options": ["1", "About 100", "About 1,000", "About 120,000"], "answer": 2, "why": "Every request that arrives during the 500 ms rebuild also misses: 2,000 req/s x 0.5 s = about 1,000 duplicate queries."},
-    {"q": "Why do many systems delete the cache key after a write instead of writing the new value into the cache?", "options": ["Deleting is faster than any write", "A delete is idempotent and never writes a possibly out-of-order value; the next read loads fresh data", "Caches cannot store updated values", "It removes the need for a TTL"], "answer": 1, "why": "Setting a value from the writer can race with other writers and store an out-of-order result. A delete is safe to repeat, and the next reader rebuilds from the source of truth. It does not remove every race, which is why a TTL stays as a backstop."},
-    {"q": "Which change best protects against 100,000 different keys all expiring in the same second after a bulk load?", "options": ["Coalescing requests per key", "Making the TTL shorter", "Adding a larger cache", "Adding random jitter to each TTL"], "answer": 3, "why": "Per-key coalescing cannot merge queries for different keys. Jitter spreads the expiry times so the rebuild work is spread out over time."},
-    {"q": "One key receives 150,000 reads per second, more than one cache node can serve, and the node is saturated, though the hit rate is 99.9%. What is the right fix?", "options": ["Spread reads over copies of the key or add a short-lived in-process cache", "Raise the TTL so it expires less often", "Add request coalescing", "Switch to explicit invalidation"], "answer": 0, "why": "This is a hot key problem, not a miss problem: 150,000 reads per second exceeds the roughly 100,000 operations per second one node can handle. The load is concentrated on one node, so you copy the value to spread reads across nodes or keep it in each app server's memory for a second or two."}
+    {
+      "q": "A key with a 60 s TTL is read 2,000 times per second and takes 500 ms to rebuild. It expires with no protection. Roughly how many database queries fire for it before the first rebuild finishes?",
+      "options": [
+        "1",
+        "About 100",
+        "About 1,000",
+        "About 120,000"
+      ],
+      "answer": 2,
+      "why": "Every request that arrives during the 500 ms rebuild also misses: 2,000 req/s x 0.5 s = about 1,000 duplicate queries."
+    },
+    {
+      "q": "Why do many systems delete the cache key after a write instead of writing the new value into the cache?",
+      "options": [
+        "Deleting is faster than any write",
+        "A delete is idempotent and never writes a possibly out-of-order value; the next read loads fresh data",
+        "Caches cannot store updated values",
+        "It removes the need for a TTL"
+      ],
+      "answer": 1,
+      "why": "Setting a value from the writer can race with other writers and store an out-of-order result. A delete is safe to repeat, and the next reader rebuilds from the source of truth. It does not remove every race, which is why a TTL stays as a backstop."
+    },
+    {
+      "q": "Which change best protects against 100,000 different keys all expiring in the same second after a bulk load?",
+      "options": [
+        "Coalescing requests per key",
+        "Making the TTL shorter",
+        "Adding a larger cache",
+        "Adding random jitter to each TTL"
+      ],
+      "answer": 3,
+      "why": "Per-key coalescing cannot merge queries for different keys. Jitter spreads the expiry times so the rebuild work is spread out over time."
+    },
+    {
+      "q": "One key receives 150,000 reads per second, more than one cache node can serve, and the node is saturated, though the hit rate is 99.9%. What is the right fix?",
+      "options": [
+        "Spread reads over copies of the key or add a short-lived in-process cache",
+        "Raise the TTL so it expires less often",
+        "Add request coalescing",
+        "Switch to explicit invalidation"
+      ],
+      "answer": 0,
+      "why": "This is a hot key problem, not a miss problem: 150,000 reads per second exceeds the roughly 100,000 operations per second one node can handle. The load is concentrated on one node, so you copy the value to spread reads across nodes or keep it in each app server's memory for a second or two."
+    }
   ],
   "cheatsheet": [
-    {"term": "TTL", "def": "Time to live: how long a cached entry may be served before it is dropped. Bounds staleness without any coordination."},
-    {"term": "Explicit invalidation", "def": "Writers delete (or update) the cache key when the source data changes. Fresher than TTL but needs every write path to remember to do it."},
-    {"term": "Cache stampede", "def": "Many requests miss the same key at once and all hit the database to rebuild it. Also called a thundering herd or dogpile."},
-    {"term": "Request coalescing", "def": "Only one request rebuilds a missing key; others wait or use the old value. Also called single-flight. Give the lock a timeout."},
-    {"term": "Probabilistic early expiry", "def": "Each reader may refresh early with a rising probability near expiry, so the key is replaced before it expires."},
-    {"term": "Stale-while-revalidate", "def": "Serve the old value while one background request fetches a new one. Trades a little staleness for no waiting."},
-    {"term": "TTL jitter", "def": "Add a random offset, such as plus or minus 10 percent, to TTLs so keys written together do not expire together."},
-    {"term": "Hot key", "def": "A single key with far more traffic than others. It can saturate one cache node. Fix by replicating it or caching locally with a short TTL."}
+    {
+      "term": "TTL",
+      "def": "Time to live: how long a cached entry may be served before it is dropped. Bounds staleness without any coordination."
+    },
+    {
+      "term": "Explicit invalidation",
+      "def": "Writers delete (or update) the cache key when the source data changes. Fresher than TTL but needs every write path to remember to do it."
+    },
+    {
+      "term": "Cache stampede",
+      "def": "Many requests miss the same key at once and all hit the database to rebuild it. Also called a thundering herd or dogpile."
+    },
+    {
+      "term": "Request coalescing",
+      "def": "Only one request rebuilds a missing key; others wait or use the old value. Also called single-flight. Give the lock a timeout."
+    },
+    {
+      "term": "Probabilistic early expiry",
+      "def": "Each reader may refresh early with a rising probability near expiry, so the key is replaced before it expires."
+    },
+    {
+      "term": "Stale-while-revalidate",
+      "def": "Serve the old value while one background request fetches a new one. Trades a little staleness for no waiting."
+    },
+    {
+      "term": "TTL jitter",
+      "def": "Add a random offset, such as plus or minus 10 percent, to TTLs so keys written together do not expire together."
+    },
+    {
+      "term": "Hot key",
+      "def": "A single key with far more traffic than others. It can saturate one cache node. Fix by replicating it or caching locally with a short TTL."
+    }
   ]
 }

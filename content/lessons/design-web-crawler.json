@@ -320,7 +320,7 @@
     {
       "tag": "SCALE",
       "title": "Distribute the workers",
-      "body": "At 400 pages/s one well-tuned machine could handle the connections and bandwidth, so we spread out for headroom and safety: peaks several times the 320 Mbps average, parsing and dedup CPU and memory, 100 TB a month of storage, no single point of failure. At about 0.5 s per fetch, 400 pg/s is about 200 fetches in flight. Shard by host hash (in practice the registered domain, or limit per IP, since many hostnames share one server). Links are forwarded to the owning worker, which dedups on receipt, then enqueues. Use consistent hashing so adding a worker moves few hosts.",
+      "body": "One tuned machine could handle 400 pages/s, so we spread out for headroom and safety: peaks several times the 320 Mbps average, parsing and dedup CPU and memory, 100 TB a month of storage, no single point of failure. At about 0.5 s per fetch, 400 pg/s is about 200 fetches in flight. Shard by host hash (in practice the registered domain, or limit per IP, since many hostnames share one server). Links are forwarded to the owning worker, which dedups on receipt, then enqueues. Use consistent hashing so adding a worker moves few hosts. Workers lease each URL: the frontier hides it until a deadline and removes it only on ack (next step).",
       "idea": "Shard by host, not by URL: politeness, DNS, and robots.txt all become local decisions.",
       "caption": "Links are routed to the owning shard, which dedups and enqueues them.",
       "focus": [
@@ -358,7 +358,7 @@
       "title": "A spider trap and a dead worker",
       "body": "Some sites generate infinite URLs, like a calendar with a next-month link forever. Defences: cap URL length, depth, and pages per host. A lease is a temporary claim: the URL stays in the frontier, hidden until a deadline, and is removed only on ack. If a worker dies, its leases expire and the URLs are retried. Each shard's frontier and seen-URL log are persisted, so the new owner reloads queues and leases and rebuilds the Bloom filter; a few repeat fetches are fine. A host that keeps timing out gets its whole back queue delayed.",
       "idea": "Assume the web is hostile and machines fail: use limits on crawl depth and per-host budgets, and lease URLs instead of deleting them.",
-      "caption": "Traps are capped by limits; a failed fetch is retried later, not lost.",
+      "caption": "Traps are capped; a dead worker's lease expires and the URL is retried.",
       "focus": [
         "fetcher",
         "web",
@@ -376,6 +376,18 @@
           "to": "frontier",
           "kind": "async",
           "label": "retry later"
+        },
+        {
+          "from": "frontier",
+          "to": "fetcher",
+          "kind": "request",
+          "label": "reassign: expired"
+        },
+        {
+          "from": "fetcher",
+          "to": "frontier",
+          "kind": "async",
+          "label": "cap depth/host"
         }
       ],
       "metrics": {

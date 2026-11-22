@@ -12,52 +12,458 @@
     "Why hybrid logical clocks pair physical time with a counter"
   ],
   "nodes": [
-    {"id": "c1", "label": "Client 1", "kind": "client", "x": 10, "y": 25},
-    {"id": "c2", "label": "Client 2", "kind": "client", "x": 10, "y": 75},
-    {"id": "a", "label": "Replica A", "kind": "server", "x": 40, "y": 25},
-    {"id": "b", "label": "Replica B", "kind": "server", "x": 40, "y": 75},
-    {"id": "ntp", "label": "NTP time server", "kind": "external", "x": 72, "y": 10},
-    {"id": "store", "label": "Merged record", "kind": "db", "x": 80, "y": 55}
+    {
+      "id": "c1",
+      "label": "Client 1",
+      "kind": "client",
+      "x": 10,
+      "y": 25
+    },
+    {
+      "id": "c2",
+      "label": "Client 2",
+      "kind": "client",
+      "x": 10,
+      "y": 75
+    },
+    {
+      "id": "a",
+      "label": "Replica A",
+      "kind": "server",
+      "x": 40,
+      "y": 25
+    },
+    {
+      "id": "b",
+      "label": "Replica B",
+      "kind": "server",
+      "x": 40,
+      "y": 75
+    },
+    {
+      "id": "ntp",
+      "label": "NTP time server",
+      "kind": "external",
+      "x": 72,
+      "y": 10
+    },
+    {
+      "id": "store",
+      "label": "Merged record",
+      "kind": "db",
+      "x": 80,
+      "y": 55
+    }
   ],
   "edges": [
-    {"from": "c1", "to": "a"},
-    {"from": "c2", "to": "b"},
-    {"from": "a", "to": "b"},
-    {"from": "a", "to": "store"},
-    {"from": "b", "to": "store"},
-    {"from": "ntp", "to": "a"},
-    {"from": "ntp", "to": "b"}
+    {
+      "from": "c1",
+      "to": "a"
+    },
+    {
+      "from": "c2",
+      "to": "b"
+    },
+    {
+      "from": "a",
+      "to": "b"
+    },
+    {
+      "from": "a",
+      "to": "store"
+    },
+    {
+      "from": "b",
+      "to": "store"
+    },
+    {
+      "from": "ntp",
+      "to": "a"
+    },
+    {
+      "from": "ntp",
+      "to": "b"
+    }
   ],
   "metrics": [
-    {"id": "skew", "label": "Clock skew", "unit": "ms"},
-    {"id": "lamport", "label": "Lamport clock", "unit": ""},
-    {"id": "kept", "label": "Writes kept", "unit": "of 2"}
+    {
+      "id": "skew",
+      "label": "Clock skew",
+      "unit": "ms"
+    },
+    {
+      "id": "lamport",
+      "label": "Lamport clock",
+      "unit": ""
+    },
+    {
+      "id": "kept",
+      "label": "Writes kept",
+      "unit": "of 2"
+    }
   ],
   "steps": [
-    {"tag": "QUESTION", "title": "Which write came last?", "body": "A shopping-cart value is stored on two replicas. Client 1 sets it to \"red\" through Replica A. Fifty milliseconds later Client 2 reads \"red\", changes it to \"blue\", and writes through Replica B. Blue is clearly the newer intent. Can the system work that out by comparing timestamps?", "idea": "Deciding what happened after what is the core problem; timestamps are only one way to answer it.", "caption": "Two clients, two replicas, one value.", "focus": ["c1", "c2", "a", "b"], "flows": [], "metrics": {}},
-    {"tag": "CONCEPT", "title": "Clocks drift and disagree", "body": "Each machine counts time with a quartz crystal. A typical crystal is off by 10 to 100 parts per million, which is up to 8 seconds a day if left alone. So two servers always show slightly different times. Here Replica B's clock runs 120 ms behind Replica A's. That gap is called clock skew.", "idea": "There is no single 'now' across machines; every clock is a slightly wrong local guess.", "caption": "Replica B's clock is 120 ms behind A.", "focus": ["a", "b"], "flows": [], "metrics": {"skew": "120"}},
-    {"tag": "NTP", "title": "NTP shrinks skew, never removes it", "body": "NTP (Network Time Protocol) lets a machine ask a time server for the time, estimate the network delay, and nudge its own clock. Over the public internet it typically gets within a few to a few tens of milliseconds. Tuned datacenter setups using chrony or PTP can reach well under a millisecond. Errors still come back: a missed sync, a VM pause, or a leap second can jump a clock.", "idea": "Synchronized clocks are close, not equal, so a timestamp comparison smaller than the error margin means nothing.", "caption": "Replicas sync to NTP; skew drops to about 5 ms.", "focus": ["ntp", "a", "b"], "flows": [{"from": "a", "to": "ntp", "kind": "request", "label": "what time?"}, {"from": "ntp", "to": "a", "kind": "response", "label": "time + delay"}, {"from": "b", "to": "ntp", "kind": "request", "label": "what time?"}, {"from": "ntp", "to": "b", "kind": "response", "label": "time + delay"}], "metrics": {"skew": "5"}},
-    {"tag": "FAILURE", "title": "Last-write-wins loses data", "body": "Suppose the sync lapsed and B is 120 ms behind again. Replica A stamps red at 10:00:00.100. Fifty ms later, B stamps blue with its slow clock: 10:00:00.030. The merge rule last-write-wins (LWW) keeps the biggest timestamp, so red wins and the newer blue write is silently discarded. No error, no log, just a lost update.", "idea": "LWW trusts wall clocks to order events, so skew larger than the gap between writes makes it drop the real latest write.", "caption": "Blue is dropped because B's clock is behind.", "focus": ["c1", "c2", "a", "b", "store"], "flows": [{"from": "c1", "to": "a", "kind": "request", "label": "set red"}, {"from": "a", "to": "store", "kind": "replicate", "label": "red @ .100"}, {"from": "c2", "to": "b", "kind": "request", "label": "set blue"}, {"from": "b", "to": "store", "kind": "fail", "label": "blue @ .030"}], "metrics": {"skew": "120", "kept": "1"}},
-    {"tag": "CONCEPT", "title": "Happens-before", "body": "Instead of asking what time it was, ask what could have influenced what. Event X happens before Y if they run on the same machine with X first, or X sends a message that Y receives, or a chain of such links connects them. If neither happens before the other, they are concurrent: neither could have known about the other. Red then blue is ordered because Client 2 read red first.", "idea": "Causality, not wall-clock time, defines order: A happens-before B only if information could have flowed from A to B.", "caption": "Client 2's write depends on red; it is causally later.", "focus": ["c1", "a", "c2", "b"], "flows": [{"from": "a", "to": "b", "kind": "replicate", "label": "red"}, {"from": "b", "to": "c2", "kind": "response", "label": "read: red"}, {"from": "c2", "to": "b", "kind": "request", "label": "write blue"}], "metrics": {}},
-    {"tag": "LAMPORT", "title": "Lamport timestamps", "body": "Leslie Lamport's trick needs no clocks at all. Each node keeps a counter. It adds 1 for every local event and attaches the counter to every message. On receiving a message the node sets its counter to max(its own, the message's) + 1. So if X happens before Y, X's number is smaller. The reverse does not hold: a smaller number does not prove causality.", "idea": "A Lamport clock gives a total order consistent with causality, but cannot tell concurrent events from ordered ones.", "caption": "Counters ride on messages; B jumps past A's value.", "focus": ["a", "b"], "flows": [{"from": "a", "to": "b", "kind": "replicate", "label": "red, L=4"}, {"from": "b", "to": "a", "kind": "response", "label": "blue, L=5"}], "metrics": {"lamport": "5"}},
-    {"tag": "VECTOR", "title": "Vector clocks spot concurrency", "body": "A vector clock keeps one counter per node. Red is written at A as [A1, B0]. B receives it and writes blue as [A1, B1]. Every entry is at least as large, so blue replaces red safely. But if A also takes a different write, giving [A2, B0], that and [A1, B1] are incomparable. The system keeps both as siblings for the app or a merge rule to resolve. Dynamo-style stores like Riak use this.", "idea": "Comparing vectors tells you three things: older, newer, or truly concurrent. The cost is a vector that grows with the number of writers.", "caption": "Ordered writes replace; concurrent ones are kept.", "focus": ["a", "b", "store"], "flows": [{"from": "a", "to": "store", "kind": "replicate", "label": "[A2,B0]"}, {"from": "b", "to": "store", "kind": "replicate", "label": "[A1,B1]"}], "metrics": {"kept": "2"}},
-    {"tag": "TRADE-OFF", "title": "Hybrid logical clocks", "body": "Lamport and vector values mean nothing to a human and cannot answer 'show me data from 9am'. A hybrid logical clock (HLC) stores the physical time plus a small counter. It follows the wall clock closely, but if a message arrives from the future, it bumps the counter instead of going backwards. CockroachDB and YugabyteDB use HLCs. Google Spanner takes another route: its TrueTime API reports an uncertainty interval, and commits wait it out, typically a few milliseconds.", "idea": "HLCs keep causal ordering and stay close to real time, at the cost of bounded, not zero, dependence on synchronized clocks.", "caption": "Timestamps carry time plus a tiebreak counter.", "focus": ["a", "b", "ntp"], "flows": [{"from": "a", "to": "b", "kind": "replicate", "label": "t=.100, c=0"}, {"from": "b", "to": "a", "kind": "response", "label": "t=.100, c=1"}], "metrics": {"skew": "5", "kept": "2"}},
-    {"tag": "RECAP", "title": "Pick the right clock", "body": "Wall clocks drift, and NTP only narrows the error, so comparing timestamps from different machines can reorder events and let LWW lose data. Lamport clocks give a causal-consistent order. Vector clocks also detect concurrency. HLCs mix both ideas with readable time. How to merge concurrent writes is left to the conflict-resolution lesson.", "idea": "Use time for humans and logs, and use causality tracking when correctness depends on order.", "caption": "Causality tracking keeps both writes visible.", "focus": ["c1", "c2", "a", "b", "ntp", "store"], "flows": [], "metrics": {"skew": "5", "lamport": "5", "kept": "2"}}
+    {
+      "tag": "QUESTION",
+      "title": "Which write came last?",
+      "body": "A shopping-cart value is stored on two replicas. Client 1 sets it to \"red\" through Replica A. Fifty milliseconds later Client 2 reads \"red\", changes it to \"blue\", and writes through Replica B. Blue is clearly the newer intent. Can the system work that out by comparing timestamps?",
+      "idea": "Deciding what happened after what is the core problem; timestamps are only one way to answer it.",
+      "caption": "Two clients, two replicas, one value.",
+      "focus": [
+        "c1",
+        "c2",
+        "a",
+        "b"
+      ],
+      "flows": [],
+      "metrics": {}
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "Clocks drift and disagree",
+      "body": "Each machine counts time with a quartz crystal. A typical crystal is off by 10 to 100 parts per million, which is up to 8 seconds a day if left alone. So two servers always show slightly different times. Here Replica B's clock runs 120 ms behind Replica A's. That gap is called clock skew.",
+      "idea": "There is no single 'now' across machines; every clock is a slightly wrong local guess.",
+      "caption": "Replica B's clock is 120 ms behind A.",
+      "focus": [
+        "a",
+        "b"
+      ],
+      "flows": [],
+      "metrics": {
+        "skew": "120"
+      }
+    },
+    {
+      "tag": "NTP",
+      "title": "NTP shrinks skew, never removes it",
+      "body": "NTP (Network Time Protocol) lets a machine ask a time server for the time, estimate the network delay, and nudge its own clock. Over the public internet it typically gets within a few to a few tens of milliseconds. Tuned datacenter setups using chrony or PTP can reach well under a millisecond. Errors still come back: a missed sync, a VM pause, or a leap second can jump a clock.",
+      "idea": "Synchronized clocks are close, not equal, so a timestamp comparison smaller than the error margin means nothing.",
+      "caption": "Replicas sync to NTP; skew drops to about 5 ms.",
+      "focus": [
+        "ntp",
+        "a",
+        "b"
+      ],
+      "flows": [
+        {
+          "from": "a",
+          "to": "ntp",
+          "kind": "request",
+          "label": "what time?"
+        },
+        {
+          "from": "ntp",
+          "to": "a",
+          "kind": "response",
+          "label": "time + delay"
+        },
+        {
+          "from": "b",
+          "to": "ntp",
+          "kind": "request",
+          "label": "what time?"
+        },
+        {
+          "from": "ntp",
+          "to": "b",
+          "kind": "response",
+          "label": "time + delay"
+        }
+      ],
+      "metrics": {
+        "skew": "5"
+      }
+    },
+    {
+      "tag": "FAILURE",
+      "title": "Last-write-wins loses data",
+      "body": "Suppose the sync lapsed and B is 120 ms behind again. Replica A stamps red at 10:00:00.100. Fifty ms later, B stamps blue with its slow clock: 10:00:00.030. The merge rule last-write-wins (LWW) keeps the biggest timestamp, so red wins and the newer blue write is silently discarded. No error, no log, just a lost update.",
+      "idea": "LWW trusts wall clocks to order events, so skew larger than the gap between writes makes it drop the real latest write.",
+      "caption": "Blue is dropped because B's clock is behind.",
+      "focus": [
+        "c1",
+        "c2",
+        "a",
+        "b",
+        "store"
+      ],
+      "flows": [
+        {
+          "from": "c1",
+          "to": "a",
+          "kind": "request",
+          "label": "set red"
+        },
+        {
+          "from": "a",
+          "to": "store",
+          "kind": "replicate",
+          "label": "red @ .100"
+        },
+        {
+          "from": "c2",
+          "to": "b",
+          "kind": "request",
+          "label": "set blue"
+        },
+        {
+          "from": "b",
+          "to": "store",
+          "kind": "fail",
+          "label": "blue @ .030"
+        }
+      ],
+      "metrics": {
+        "skew": "120",
+        "kept": "1"
+      }
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "Happens-before",
+      "body": "Instead of asking what time it was, ask what could have influenced what. Event X happens before Y if they run on the same machine with X first, or X sends a message that Y receives, or a chain of such links connects them. If neither happens before the other, they are concurrent: neither could have known about the other. Red then blue is ordered because Client 2 read red first.",
+      "idea": "Causality, not wall-clock time, defines order: A happens-before B only if information could have flowed from A to B.",
+      "caption": "Client 2's write depends on red; it is causally later.",
+      "focus": [
+        "c1",
+        "a",
+        "c2",
+        "b"
+      ],
+      "flows": [
+        {
+          "from": "a",
+          "to": "b",
+          "kind": "replicate",
+          "label": "red"
+        },
+        {
+          "from": "c2",
+          "to": "b",
+          "kind": "request",
+          "label": "read"
+        },
+        {
+          "from": "b",
+          "to": "c2",
+          "kind": "response",
+          "label": "read: red"
+        },
+        {
+          "from": "c2",
+          "to": "b",
+          "kind": "request",
+          "label": "write blue"
+        }
+      ],
+      "metrics": {}
+    },
+    {
+      "tag": "LAMPORT",
+      "title": "Lamport timestamps",
+      "body": "Leslie Lamport's trick needs no clocks at all. Each node keeps a counter. It adds 1 for every local event and attaches the counter to every message. On receiving a message the node sets its counter to max(its own, the message's) + 1. So if X happens before Y, X's number is smaller. The reverse does not hold: a smaller number does not prove causality.",
+      "idea": "A Lamport clock gives a total order consistent with causality, but cannot tell concurrent events from ordered ones.",
+      "caption": "Counters ride on messages; B jumps past A's value.",
+      "focus": [
+        "a",
+        "b"
+      ],
+      "flows": [
+        {
+          "from": "a",
+          "to": "b",
+          "kind": "replicate",
+          "label": "red, L=4"
+        },
+        {
+          "from": "b",
+          "to": "a",
+          "kind": "replicate",
+          "label": "blue, L=6"
+        }
+      ],
+      "metrics": {
+        "lamport": "6"
+      }
+    },
+    {
+      "tag": "VECTOR",
+      "title": "Vector clocks spot concurrency",
+      "body": "A vector clock keeps one counter per node. Red is written at A as [A1, B0]. B receives it and writes blue as [A1, B1]. Every entry is at least as large, so blue replaces red safely. But if A also takes a different write, giving [A2, B0], that and [A1, B1] are incomparable. The system keeps both as siblings for the app or a merge rule to resolve. Dynamo-style stores like Riak use this.",
+      "idea": "Comparing vectors tells you three things: older, newer, or truly concurrent. The cost is a vector that grows with the number of writers.",
+      "caption": "Ordered writes replace; concurrent ones are kept.",
+      "focus": [
+        "a",
+        "b",
+        "store"
+      ],
+      "flows": [
+        {
+          "from": "a",
+          "to": "b",
+          "kind": "replicate",
+          "label": "red [A1,B0]"
+        },
+        {
+          "from": "b",
+          "to": "a",
+          "kind": "replicate",
+          "label": "blue [A1,B1]"
+        },
+        {
+          "from": "a",
+          "to": "store",
+          "kind": "replicate",
+          "label": "[A2,B0]"
+        },
+        {
+          "from": "b",
+          "to": "store",
+          "kind": "replicate",
+          "label": "[A1,B1]"
+        }
+      ],
+      "metrics": {
+        "kept": "2"
+      }
+    },
+    {
+      "tag": "TRADE-OFF",
+      "title": "Hybrid logical clocks",
+      "body": "Lamport and vector values mean nothing to a human and cannot answer 'show me data from 9am'. A hybrid logical clock (HLC) stores the physical time plus a small counter. It follows the wall clock closely, but if a message arrives from the future, it bumps the counter instead of going backwards. CockroachDB and YugabyteDB use HLCs. Google Spanner takes another route: its TrueTime API reports an uncertainty interval, and commits wait it out, typically a few milliseconds.",
+      "idea": "HLCs keep causal ordering and stay close to real time, at the cost of bounded, not zero, dependence on synchronized clocks.",
+      "caption": "Timestamps carry time plus a tiebreak counter.",
+      "focus": [
+        "a",
+        "b",
+        "ntp"
+      ],
+      "flows": [
+        {
+          "from": "a",
+          "to": "b",
+          "kind": "replicate",
+          "label": "t=.100, c=0"
+        },
+        {
+          "from": "b",
+          "to": "a",
+          "kind": "replicate",
+          "label": "t=.100, c=1"
+        }
+      ],
+      "metrics": {
+        "skew": "5",
+        "kept": "2"
+      }
+    },
+    {
+      "tag": "RECAP",
+      "title": "Pick the right clock",
+      "body": "Wall clocks drift, and NTP only narrows the error, so comparing timestamps from different machines can reorder events and let LWW lose data. Lamport clocks give a causal-consistent order. Vector clocks also detect concurrency. HLCs mix both ideas with readable time. How to merge concurrent writes is left to the conflict-resolution lesson.",
+      "idea": "Use time for humans and logs, and use causality tracking when correctness depends on order.",
+      "caption": "Causality tracking keeps both writes visible.",
+      "focus": [
+        "c1",
+        "c2",
+        "a",
+        "b",
+        "ntp",
+        "store"
+      ],
+      "flows": [],
+      "metrics": {
+        "skew": "5",
+        "lamport": "6",
+        "kept": "2"
+      }
+    }
   ],
   "quiz": [
-    {"q": "Replica A and B are synced by NTP to within about 20 ms. Two writes to the same key happen 5 ms apart on different replicas. What can a timestamp comparison tell you?", "options": ["Which write is newer, because NTP is accurate", "Which write is newer, as long as the clocks are in the same timezone", "Nothing reliable, since the gap is smaller than the clock error", "That the writes are concurrent"], "answer": 2, "why": "Skew of 20 ms is larger than the 5 ms gap, so either replica's stamp could be ahead. The comparison is within the noise and cannot be trusted."},
-    {"q": "Last-write-wins is used to merge two replicas. Which scenario most clearly causes silent data loss?", "options": ["Both replicas have exactly the same clock", "The replica that took the later write has a clock running behind the other", "The writes are to different keys", "The network is slow but all messages arrive"], "answer": 1, "why": "A later write stamped by a slow clock gets a smaller timestamp, so the merge discards it even though it was the latest in real time."},
-    {"q": "Two vector clocks are [A:3, B:1] and [A:2, B:2]. What is their relationship?", "options": ["The first is older", "The second is older", "They are identical", "They are concurrent"], "answer": 3, "why": "Neither vector is greater than or equal in every entry: A is higher in the first, B is higher in the second. So neither write saw the other."},
-    {"q": "Event X has Lamport timestamp 7 and event Y has Lamport timestamp 9. What can you conclude?", "options": ["X happened before Y", "Y cannot have happened before X", "X and Y are concurrent", "Y happened before X"], "answer": 1, "why": "If Y happened before X, then Y's timestamp would be smaller. So Y cannot precede X, but X may still be concurrent with Y, which is why 'X happened before Y' is not guaranteed."},
-    {"q": "Why would a database choose a hybrid logical clock over a plain Lamport clock?", "options": ["HLCs need no counter", "HLC timestamps stay close to real time, so you can query by time and still respect causality", "HLCs eliminate clock skew", "HLCs detect concurrent writes like vector clocks"], "answer": 1, "why": "An HLC pairs physical time with a counter: readable, near wall-clock, and causality-safe. It does not remove skew or give per-node concurrency detection."}
+    {
+      "q": "Replica A and B are synced by NTP to within about 20 ms. Two writes to the same key happen 5 ms apart on different replicas. What can a timestamp comparison tell you?",
+      "options": [
+        "Which write is newer, because NTP is accurate",
+        "Which write is newer, as long as the clocks are in the same timezone",
+        "Nothing reliable, since the gap is smaller than the clock error",
+        "That the writes are concurrent"
+      ],
+      "answer": 2,
+      "why": "Skew of 20 ms is larger than the 5 ms gap, so either replica's stamp could be ahead. The comparison is within the noise and cannot be trusted."
+    },
+    {
+      "q": "Last-write-wins is used to merge two replicas. Which scenario most clearly causes silent data loss?",
+      "options": [
+        "Both replicas have exactly the same clock",
+        "The replica that took the later write has a clock running behind the other",
+        "The writes are to different keys",
+        "The network is slow but all messages arrive"
+      ],
+      "answer": 1,
+      "why": "A later write stamped by a slow clock gets a smaller timestamp, so the merge discards it even though it was the latest in real time."
+    },
+    {
+      "q": "Two vector clocks are [A:3, B:1] and [A:2, B:2]. What is their relationship?",
+      "options": [
+        "The first is older",
+        "The second is older",
+        "They are identical",
+        "They are concurrent"
+      ],
+      "answer": 3,
+      "why": "Neither vector is greater than or equal in every entry: A is higher in the first, B is higher in the second. So neither write saw the other."
+    },
+    {
+      "q": "Event X has Lamport timestamp 7 and event Y has Lamport timestamp 9. What can you conclude?",
+      "options": [
+        "X happened before Y",
+        "Y cannot have happened before X",
+        "X and Y are concurrent",
+        "Y happened before X"
+      ],
+      "answer": 1,
+      "why": "If Y happened before X, then Y's timestamp would be smaller. So Y cannot precede X, but X may still be concurrent with Y, which is why 'X happened before Y' is not guaranteed."
+    },
+    {
+      "q": "Why would a database choose a hybrid logical clock over a plain Lamport clock?",
+      "options": [
+        "HLCs need no counter",
+        "HLC timestamps stay close to real time, so you can query by time and still respect causality",
+        "HLCs eliminate clock skew",
+        "HLCs detect concurrent writes like vector clocks"
+      ],
+      "answer": 1,
+      "why": "An HLC pairs physical time with a counter: readable, near wall-clock, and causality-safe. It does not remove skew or give per-node concurrency detection."
+    }
   ],
   "cheatsheet": [
-    {"term": "Clock skew", "def": "The difference between two machines' clocks at the same real instant. Always non-zero; NTP keeps it to roughly ms, not zero."},
-    {"term": "Clock drift", "def": "How fast a clock gains or loses time. Cheap crystals drift tens of parts per million, several seconds per day if unsynced."},
-    {"term": "Happens-before (→)", "def": "X → Y if X precedes Y on one node, or X is a send whose receive is Y, or by chaining. Otherwise the events are concurrent."},
-    {"term": "Lamport timestamp", "def": "A counter bumped per event and set to max(local, received) + 1 on receive. If X → Y then L(X) < L(Y); the reverse is not guaranteed."},
-    {"term": "Vector clock", "def": "One counter per node. Compare entry-wise to find older, newer, or concurrent. Grows with the number of writers."},
-    {"term": "Hybrid logical clock", "def": "Physical time plus a logical counter. Stays near wall-clock time and never goes backwards. Used by CockroachDB, YugabyteDB."},
-    {"term": "Last-write-wins (LWW)", "def": "Keeps the highest timestamp. Simple, but loses updates under skew or true concurrency. Fine for idempotent overwrites like caches."}
+    {
+      "term": "Clock skew",
+      "def": "The difference between two machines' clocks at the same real instant. Always non-zero; NTP keeps it to roughly ms, not zero."
+    },
+    {
+      "term": "Clock drift",
+      "def": "How fast a clock gains or loses time. Cheap crystals drift tens of parts per million, several seconds per day if unsynced."
+    },
+    {
+      "term": "Happens-before (→)",
+      "def": "X → Y if X precedes Y on one node, or X is a send whose receive is Y, or by chaining. Otherwise the events are concurrent."
+    },
+    {
+      "term": "Lamport timestamp",
+      "def": "A counter bumped per event and set to max(local, received) + 1 on receive. If X → Y then L(X) < L(Y); the reverse is not guaranteed."
+    },
+    {
+      "term": "Vector clock",
+      "def": "One counter per node. Compare entry-wise to find older, newer, or concurrent. Grows with the number of writers."
+    },
+    {
+      "term": "Hybrid logical clock",
+      "def": "Physical time plus a logical counter. Stays near wall-clock time and never goes backwards. Used by CockroachDB, YugabyteDB."
+    },
+    {
+      "term": "Last-write-wins (LWW)",
+      "def": "Keeps the highest timestamp. Simple, but loses updates under skew or true concurrency. Fine for idempotent overwrites like caches."
+    }
   ]
 }

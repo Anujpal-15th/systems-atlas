@@ -12,50 +12,508 @@
     "Why stateless servers can be added, removed or killed freely"
   ],
   "nodes": [
-    {"id": "browser", "label": "Browser", "kind": "user", "x": 9, "y": 50},
-    {"id": "lb", "label": "Load balancer", "kind": "lb", "x": 32, "y": 50},
-    {"id": "appa", "label": "App server A", "kind": "server", "x": 57, "y": 22},
-    {"id": "appb", "label": "App server B", "kind": "server", "x": 57, "y": 78},
-    {"id": "sessions", "label": "Session store", "kind": "cache", "x": 84, "y": 22},
-    {"id": "db", "label": "Database", "kind": "db", "x": 84, "y": 78}
+    {
+      "id": "browser",
+      "label": "Browser",
+      "kind": "user",
+      "x": 9,
+      "y": 50
+    },
+    {
+      "id": "lb",
+      "label": "Load balancer",
+      "kind": "lb",
+      "x": 32,
+      "y": 50
+    },
+    {
+      "id": "appa",
+      "label": "App server A",
+      "kind": "server",
+      "x": 57,
+      "y": 22
+    },
+    {
+      "id": "appb",
+      "label": "App server B",
+      "kind": "server",
+      "x": 57,
+      "y": 78
+    },
+    {
+      "id": "sessions",
+      "label": "Session store",
+      "kind": "cache",
+      "x": 84,
+      "y": 22
+    },
+    {
+      "id": "db",
+      "label": "Database",
+      "kind": "db",
+      "x": 84,
+      "y": 78
+    }
   ],
   "edges": [
-    {"from": "browser", "to": "lb"},
-    {"from": "lb", "to": "appa"},
-    {"from": "lb", "to": "appb"},
-    {"from": "appa", "to": "sessions"},
-    {"from": "appb", "to": "sessions"},
-    {"from": "appa", "to": "db"},
-    {"from": "appb", "to": "db"}
+    {
+      "from": "browser",
+      "to": "lb"
+    },
+    {
+      "from": "lb",
+      "to": "appa"
+    },
+    {
+      "from": "lb",
+      "to": "appb"
+    },
+    {
+      "from": "appa",
+      "to": "sessions"
+    },
+    {
+      "from": "appb",
+      "to": "sessions"
+    },
+    {
+      "from": "appa",
+      "to": "db"
+    },
+    {
+      "from": "appb",
+      "to": "db"
+    }
   ],
   "metrics": [
-    {"id": "servers", "label": "App servers", "unit": "up"},
-    {"id": "failed", "label": "Users re-login", "unit": "%"},
-    {"id": "lookup", "label": "Session read", "unit": "ms"}
+    {
+      "id": "servers",
+      "label": "App servers",
+      "unit": "up"
+    },
+    {
+      "id": "failed",
+      "label": "Users re-login",
+      "unit": "%"
+    },
+    {
+      "id": "lookup",
+      "label": "Session read",
+      "unit": "ms"
+    }
   ],
   "steps": [
-    {"tag": "QUESTION", "title": "Why did my login vanish?", "body": "You log in to a shop and fill your cart. A minute later the site shows the login page again, cart gone. Nothing was wrong with your password. Behind the scenes, the server that knew you was replaced, or a different server answered. This lesson is about what that server was remembering, and where it should have kept it instead.", "idea": "If a request only works on the one server that handled the last request, scaling out and failing over both break.", "caption": "Two identical servers sit behind a load balancer.", "focus": ["browser", "lb", "appa", "appb"], "flows": [{"from": "browser", "to": "lb", "kind": "request", "label": "GET /cart"}, {"from": "lb", "to": "appa", "kind": "request", "label": "GET /cart"}], "metrics": {"servers": "2", "failed": "0"}},
-    {"tag": "CONCEPT", "title": "State lives in server memory", "body": "HTTP forgets you between requests, so apps keep a session: a small record such as user 42, cart with 3 items, stored under a random ID. The browser holds only the ID in a cookie. In the simplest design the record sits in the memory of the server that handled the login. That server is now stateful: it holds data that the next request depends on.", "idea": "A stateful server remembers something between requests that no other server knows.", "caption": "Login lands on A, so the session exists only in A's RAM.", "focus": ["browser", "lb", "appa"], "flows": [{"from": "browser", "to": "lb", "kind": "request", "label": "POST /login"}, {"from": "lb", "to": "appa", "kind": "request", "label": "POST /login"}, {"from": "appa", "to": "lb", "kind": "response", "label": "Set-Cookie sid=9f2"}], "metrics": {}},
-    {"tag": "PROBLEM", "title": "Round robin hits the wrong server", "body": "The load balancer spreads requests evenly, so the next click goes to server B. B receives the cookie sid=9f2 but has never seen that ID, so it treats you as logged out. With two servers about half your requests miss; with ten servers about nine in ten do. Adding capacity made the site worse, which is the opposite of what scaling should do.", "idea": "Per-server state makes more servers mean more cache misses on your own users.", "caption": "Server B has no record of sid=9f2 and rejects the request.", "focus": ["lb", "appb"], "flows": [{"from": "browser", "to": "lb", "kind": "request", "label": "GET /cart sid=9f2"}, {"from": "lb", "to": "appb", "kind": "request", "label": "GET /cart"}, {"from": "appb", "to": "lb", "kind": "fail", "label": "401 login again"}], "metrics": {"failed": "50"}},
-    {"tag": "TRADE-OFF", "title": "Sticky sessions: a patch", "body": "The cheap fix is stickiness: the load balancer remembers that sid=9f2 belongs to A, usually through a cookie or a hash of the client IP, and always routes you there. It works, but you pay in other ways. Load can skew when a few heavy users pile onto one server. A deploy must drain each server slowly. And if A crashes, every user pinned to A loses their session.", "idea": "Sticky sessions hide the problem but keep it: the server still holds the only copy, so its failure loses data.", "caption": "Pinned to A, requests work, until A dies and takes its sessions along.", "focus": ["lb", "appa"], "flows": [{"from": "browser", "to": "lb", "kind": "request", "label": "GET /cart sid=9f2"}, {"from": "lb", "to": "appa", "kind": "request", "label": "pinned to A"}, {"from": "lb", "to": "appa", "kind": "fail", "label": "A crashed"}], "metrics": {"failed": "50"}},
-    {"tag": "FIX", "title": "Move sessions to a shared store", "body": "Instead of RAM, any app server writes the session to a fast shared store such as Redis or Memcached, keyed by the session ID. On login, server A saves the record there with an expiry, say 30 minutes since last use. The store is a separate component that all servers talk to, so the app servers themselves no longer hold anything the others lack.", "idea": "Externalize the state: the servers keep logic, and a shared store keeps memory.", "caption": "A writes the session to the shared store at login.", "focus": ["appa", "sessions"], "flows": [{"from": "appa", "to": "sessions", "kind": "request", "label": "SET sess:9f2 30m"}, {"from": "sessions", "to": "appa", "kind": "response", "label": "OK"}], "metrics": {"failed": "0", "lookup": "1"}},
-    {"tag": "FLOW", "title": "Any server can answer", "body": "Now the next click can land on B. B reads the cookie, fetches sess:9f2 from the store in roughly 1 ms on the same network, finds user 42, then queries the database for the cart. The load balancer can use plain round robin or least connections, with no pinning. The price is one extra network hop per request, plus a new component you must keep highly available, usually with a replica and automatic failover.", "idea": "Stateless servers cost one cheap lookup per request and gain free routing.", "caption": "B looks up the session in the store and serves the cart.", "focus": ["lb", "appb", "sessions", "db"], "flows": [{"from": "browser", "to": "lb", "kind": "request", "label": "GET /cart sid=9f2"}, {"from": "lb", "to": "appb", "kind": "request", "label": "any server"}, {"from": "appb", "to": "sessions", "kind": "request", "label": "GET sess:9f2"}, {"from": "sessions", "to": "appb", "kind": "response", "label": "user 42"}, {"from": "appb", "to": "db", "kind": "request", "label": "SELECT cart"}, {"from": "db", "to": "appb", "kind": "response", "label": "3 items"}, {"from": "appb", "to": "lb", "kind": "response", "label": "200 cart"}], "metrics": {"lookup": "1"}},
-    {"tag": "ALTERNATIVE", "title": "Signed tokens skip the lookup", "body": "Another route is to put the session data in the client. After login the server issues a signed token, often a JWT, holding user ID and expiry, signed with a secret key all servers share. Any server verifies the signature in microseconds and needs no store at all. The cost: you cannot easily revoke one token before it expires, so keep tokens short-lived (say 15 minutes) with a refresh mechanism, and never put secrets inside them.", "idea": "Tokens trade revocability and size for zero server-side session storage.", "caption": "B verifies the token's signature itself; no session store is read.", "focus": ["browser", "lb", "appb", "db"], "flows": [{"from": "browser", "to": "lb", "kind": "request", "label": "Bearer eyJ..."}, {"from": "lb", "to": "appb", "kind": "request", "label": "verify signature"}, {"from": "appb", "to": "db", "kind": "request", "label": "SELECT cart"}, {"from": "db", "to": "appb", "kind": "response", "label": "3 items"}], "metrics": {"lookup": "0"}},
-    {"tag": "PAYOFF", "title": "Kill a server, nobody notices", "body": "With no state on the servers, they become interchangeable. If A crashes, the load balancer's health check marks it down and sends everything to B; users keep their sessions. You can deploy by replacing servers one at a time, and autoscale by adding or removing them at will. This is what lets you treat servers as disposable, which the next lessons on load balancing and autoscaling build on.", "idea": "Stateless servers can be added, removed, or killed at any time with no user impact.", "caption": "A fails its health check; B carries the traffic and sessions survive.", "focus": ["lb", "appa", "appb", "sessions"], "flows": [{"from": "lb", "to": "appa", "kind": "fail", "label": "health check fail"}, {"from": "browser", "to": "lb", "kind": "request", "label": "GET /cart sid=9f2"}, {"from": "lb", "to": "appb", "kind": "request", "label": "GET /cart"}, {"from": "appb", "to": "sessions", "kind": "request", "label": "GET sess:9f2"}, {"from": "appb", "to": "lb", "kind": "response", "label": "200 cart"}], "metrics": {"servers": "1", "failed": "0", "lookup": "1"}},
-    {"tag": "RECAP", "title": "Keep state out of the servers", "body": "State held in a server's memory pins users to it and is lost when it dies. Sticky sessions patch the routing but not the loss. A shared session store or signed tokens move the state elsewhere, so any server can answer any request. The state did not vanish: it now lives in a store you must make durable and fast. Stateless means the app tier is disposable, not that the system has no data.", "idea": "Stateless app servers scale and fail over easily; the state moves to a small number of well-protected places.", "caption": "Servers hold logic only; sessions and data live in shared stores.", "focus": ["browser", "lb", "appa", "appb", "sessions", "db"], "flows": [], "metrics": {"servers": "2", "failed": "0", "lookup": "1"}}
+    {
+      "tag": "QUESTION",
+      "title": "Why did my login vanish?",
+      "body": "You log in to a shop and fill your cart. A minute later the site shows the login page again, cart gone. Nothing was wrong with your password. Behind the scenes, the server that knew you was replaced, or a different server answered. This lesson is about what that server was remembering, and where it should have kept it instead.",
+      "idea": "If a request only works on the one server that handled the last request, scaling out and failing over both break.",
+      "caption": "Two identical servers sit behind a load balancer.",
+      "focus": [
+        "browser",
+        "lb",
+        "appa",
+        "appb"
+      ],
+      "flows": [
+        {
+          "from": "browser",
+          "to": "lb",
+          "kind": "request",
+          "label": "GET /cart"
+        },
+        {
+          "from": "lb",
+          "to": "appa",
+          "kind": "request",
+          "label": "GET /cart"
+        }
+      ],
+      "metrics": {
+        "servers": "2",
+        "failed": "0"
+      }
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "State lives in server memory",
+      "body": "HTTP forgets you between requests, so apps keep a session: a small record such as user 42, cart with 3 items, stored under a random ID. The browser holds only the ID in a cookie. In the simplest design the record sits in the memory of the server that handled the login. That server is now stateful: it holds data that the next request depends on.",
+      "idea": "A stateful server remembers something between requests that no other server knows.",
+      "caption": "Login lands on A, so the session exists only in A's RAM.",
+      "focus": [
+        "browser",
+        "lb",
+        "appa"
+      ],
+      "flows": [
+        {
+          "from": "browser",
+          "to": "lb",
+          "kind": "request",
+          "label": "POST /login"
+        },
+        {
+          "from": "lb",
+          "to": "appa",
+          "kind": "request",
+          "label": "POST /login"
+        },
+        {
+          "from": "appa",
+          "to": "lb",
+          "kind": "response",
+          "label": "Set-Cookie sid=9f2"
+        }
+      ],
+      "metrics": {}
+    },
+    {
+      "tag": "PROBLEM",
+      "title": "Round robin hits the wrong server",
+      "body": "The load balancer spreads requests evenly, so the next click goes to server B. B receives the cookie sid=9f2 but has never seen that ID, so it treats you as logged out. With two servers about half your requests miss; with ten servers about nine in ten do. Adding capacity made the site worse, which is the opposite of what scaling should do.",
+      "idea": "Per-server state makes more servers mean more cache misses on your own users.",
+      "caption": "Server B has no record of sid=9f2 and rejects the request.",
+      "focus": [
+        "lb",
+        "appb"
+      ],
+      "flows": [
+        {
+          "from": "browser",
+          "to": "lb",
+          "kind": "request",
+          "label": "GET /cart sid=9f2"
+        },
+        {
+          "from": "lb",
+          "to": "appb",
+          "kind": "request",
+          "label": "GET /cart"
+        },
+        {
+          "from": "appb",
+          "to": "lb",
+          "kind": "fail",
+          "label": "401 login again"
+        }
+      ],
+      "metrics": {
+        "failed": "50"
+      }
+    },
+    {
+      "tag": "TRADE-OFF",
+      "title": "Sticky sessions: a patch",
+      "body": "The cheap fix is stickiness: the load balancer remembers that sid=9f2 belongs to A, usually through a cookie or a hash of the client IP, and always routes you there. It works, but you pay in other ways. Load can skew when a few heavy users pile onto one server. A deploy must drain each server slowly. And if A crashes, every user pinned to A loses their session.",
+      "idea": "Sticky sessions hide the problem but keep it: the server still holds the only copy, so its failure loses data.",
+      "caption": "Pinned to A, requests work, until A dies and takes its sessions along.",
+      "focus": [
+        "lb",
+        "appa"
+      ],
+      "flows": [
+        {
+          "from": "browser",
+          "to": "lb",
+          "kind": "request",
+          "label": "GET /cart sid=9f2"
+        },
+        {
+          "from": "lb",
+          "to": "appa",
+          "kind": "request",
+          "label": "pinned to A"
+        },
+        {
+          "from": "lb",
+          "to": "appa",
+          "kind": "fail",
+          "label": "A crashed"
+        }
+      ],
+      "metrics": {
+        "failed": "50"
+      }
+    },
+    {
+      "tag": "FIX",
+      "title": "Move sessions to a shared store",
+      "body": "Instead of RAM, any app server writes the session to a fast shared store such as Redis or Memcached, keyed by the session ID. On login, server A saves the record there with an expiry, say 30 minutes since last use. The store is a separate component that all servers talk to, so the app servers themselves no longer hold anything the others lack.",
+      "idea": "Externalize the state: the servers keep logic, and a shared store keeps memory.",
+      "caption": "A writes the session to the shared store at login.",
+      "focus": [
+        "appa",
+        "sessions"
+      ],
+      "flows": [
+        {
+          "from": "appa",
+          "to": "sessions",
+          "kind": "request",
+          "label": "SET sess:9f2 30m"
+        },
+        {
+          "from": "sessions",
+          "to": "appa",
+          "kind": "response",
+          "label": "OK"
+        }
+      ],
+      "metrics": {
+        "failed": "0",
+        "lookup": "1"
+      }
+    },
+    {
+      "tag": "FLOW",
+      "title": "Any server can answer",
+      "body": "Now the next click can land on B. B reads the cookie, fetches sess:9f2 from the store in roughly 1 ms on the same network, finds user 42, then queries the database for the cart. The load balancer can use plain round robin or least connections, with no pinning. The price is one extra network hop per request, plus a new component you must keep highly available, usually with a replica and automatic failover.",
+      "idea": "Stateless servers cost one cheap lookup per request and gain free routing.",
+      "caption": "B looks up the session in the store and serves the cart.",
+      "focus": [
+        "lb",
+        "appb",
+        "sessions",
+        "db"
+      ],
+      "flows": [
+        {
+          "from": "browser",
+          "to": "lb",
+          "kind": "request",
+          "label": "GET /cart sid=9f2"
+        },
+        {
+          "from": "lb",
+          "to": "appb",
+          "kind": "request",
+          "label": "any server"
+        },
+        {
+          "from": "appb",
+          "to": "sessions",
+          "kind": "request",
+          "label": "GET sess:9f2"
+        },
+        {
+          "from": "sessions",
+          "to": "appb",
+          "kind": "response",
+          "label": "user 42"
+        },
+        {
+          "from": "appb",
+          "to": "db",
+          "kind": "request",
+          "label": "SELECT cart"
+        },
+        {
+          "from": "db",
+          "to": "appb",
+          "kind": "response",
+          "label": "3 items"
+        },
+        {
+          "from": "appb",
+          "to": "lb",
+          "kind": "response",
+          "label": "200 cart"
+        }
+      ],
+      "metrics": {
+        "lookup": "1"
+      }
+    },
+    {
+      "tag": "ALTERNATIVE",
+      "title": "Signed tokens skip the lookup",
+      "body": "Another route is to put the session data in the client. After login the server issues a signed token, often a JWT, holding user ID and expiry, signed with a secret key all servers share. Any server verifies the signature in microseconds and needs no store at all. The cost: you cannot easily revoke one token before it expires, so keep tokens short-lived (say 15 minutes) with a refresh mechanism, and never put secrets inside them.",
+      "idea": "Tokens trade revocability and size for zero server-side session storage.",
+      "caption": "B verifies the token's signature itself; no session store is read.",
+      "focus": [
+        "browser",
+        "lb",
+        "appb",
+        "db"
+      ],
+      "flows": [
+        {
+          "from": "browser",
+          "to": "lb",
+          "kind": "request",
+          "label": "Bearer eyJ..."
+        },
+        {
+          "from": "lb",
+          "to": "appb",
+          "kind": "request",
+          "label": "GET /cart + token"
+        },
+        {
+          "from": "appb",
+          "to": "db",
+          "kind": "request",
+          "label": "SELECT cart"
+        },
+        {
+          "from": "db",
+          "to": "appb",
+          "kind": "response",
+          "label": "3 items"
+        }
+      ],
+      "metrics": {
+        "lookup": "0"
+      }
+    },
+    {
+      "tag": "PAYOFF",
+      "title": "Kill a server, nobody notices",
+      "body": "With no state on the servers, they become interchangeable. If A crashes, the load balancer's health check marks it down and sends everything to B; users keep their sessions. You can deploy by replacing servers one at a time, and autoscale by adding or removing them at will. This is what lets you treat servers as disposable, which the next lessons on load balancing and autoscaling build on.",
+      "idea": "Stateless servers can be added, removed, or killed at any time with no user impact.",
+      "caption": "A fails its health check; B carries the traffic and sessions survive.",
+      "focus": [
+        "lb",
+        "appa",
+        "appb",
+        "sessions"
+      ],
+      "flows": [
+        {
+          "from": "lb",
+          "to": "appa",
+          "kind": "fail",
+          "label": "health check fail"
+        },
+        {
+          "from": "browser",
+          "to": "lb",
+          "kind": "request",
+          "label": "GET /cart sid=9f2"
+        },
+        {
+          "from": "lb",
+          "to": "appb",
+          "kind": "request",
+          "label": "GET /cart"
+        },
+        {
+          "from": "appb",
+          "to": "sessions",
+          "kind": "request",
+          "label": "GET sess:9f2"
+        },
+        {
+          "from": "sessions",
+          "to": "appb",
+          "kind": "response",
+          "label": "user 42"
+        },
+        {
+          "from": "appb",
+          "to": "lb",
+          "kind": "response",
+          "label": "200 cart"
+        }
+      ],
+      "metrics": {
+        "servers": "1",
+        "failed": "0",
+        "lookup": "1"
+      }
+    },
+    {
+      "tag": "RECAP",
+      "title": "Keep state out of the servers",
+      "body": "State held in a server's memory pins users to it and is lost when it dies. Sticky sessions patch the routing but not the loss. A shared session store or signed tokens move the state elsewhere, so any server can answer any request. The state did not vanish: it now lives in a store you must make durable and fast. Stateless means the app tier is disposable, not that the system has no data.",
+      "idea": "Stateless app servers scale and fail over easily; the state moves to a small number of well-protected places.",
+      "caption": "Servers hold logic only; sessions and data live in shared stores.",
+      "focus": [
+        "browser",
+        "lb",
+        "appa",
+        "appb",
+        "sessions",
+        "db"
+      ],
+      "flows": [],
+      "metrics": {
+        "servers": "2",
+        "failed": "0",
+        "lookup": "1"
+      }
+    }
   ],
   "quiz": [
-    {"q": "You run 5 stateful servers with in-memory sessions and plain round robin. Roughly what share of a logged-in user's requests land on a server that does not know them?", "options": ["About 0%, round robin remembers users", "About 20%", "About 80%", "About 100%"], "answer": 2, "why": "Only the server that handled the login has the session. Each later request picks one of 5 servers evenly, so 4 in 5 (80%) miss."},
-    {"q": "A team adds sticky sessions and calls the problem solved. Which failure still loses users' logins?", "options": ["A user opens the site in a second tab", "The load balancer adds a sixth server", "The server holding a user's session crashes", "The user refreshes the page"], "answer": 2, "why": "Stickiness only controls routing. The session still exists in one server's memory, so if that server dies or is replaced the session is gone."},
-    {"q": "Which statement about signed tokens (JWTs) versus a shared session store is correct?", "options": ["Tokens avoid a per-request lookup but are harder to revoke before expiry", "Tokens are always more secure because the client holds them", "A session store requires sticky sessions to work", "Tokens let the server change a user's data without the client noticing"], "answer": 0, "why": "A signed token is verified locally with no store read, but the server holds no record to delete, so early revocation needs extra machinery such as short lifetimes or a deny list."},
-    {"q": "After moving sessions to Redis, the app servers are stateless. What new risk have you taken on?", "options": ["Servers can no longer be restarted", "The session store is now a shared dependency that must be fast and highly available", "Load balancing must become sticky", "Cookies no longer work"], "answer": 1, "why": "State did not disappear, it moved. If the session store is down or slow, every server is affected, so it needs replication, failover, and monitoring."}
+    {
+      "q": "You run 5 stateful servers with in-memory sessions and plain round robin. Roughly what share of a logged-in user's requests land on a server that does not know them?",
+      "options": [
+        "About 0%, round robin remembers users",
+        "About 20%",
+        "About 80%",
+        "About 100%"
+      ],
+      "answer": 2,
+      "why": "Only the server that handled the login has the session. Each later request picks one of 5 servers evenly, so 4 in 5 (80%) miss."
+    },
+    {
+      "q": "A team adds sticky sessions and calls the problem solved. Which failure still loses users' logins?",
+      "options": [
+        "A user opens the site in a second tab",
+        "The load balancer adds a sixth server",
+        "The server holding a user's session crashes",
+        "The user refreshes the page"
+      ],
+      "answer": 2,
+      "why": "Stickiness only controls routing. The session still exists in one server's memory, so if that server dies or is replaced the session is gone."
+    },
+    {
+      "q": "Which statement about signed tokens (JWTs) versus a shared session store is correct?",
+      "options": [
+        "Tokens avoid a per-request lookup but are harder to revoke before expiry",
+        "Tokens are always more secure because the client holds them",
+        "A session store requires sticky sessions to work",
+        "Tokens let the server change a user's data without the client noticing"
+      ],
+      "answer": 0,
+      "why": "A signed token is verified locally with no store read, but the server holds no record to delete, so early revocation needs extra machinery such as short lifetimes or a deny list."
+    },
+    {
+      "q": "After moving sessions to Redis, the app servers are stateless. What new risk have you taken on?",
+      "options": [
+        "Servers can no longer be restarted",
+        "The session store is now a shared dependency that must be fast and highly available",
+        "Load balancing must become sticky",
+        "Cookies no longer work"
+      ],
+      "answer": 1,
+      "why": "State did not disappear, it moved. If the session store is down or slow, every server is affected, so it needs replication, failover, and monitoring."
+    }
   ],
   "cheatsheet": [
-    {"term": "Stateful server", "def": "Keeps data between requests (such as a session in RAM) that other servers lack, so requests must reach that same server."},
-    {"term": "Stateless server", "def": "Holds nothing a later request depends on; everything needed arrives with the request or comes from a shared store."},
-    {"term": "Sticky session", "def": "Load balancer pins a user to one server via cookie or IP hash. Easy, but skews load, slows deploys, and loses sessions on a crash."},
-    {"term": "Shared session store", "def": "Redis or Memcached keyed by session ID with a TTL. Costs about 1 ms per request and must be replicated for availability."},
-    {"term": "Signed token (JWT)", "def": "Client-held claims signed with a key. No lookup needed, but hard to revoke, so use short expiry plus refresh tokens."},
-    {"term": "Disposable servers", "def": "The payoff of statelessness: autoscale, rolling deploys, and failover all work by freely adding or removing app servers."}
+    {
+      "term": "Stateful server",
+      "def": "Keeps data between requests (such as a session in RAM) that other servers lack, so requests must reach that same server."
+    },
+    {
+      "term": "Stateless server",
+      "def": "Holds nothing a later request depends on; everything needed arrives with the request or comes from a shared store."
+    },
+    {
+      "term": "Sticky session",
+      "def": "Load balancer pins a user to one server via cookie or IP hash. Easy, but skews load, slows deploys, and loses sessions on a crash."
+    },
+    {
+      "term": "Shared session store",
+      "def": "Redis or Memcached keyed by session ID with a TTL. Costs about 1 ms per request and must be replicated for availability."
+    },
+    {
+      "term": "Signed token (JWT)",
+      "def": "Client-held claims signed with a key. No lookup needed, but hard to revoke, so use short expiry plus refresh tokens."
+    },
+    {
+      "term": "Disposable servers",
+      "def": "The payoff of statelessness: autoscale, rolling deploys, and failover all work by freely adding or removing app servers."
+    }
   ]
 }

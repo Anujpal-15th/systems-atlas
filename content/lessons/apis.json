@@ -127,7 +127,9 @@
       "caption": "The phone needs data from two backend services.",
       "focus": [
         "mobile",
-        "gw"
+        "gw",
+        "orders",
+        "inv"
       ],
       "flows": [],
       "metrics": {}
@@ -141,7 +143,8 @@
       "focus": [
         "mobile",
         "gw",
-        "orders"
+        "orders",
+        "db"
       ],
       "flows": [
         {
@@ -188,6 +191,30 @@
         "inv"
       ],
       "flows": [
+        {
+          "from": "mobile",
+          "to": "gw",
+          "kind": "request",
+          "label": "GET /orders/812"
+        },
+        {
+          "from": "gw",
+          "to": "orders",
+          "kind": "request",
+          "label": "order"
+        },
+        {
+          "from": "orders",
+          "to": "gw",
+          "kind": "response",
+          "label": "order JSON"
+        },
+        {
+          "from": "gw",
+          "to": "mobile",
+          "kind": "response",
+          "label": "order JSON"
+        },
         {
           "from": "mobile",
           "to": "gw",
@@ -384,6 +411,18 @@
           "to": "orders",
           "kind": "request",
           "label": "...x100"
+        },
+        {
+          "from": "gql",
+          "to": "inv",
+          "kind": "request",
+          "label": "stock of item 1"
+        },
+        {
+          "from": "gql",
+          "to": "inv",
+          "kind": "request",
+          "label": "...x1000"
         }
       ],
       "metrics": {}
@@ -417,11 +456,23 @@
           "from": "orders",
           "to": "db",
           "kind": "request",
-          "label": "WHERE id > c1"
+          "label": "id > c1 LIMIT 50"
+        },
+        {
+          "from": "db",
+          "to": "orders",
+          "kind": "response",
+          "label": "50 rows"
         },
         {
           "from": "orders",
           "to": "gw",
+          "kind": "response",
+          "label": "50 + next cursor"
+        },
+        {
+          "from": "gw",
+          "to": "web",
           "kind": "response",
           "label": "50 + next cursor"
         }

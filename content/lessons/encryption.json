@@ -249,6 +249,12 @@
       ],
       "flows": [
         {
+          "from": "app",
+          "to": "db",
+          "kind": "request",
+          "label": "read record"
+        },
+        {
           "from": "db",
           "to": "app",
           "kind": "response",
@@ -285,6 +291,18 @@
       "flows": [
         {
           "from": "app",
+          "to": "db",
+          "kind": "request",
+          "label": "load wrapped key"
+        },
+        {
+          "from": "db",
+          "to": "app",
+          "kind": "response",
+          "label": "wrapped key v1"
+        },
+        {
+          "from": "app",
           "to": "kms",
           "kind": "request",
           "label": "ReEncrypt(key)"
@@ -311,17 +329,24 @@
       "title": "Hashing is not encryption",
       "body": "Encryption is reversible with the key. A hash function such as SHA-256 is one-way: it turns any input into a fixed 32-byte fingerprint that cannot be undone. Use hashes to detect corruption (did this backup change?); to resist tampering, keep the hash somewhere the attacker cannot write, or use a keyed MAC or signature. Hashes also store passwords, but only with a slow salted algorithm. Never hash a card number if you need it back later, and a small input space can be guessed by brute force anyway.",
       "idea": "Encrypt when you must read the data back; hash when you only need to compare or verify.",
-      "caption": "Encrypted backup plus SHA-256 checksum stored separately.",
+      "caption": "Encrypted backup goes to object storage; its checksum is kept elsewhere.",
       "focus": [
         "app",
-        "store"
+        "store",
+        "db"
       ],
       "flows": [
         {
           "from": "app",
           "to": "store",
           "kind": "request",
-          "label": "backup + checksum"
+          "label": "encrypted backup"
+        },
+        {
+          "from": "app",
+          "to": "db",
+          "kind": "async",
+          "label": "SHA-256 checksum"
         }
       ],
       "metrics": {}

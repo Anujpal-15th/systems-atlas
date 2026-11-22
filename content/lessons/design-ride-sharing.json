@@ -367,7 +367,7 @@
     {
       "tag": "WHAT IF",
       "title": "The driver does not answer",
-      "body": "Now suppose the driver is in a tunnel and the 15 second timer expires. The trip service releases the reservation and tells the matcher, which, about 1 s later, offers the ride to the next candidate on its list. If the old driver's accept arrives late, the guarded update sees the trip is no longer waiting for that driver and rejects it. The request is now 17 s old (15 s timeout plus about 1 s to re-offer). Each decline or timeout adds delay, so many systems cap the attempts and then widen the search.",
+      "body": "Now suppose the driver is in a tunnel and the 15 second timer expires. The trip service releases the reservation and tells the matcher, which, about 1 s later, offers the ride to the next candidate on its list. If the old driver's accept arrives late, the guarded update sees the trip is no longer waiting for that driver and rejects it. The request is now 17 s old (about 1 s before the first offer, a 15 s timeout, and about 1 s to re-offer). Each decline or timeout adds delay, so many systems cap the attempts and then widen the search.",
       "idea": "Timeouts plus guarded updates keep a slow driver from corrupting a trip that moved on.",
       "caption": "Offer expires; the matcher moves to the next driver.",
       "focus": [
@@ -382,6 +382,12 @@
           "to": "gw",
           "kind": "fail",
           "label": "offer expired"
+        },
+        {
+          "from": "gw",
+          "to": "driver",
+          "kind": "async",
+          "label": "offer, 15s"
         },
         {
           "from": "gw",
@@ -402,6 +408,12 @@
           "label": "reserve driver 2"
         },
         {
+          "from": "trip",
+          "to": "gw",
+          "kind": "async",
+          "label": "offer driver 2"
+        },
+        {
           "from": "driver",
           "to": "gw",
           "kind": "request",
@@ -409,9 +421,21 @@
         },
         {
           "from": "gw",
+          "to": "trip",
+          "kind": "request",
+          "label": "accept trip"
+        },
+        {
+          "from": "trip",
+          "to": "gw",
+          "kind": "fail",
+          "label": "rejected: moved on"
+        },
+        {
+          "from": "gw",
           "to": "driver",
           "kind": "fail",
-          "label": "rejected"
+          "label": "offer gone"
         }
       ],
       "metrics": {
@@ -422,7 +446,7 @@
     {
       "tag": "SURGE",
       "title": "Price from supply and demand",
-      "body": "When requests far outnumber free drivers in an area, surge raises the price to attract drivers and ration demand. A pricing job samples free-driver counts from the geo index every few seconds, averages them over a one to two minute window, and counts open requests from the matcher. It computes a multiplier from the ratio, smooths it and caps it. The multiplier is recomputed continuously. When the rider opens the request screen, the app asks for a fare estimate carrying the current multiplier. The quote is locked for a few minutes, so the price does not change between confirming and matching.",
+      "body": "When requests far outnumber free drivers in an area, surge raises the price to attract drivers and ration demand. A pricing job samples free-driver counts from the geo index every few seconds, averages them over a one to two minute window, and counts open requests from the matcher. It computes a multiplier from the ratio, smooths it and caps it. The multiplier is recomputed continuously. When the matcher quotes the fare for a ride request, it asks the pricing service for that cell's current multiplier. The quote is locked for a few minutes, so the price does not change between confirming and matching.",
       "idea": "Surge is a per-cell ratio of demand to supply, smoothed and capped.",
       "caption": "Counts per cell become a multiplier on the fare.",
       "focus": [
@@ -469,7 +493,7 @@
     {
       "tag": "RECAP",
       "title": "The whole picture",
-      "body": "Pings flow into a sharded in-memory cell index with short TTLs. A ride request searches the rider's cell and neighbours, ranks by ETA, reserves one driver, and offers the ride with a timeout. A guarded state machine in the trip database keeps every transition safe under retries. After acceptance, the driver's pings are also pushed to the rider's app so the car moves on the map. Surge turns per-cell supply and demand into a price. Only the few decisions that matter touch the durable database.",
+      "body": "Pings flow into a sharded in-memory cell index with short TTLs. A ride request searches the rider's cell and neighbours, ranks by ETA, reserves one driver, and offers the ride with a timeout. A guarded state machine in the trip database keeps every transition safe under retries. Surge turns per-cell supply and demand into a price. Only the few decisions that matter touch the durable database.",
       "idea": "Keep the hot stream in memory, and put strong guarantees only on the small set of decisions that need them.",
       "caption": "Ingest, index, match, trip, price.",
       "focus": [

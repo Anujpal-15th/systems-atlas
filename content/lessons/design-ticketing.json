@@ -12,57 +12,524 @@
     "How payment, hold expiry and confirmation fit into one seat state machine"
   ],
   "nodes": [
-    {"id": "fans", "label": "Fans (browsers)", "kind": "user", "x": 8, "y": 50},
-    {"id": "room", "label": "Waiting room", "kind": "queue", "x": 28, "y": 22},
-    {"id": "api", "label": "Booking API", "kind": "service", "x": 30, "y": 76},
-    {"id": "hold", "label": "Hold store (Redis)", "kind": "cache", "x": 55, "y": 22},
-    {"id": "db", "label": "Seat database", "kind": "db", "x": 62, "y": 76},
-    {"id": "pay", "label": "Payment provider", "kind": "external", "x": 90, "y": 50},
-    {"id": "sweeper", "label": "Expiry sweeper", "kind": "worker", "x": 88, "y": 84}
+    {
+      "id": "fans",
+      "label": "Fans (browsers)",
+      "kind": "user",
+      "x": 8,
+      "y": 50
+    },
+    {
+      "id": "room",
+      "label": "Waiting room",
+      "kind": "queue",
+      "x": 28,
+      "y": 22
+    },
+    {
+      "id": "api",
+      "label": "Booking API",
+      "kind": "service",
+      "x": 30,
+      "y": 76
+    },
+    {
+      "id": "hold",
+      "label": "Hold store (Redis)",
+      "kind": "cache",
+      "x": 55,
+      "y": 22
+    },
+    {
+      "id": "db",
+      "label": "Seat database",
+      "kind": "db",
+      "x": 62,
+      "y": 76
+    },
+    {
+      "id": "pay",
+      "label": "Payment provider",
+      "kind": "external",
+      "x": 90,
+      "y": 50
+    },
+    {
+      "id": "sweeper",
+      "label": "Expiry sweeper",
+      "kind": "worker",
+      "x": 88,
+      "y": 84
+    }
   ],
   "edges": [
-    {"from": "fans", "to": "room"},
-    {"from": "room", "to": "api"},
-    {"from": "fans", "to": "api"},
-    {"from": "api", "to": "hold"},
-    {"from": "api", "to": "db"},
-    {"from": "api", "to": "pay"},
-    {"from": "sweeper", "to": "db"},
-    {"from": "hold", "to": "db"}
+    {
+      "from": "fans",
+      "to": "room"
+    },
+    {
+      "from": "room",
+      "to": "api"
+    },
+    {
+      "from": "fans",
+      "to": "api"
+    },
+    {
+      "from": "api",
+      "to": "hold"
+    },
+    {
+      "from": "api",
+      "to": "db"
+    },
+    {
+      "from": "api",
+      "to": "pay"
+    },
+    {
+      "from": "sweeper",
+      "to": "db"
+    },
+    {
+      "from": "hold",
+      "to": "db"
+    }
   ],
   "metrics": [
-    {"id": "wait", "label": "In waiting room", "unit": "people"},
-    {"id": "active", "label": "Shopping now", "unit": "people"},
-    {"id": "held", "label": "Seats held", "unit": "seats"},
-    {"id": "sold", "label": "Seats sold", "unit": "seats"}
+    {
+      "id": "wait",
+      "label": "In waiting room",
+      "unit": "people"
+    },
+    {
+      "id": "active",
+      "label": "Shopping now",
+      "unit": "people"
+    },
+    {
+      "id": "held",
+      "label": "Seats held",
+      "unit": "seats"
+    },
+    {
+      "id": "sold",
+      "label": "Seats sold",
+      "unit": "seats"
+    }
   ],
   "steps": [
-    {"tag": "QUESTION", "title": "20,000 seats, 200,000 fans", "body": "Tickets for a stadium show go on sale at 10:00. The venue has 20,000 seats and about 200,000 fans arrive in the first minute. Most traffic is not buying, it is refreshing and picking seats. The hard part is not speed alone: two people must never end up owning the same seat, and a seat in someone's cart should not be lost forever if they walk away.", "idea": "Ticketing is a contention problem: many users, a small fixed inventory, and zero tolerance for double sales.", "caption": "A huge crowd aims at a small, fixed inventory.", "focus": ["fans", "api", "db"], "flows": [{"from": "fans", "to": "api", "kind": "request", "label": "200k arrive"}], "metrics": {"wait": "0", "active": "200000", "held": "0", "sold": "0"}},
-    {"tag": "WHAT IF", "title": "The naive version breaks", "body": "A simple design reads the seat, checks it is free, then writes the sale. Two requests can both read 'free' before either writes, so both succeed. That is a race condition: the check and the write are separate steps. With thousands of people clicking seat A12 at once, double sales become very likely, and no amount of extra servers fixes it.", "idea": "Check-then-write is unsafe; the check and the claim must be one atomic operation.", "caption": "Two requests both see A12 as free.", "focus": ["api", "db"], "flows": [{"from": "api", "to": "db", "kind": "request", "label": "read A12: free"}, {"from": "api", "to": "db", "kind": "fail", "label": "both write A12"}], "metrics": {}},
-    {"tag": "CONCEPT", "title": "Claim the seat atomically", "body": "Let the database arbitrate. A conditional update such as 'set owner = me WHERE seat = A12 AND status = available' succeeds for exactly one caller, because the database serialises writes to the same row. The loser gets zero rows changed and is told to pick another seat. A version column that must still match when you write (optimistic check), or a unique constraint on (event_id, seat_id) in a tickets table, gives the same guarantee.", "idea": "Let a single authority with an atomic conditional write decide; losers just retry elsewhere.", "caption": "One conditional UPDATE wins; the rest get zero rows.", "focus": ["api", "db"], "flows": [{"from": "api", "to": "db", "kind": "request", "label": "UPDATE if free"}, {"from": "db", "to": "api", "kind": "response", "label": "1 row: yours"}, {"from": "db", "to": "api", "kind": "fail", "label": "0 rows: taken"}], "metrics": {"held": "1"}},
-    {"tag": "CONCEPT", "title": "Holds with an expiry", "body": "Buying takes minutes: choose seats, enter card details, maybe a 3-D Secure bank check. So a click moves the seat from available to held until a deadline, typically 5 to 10 minutes (a rule of thumb). The seat row stores status, held_by and held_until, claimed with the same conditional UPDATE, which may also take a seat whose held_until has passed. Many systems add a Redis key set with SET NX EX (TTL = time to live) as a fast first gate to absorb contention, but the database row is what survives a Redis restart.", "idea": "A hold is a lease: it reserves the seat now and releases itself if the buyer goes quiet.", "caption": "A12 and three other seats are held for 8 minutes.", "focus": ["api", "hold", "db"], "flows": [{"from": "api", "to": "hold", "kind": "request", "label": "SET A12 NX EX 480"}, {"from": "hold", "to": "api", "kind": "response", "label": "OK: held"}, {"from": "api", "to": "db", "kind": "request", "label": "row: held_until"}], "metrics": {"held": "4"}},
-    {"tag": "FLOW", "title": "Pay, then confirm", "body": "The user pays while the hold is ticking. When payment starts, mark the seat payment_pending and extend the hold past the payment timeout, so it cannot expire mid-checkout. Call the payment provider with an idempotency key so a retry cannot charge twice (payments have their own lesson). On success, one database transaction flips the seat to sold only if held_by is still this buyer: UPDATE seat SET status=sold WHERE seat=A12 AND status=payment_pending AND held_by=me. If the hold was somehow lost, refund; this should be rare.", "idea": "Seat state changes to sold only inside a transaction that re-checks ownership after payment succeeds.", "caption": "Payment succeeds, seat becomes sold.", "focus": ["api", "pay", "db"], "flows": [{"from": "api", "to": "pay", "kind": "request", "label": "charge + idem key"}, {"from": "pay", "to": "api", "kind": "response", "label": "paid"}, {"from": "api", "to": "db", "kind": "request", "label": "pending -> SOLD"}], "metrics": {"held": "3", "sold": "1"}},
-    {"tag": "WHAT IF", "title": "The buyer walks away", "body": "Most holds are abandoned: people close the tab or change their mind. When the TTL passes, the Redis key vanishes, which only frees the fast gate; Redis does not tell the database. The database row is freed either by the sweeper, which resets seats whose held_until has passed, or by the next conditional UPDATE, which may take an expired seat directly. This also covers a Redis restart that forgot every hold. A late payment on a lost hold must be refunded, never silently double sold.", "idea": "Expiry returns abandoned inventory to the pool, and the database row remains the source of truth.", "caption": "Expired holds release seats back to sale.", "focus": ["sweeper", "db"], "flows": [{"from": "sweeper", "to": "db", "kind": "request", "label": "release expired"}], "metrics": {"held": "1"}},
-    {"tag": "CONCEPT", "title": "The stampede problem", "body": "Atomic claims keep data correct but not the system healthy. If 200,000 users hammer the seat map, the database melts and everyone gets errors, including people who would have succeeded. Seat maps are read-heavy, so serve them from a cache with a second or two of staleness (the Redis node doubles as the seat-map cache), and accept that a clicked seat may turn out taken. The claim, not the display, enforces correctness.", "idea": "Protect the write path: cache reads loosely, and let only the claim be strict.", "caption": "Too many shoppers overload the claim path.", "focus": ["fans", "api", "db"], "flows": [{"from": "fans", "to": "api", "kind": "request", "label": "200k clicks"}, {"from": "api", "to": "db", "kind": "fail", "label": "overloaded"}, {"from": "api", "to": "hold", "kind": "response", "label": "cached seat map"}], "metrics": {"active": "200000"}},
-    {"tag": "FLOW", "title": "Virtual waiting room", "body": "Put a queue in front. Everyone who arrives in the first few minutes gets a random position (so refreshing early earns nothing); later arrivals queue behind them. They wait on a lightweight page served from a CDN (a network of edge caches). The room admits a limited number, say 2,000 shoppers at a time (a rule of thumb: tune it to what the booking path can serve), and lets in more as others finish or time out. Admitted users carry a signed token the API checks. The database now sees thousands of users, not hundreds of thousands.", "idea": "A waiting room converts a spike into a steady, admission-controlled flow the backend can handle.", "caption": "Only 2,000 shoppers are admitted at a time.", "focus": ["fans", "room", "api"], "flows": [{"from": "fans", "to": "room", "kind": "request", "label": "join queue"}, {"from": "room", "to": "api", "kind": "async", "label": "admit 2,000"}, {"from": "room", "to": "fans", "kind": "response", "label": "signed token"}], "metrics": {"wait": "198000", "active": "2000"}},
-    {"tag": "TRADE-OFF", "title": "Fairness and sellouts", "body": "Random order is fairer than first-come-first-served, which rewards fast connections and bots. Limit tickets per account (say 4); claim multi-seat requests in one transaction, all or nothing, locking seats in a consistent order (e.g. by seat id) to avoid deadlocks. Require login or verification before admission to slow scalpers. If an event sells out in minutes, the room can show 'sold out' to everyone still waiting instead of making them queue for nothing. The cost is complexity: another system that must itself never fall over.", "idea": "Admission control is a product decision as well as an engineering one: fairness, anti-bot, and honesty.", "caption": "Admitted shoppers hold and buy; the rest wait.", "focus": ["room", "api", "hold"], "flows": [{"from": "api", "to": "hold", "kind": "request", "label": "hold up to 4"}, {"from": "api", "to": "room", "kind": "async", "label": "slot freed"}], "metrics": {"wait": "190000", "active": "2000", "held": "800", "sold": "6000"}},
-    {"tag": "RECAP", "title": "Safe under pressure", "body": "Throttle the crowd with a waiting room, hold seats with expiring leases, take payment, and let the database's atomic write decide the final owner. The cache and hold store absorb pressure; the database guarantees no seat is sold twice. Each seat moves through available, held, payment_pending, sold, and back to available when a hold expires or payment fails.", "idea": "Correctness lives in one atomic claim; everything else exists to keep that claim fast and fair.", "caption": "Every seat has exactly one owner at a time.", "focus": ["fans", "room", "api", "hold", "db", "pay", "sweeper"], "flows": [], "metrics": {"wait": "0", "active": "0", "held": "0", "sold": "20000"}}
+    {
+      "tag": "QUESTION",
+      "title": "20,000 seats, 200,000 fans",
+      "body": "Tickets for a stadium show go on sale at 10:00. The venue has 20,000 seats and about 200,000 fans arrive in the first minute. Most traffic is not buying, it is refreshing and picking seats. The hard part is not speed alone: two people must never end up owning the same seat, and a seat in someone's cart should not be lost forever if they walk away.",
+      "idea": "Ticketing is a contention problem: many users, a small fixed inventory, and zero tolerance for double sales.",
+      "caption": "A huge crowd aims at a small, fixed inventory.",
+      "focus": [
+        "fans",
+        "api",
+        "db"
+      ],
+      "flows": [
+        {
+          "from": "fans",
+          "to": "api",
+          "kind": "request",
+          "label": "200k arrive"
+        }
+      ],
+      "metrics": {
+        "wait": "0",
+        "active": "200000",
+        "held": "0",
+        "sold": "0"
+      }
+    },
+    {
+      "tag": "WHAT IF",
+      "title": "The naive version breaks",
+      "body": "A simple design reads the seat, checks it is free, then writes the sale. Two requests can both read 'free' before either writes, so both succeed. That is a race condition: the check and the write are separate steps. With thousands of people clicking seat A12 at once, double sales become very likely, and no amount of extra servers fixes it.",
+      "idea": "Check-then-write is unsafe; the check and the claim must be one atomic operation.",
+      "caption": "Two requests both see A12 as free.",
+      "focus": [
+        "api",
+        "db"
+      ],
+      "flows": [
+        {
+          "from": "api",
+          "to": "db",
+          "kind": "request",
+          "label": "read A12: free"
+        },
+        {
+          "from": "api",
+          "to": "db",
+          "kind": "fail",
+          "label": "both write A12"
+        }
+      ],
+      "metrics": {}
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "Claim the seat atomically",
+      "body": "Let the database arbitrate. A conditional update such as 'set owner = me WHERE seat = A12 AND status = available' succeeds for exactly one caller, because the database serialises writes to the same row. The loser gets zero rows changed and is told to pick another seat. A version column that must still match when you write (optimistic check), or a unique constraint on (event_id, seat_id) in a tickets table, gives the same guarantee.",
+      "idea": "Let a single authority with an atomic conditional write decide; losers just retry elsewhere.",
+      "caption": "One conditional UPDATE wins; the rest get zero rows.",
+      "focus": [
+        "api",
+        "db"
+      ],
+      "flows": [
+        {
+          "from": "api",
+          "to": "db",
+          "kind": "request",
+          "label": "UPDATE if free"
+        },
+        {
+          "from": "db",
+          "to": "api",
+          "kind": "response",
+          "label": "1 row: yours"
+        },
+        {
+          "from": "db",
+          "to": "api",
+          "kind": "fail",
+          "label": "0 rows: taken"
+        }
+      ],
+      "metrics": {
+        "held": "1"
+      }
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "Holds with an expiry",
+      "body": "Buying takes minutes: choose seats, enter card details, maybe a 3-D Secure bank check. So a click moves the seat from available to held until a deadline, typically 5 to 10 minutes (a rule of thumb). The seat row stores status, held_by and held_until, claimed with the same conditional UPDATE, which may also take a seat whose held_until has passed. Many systems add a Redis key set with SET NX EX (TTL = time to live) as a fast first gate to absorb contention, but the database row is what survives a Redis restart.",
+      "idea": "A hold is a lease: it reserves the seat now and releases itself if the buyer goes quiet.",
+      "caption": "A12 and three other seats are held for 8 minutes.",
+      "focus": [
+        "api",
+        "hold",
+        "db"
+      ],
+      "flows": [
+        {
+          "from": "api",
+          "to": "hold",
+          "kind": "request",
+          "label": "SET A12 NX EX 480"
+        },
+        {
+          "from": "hold",
+          "to": "api",
+          "kind": "response",
+          "label": "OK: held"
+        },
+        {
+          "from": "api",
+          "to": "db",
+          "kind": "request",
+          "label": "row: held_until"
+        }
+      ],
+      "metrics": {
+        "held": "4"
+      }
+    },
+    {
+      "tag": "FLOW",
+      "title": "Pay, then confirm",
+      "body": "The user pays while the hold is ticking. When payment starts, mark the seat payment_pending and extend the hold past the payment timeout, so it cannot expire mid-checkout. Call the payment provider with an idempotency key so a retry cannot charge twice (payments have their own lesson). On success, one database transaction flips the seat to sold only if held_by is still this buyer: UPDATE seat SET status=sold WHERE seat=A12 AND status=payment_pending AND held_by=me. If the hold was somehow lost, refund; this should be rare.",
+      "idea": "Seat state changes to sold only inside a transaction that re-checks ownership after payment succeeds.",
+      "caption": "Payment succeeds, seat becomes sold.",
+      "focus": [
+        "api",
+        "pay",
+        "db"
+      ],
+      "flows": [
+        {
+          "from": "api",
+          "to": "pay",
+          "kind": "request",
+          "label": "charge + idem key"
+        },
+        {
+          "from": "pay",
+          "to": "api",
+          "kind": "response",
+          "label": "paid"
+        },
+        {
+          "from": "api",
+          "to": "db",
+          "kind": "request",
+          "label": "pending -> SOLD"
+        }
+      ],
+      "metrics": {
+        "held": "3",
+        "sold": "1"
+      }
+    },
+    {
+      "tag": "WHAT IF",
+      "title": "The buyer walks away",
+      "body": "Most holds are abandoned: people close the tab or change their mind. When the TTL passes, the Redis key vanishes, which only frees the fast gate; Redis does not tell the database. The database row is freed either by the sweeper, which resets seats whose held_until has passed, or by the next conditional UPDATE, which may take an expired seat directly. This also covers a Redis restart that forgot every hold. A late payment on a lost hold must be refunded, never silently double sold.",
+      "idea": "Expiry returns abandoned inventory to the pool, and the database row remains the source of truth.",
+      "caption": "Expired holds release seats back to sale.",
+      "focus": [
+        "sweeper",
+        "db"
+      ],
+      "flows": [
+        {
+          "from": "sweeper",
+          "to": "db",
+          "kind": "request",
+          "label": "release expired"
+        }
+      ],
+      "metrics": {
+        "held": "1"
+      }
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "The stampede problem",
+      "body": "Atomic claims keep data correct but not the system healthy. If 200,000 users hammer the seat map, the database melts and everyone gets errors, including people who would have succeeded. Seat maps are read-heavy, so serve them from a cache with a second or two of staleness (the Redis node doubles as the seat-map cache), and accept that a clicked seat may turn out taken. The claim, not the display, enforces correctness.",
+      "idea": "Protect the write path: cache reads loosely, and let only the claim be strict.",
+      "caption": "Too many shoppers overload the claim path.",
+      "focus": [
+        "fans",
+        "api",
+        "hold",
+        "db"
+      ],
+      "flows": [
+        {
+          "from": "fans",
+          "to": "api",
+          "kind": "request",
+          "label": "200k clicks"
+        },
+        {
+          "from": "api",
+          "to": "db",
+          "kind": "fail",
+          "label": "overloaded"
+        },
+        {
+          "from": "api",
+          "to": "hold",
+          "kind": "request",
+          "label": "seat map?"
+        },
+        {
+          "from": "hold",
+          "to": "api",
+          "kind": "response",
+          "label": "cached seat map"
+        },
+        {
+          "from": "api",
+          "to": "fans",
+          "kind": "response",
+          "label": "seat map"
+        }
+      ],
+      "metrics": {
+        "active": "200000"
+      }
+    },
+    {
+      "tag": "FLOW",
+      "title": "Virtual waiting room",
+      "body": "Put a queue in front. Everyone who arrives in the first few minutes gets a random position (so refreshing early earns nothing); later arrivals queue behind them. They wait on a lightweight page served from a CDN (a network of edge caches). The room admits a limited number, say 2,000 shoppers at a time (a rule of thumb: tune it to what the booking path can serve), and lets in more as others finish or time out. Admitted users carry a signed token the API checks. The database now sees thousands of users, not hundreds of thousands.",
+      "idea": "A waiting room converts a spike into a steady, admission-controlled flow the backend can handle.",
+      "caption": "Only 2,000 shoppers are admitted at a time.",
+      "focus": [
+        "fans",
+        "room",
+        "api"
+      ],
+      "flows": [
+        {
+          "from": "fans",
+          "to": "room",
+          "kind": "request",
+          "label": "join queue"
+        },
+        {
+          "from": "room",
+          "to": "fans",
+          "kind": "response",
+          "label": "signed token"
+        },
+        {
+          "from": "room",
+          "to": "api",
+          "kind": "async",
+          "label": "admit 2,000"
+        },
+        {
+          "from": "fans",
+          "to": "api",
+          "kind": "request",
+          "label": "buy, with token"
+        }
+      ],
+      "metrics": {
+        "wait": "198000",
+        "active": "2000"
+      }
+    },
+    {
+      "tag": "TRADE-OFF",
+      "title": "Fairness and sellouts",
+      "body": "Random order is fairer than first-come-first-served, which rewards fast connections and bots. Limit tickets per account (say 4); claim multi-seat requests in one transaction, all or nothing, locking seats in a consistent order (e.g. by seat id) to avoid deadlocks. Require login or verification before admission to slow scalpers. If an event sells out in minutes, the room can show 'sold out' to everyone still waiting instead of making them queue for nothing. The cost is complexity: another system that must itself never fall over.",
+      "idea": "Admission control is a product decision as well as an engineering one: fairness, anti-bot, and honesty.",
+      "caption": "Admitted shoppers hold and buy; the rest wait.",
+      "focus": [
+        "room",
+        "api",
+        "hold"
+      ],
+      "flows": [
+        {
+          "from": "api",
+          "to": "hold",
+          "kind": "request",
+          "label": "hold up to 4"
+        },
+        {
+          "from": "api",
+          "to": "room",
+          "kind": "async",
+          "label": "slot freed"
+        }
+      ],
+      "metrics": {
+        "wait": "190000",
+        "active": "2000",
+        "held": "800",
+        "sold": "6000"
+      }
+    },
+    {
+      "tag": "RECAP",
+      "title": "Safe under pressure",
+      "body": "Throttle the crowd with a waiting room, hold seats with expiring leases, take payment, and let the database's atomic write decide the final owner. The cache and hold store absorb pressure; the database guarantees no seat is sold twice. Each seat moves through available, held, payment_pending, sold, and back to available when a hold expires or payment fails.",
+      "idea": "Correctness lives in one atomic claim; everything else exists to keep that claim fast and fair.",
+      "caption": "Every seat has exactly one owner at a time.",
+      "focus": [
+        "fans",
+        "room",
+        "api",
+        "hold",
+        "db",
+        "pay",
+        "sweeper"
+      ],
+      "flows": [],
+      "metrics": {
+        "wait": "0",
+        "active": "0",
+        "held": "0",
+        "sold": "20000"
+      }
+    }
   ],
   "quiz": [
-    {"q": "Two buyers click seat A12 in the same millisecond. Which design reliably prevents a double sale?", "options": ["Check the seat is free in app code, then write the sale", "Use more app servers so each request is faster", "A conditional database write that only succeeds if the seat is still available", "Show a warning in the UI when someone else is looking at the seat"], "answer": 2, "why": "Only an atomic claim by one authority guarantees a single winner. Check-then-write has a race window, faster servers just shrink it, and UI warnings are advisory."},
-    {"q": "Why give a seat hold a TTL instead of waiting for the user to cancel?", "options": ["TTLs make payments faster", "Abandoned carts are common, and expiry returns those seats to sale automatically", "It removes the need for a database", "It lets two users hold the same seat"], "answer": 1, "why": "Many users never finish. A TTL makes the hold a lease that frees itself, so inventory is not stranded by people who left."},
-    {"q": "The seat map is cached for 2 seconds and shows A12 free, but it was just taken. What happens when a user clicks it?", "options": ["They buy it twice", "The cache is corrupted and must be flushed", "The hold store grants it anyway", "The atomic claim fails and they are asked to pick another seat"], "answer": 3, "why": "Displays may be stale, but correctness is enforced at claim time, so the loser simply gets a 'taken' response."},
-    {"q": "What is the main reason to add a virtual waiting room?", "options": ["To limit concurrent shoppers so the booking path stays healthy", "To make the atomic update unnecessary", "To make payments cheaper", "To sort buyers by internet speed"], "answer": 0, "why": "The waiting room admits a controlled number of users. It protects capacity and does not replace atomic claims."},
-    {"q": "Despite hold extension, a payment succeeds at 8 minutes 5 seconds, but the hold expired at 8 minutes and another user holds the seat. What should the system do?", "options": ["Give the seat to both users", "Confirm anyway and ignore the other hold", "Fail the confirmation and refund, because the hold is no longer theirs", "Delete the other user's hold silently"], "answer": 2, "why": "Confirmation must re-check ownership inside the transaction. If the lease is lost, refund rather than breaking the one-owner rule."}
+    {
+      "q": "Two buyers click seat A12 in the same millisecond. Which design reliably prevents a double sale?",
+      "options": [
+        "Check the seat is free in app code, then write the sale",
+        "Use more app servers so each request is faster",
+        "A conditional database write that only succeeds if the seat is still available",
+        "Show a warning in the UI when someone else is looking at the seat"
+      ],
+      "answer": 2,
+      "why": "Only an atomic claim by one authority guarantees a single winner. Check-then-write has a race window, faster servers just shrink it, and UI warnings are advisory."
+    },
+    {
+      "q": "Why give a seat hold a TTL instead of waiting for the user to cancel?",
+      "options": [
+        "TTLs make payments faster",
+        "Abandoned carts are common, and expiry returns those seats to sale automatically",
+        "It removes the need for a database",
+        "It lets two users hold the same seat"
+      ],
+      "answer": 1,
+      "why": "Many users never finish. A TTL makes the hold a lease that frees itself, so inventory is not stranded by people who left."
+    },
+    {
+      "q": "The seat map is cached for 2 seconds and shows A12 free, but it was just taken. What happens when a user clicks it?",
+      "options": [
+        "They buy it twice",
+        "The cache is corrupted and must be flushed",
+        "The hold store grants it anyway",
+        "The atomic claim fails and they are asked to pick another seat"
+      ],
+      "answer": 3,
+      "why": "Displays may be stale, but correctness is enforced at claim time, so the loser simply gets a 'taken' response."
+    },
+    {
+      "q": "What is the main reason to add a virtual waiting room?",
+      "options": [
+        "To limit concurrent shoppers so the booking path stays healthy",
+        "To make the atomic update unnecessary",
+        "To make payments cheaper",
+        "To sort buyers by internet speed"
+      ],
+      "answer": 0,
+      "why": "The waiting room admits a controlled number of users. It protects capacity and does not replace atomic claims."
+    },
+    {
+      "q": "Despite hold extension, a payment succeeds at 8 minutes 5 seconds, but the hold expired at 8 minutes and another user holds the seat. What should the system do?",
+      "options": [
+        "Give the seat to both users",
+        "Confirm anyway and ignore the other hold",
+        "Fail the confirmation and refund, because the hold is no longer theirs",
+        "Delete the other user's hold silently"
+      ],
+      "answer": 2,
+      "why": "Confirmation must re-check ownership inside the transaction. If the lease is lost, refund rather than breaking the one-owner rule."
+    }
   ],
   "cheatsheet": [
-    {"term": "Atomic claim", "def": "A single conditional write (UPDATE ... WHERE status = available) that only one concurrent caller can win."},
-    {"term": "Hold (lease)", "def": "A temporary reservation with a deadline, typically 5 to 10 minutes, that frees itself if unused."},
-    {"term": "SET NX EX", "def": "Redis command: set a key only if absent, with an expiry. A fast one-winner gate in front of the database row, which still carries the hold."},
-    {"term": "Seat state machine", "def": "available -> held -> payment_pending -> sold, with held/payment_pending -> available on expiry, failure or cancel. Only legal transitions are allowed."},
-    {"term": "Waiting room", "def": "Admission-controlled queue that lets in a fixed number of shoppers; often randomised for fairness."},
-    {"term": "Source of truth", "def": "The seat row (status, held_by, held_until) records the hold and final ownership. Caches and Redis are fast helpers, never the last word."},
-    {"term": "Idempotency key", "def": "A unique ID on the payment call so retries never charge twice."}
+    {
+      "term": "Atomic claim",
+      "def": "A single conditional write (UPDATE ... WHERE status = available) that only one concurrent caller can win."
+    },
+    {
+      "term": "Hold (lease)",
+      "def": "A temporary reservation with a deadline, typically 5 to 10 minutes, that frees itself if unused."
+    },
+    {
+      "term": "SET NX EX",
+      "def": "Redis command: set a key only if absent, with an expiry. A fast one-winner gate in front of the database row, which still carries the hold."
+    },
+    {
+      "term": "Seat state machine",
+      "def": "available -> held -> payment_pending -> sold, with held/payment_pending -> available on expiry, failure or cancel. Only legal transitions are allowed."
+    },
+    {
+      "term": "Waiting room",
+      "def": "Admission-controlled queue that lets in a fixed number of shoppers; often randomised for fairness."
+    },
+    {
+      "term": "Source of truth",
+      "def": "The seat row (status, held_by, held_until) records the hold and final ownership. Caches and Redis are fast helpers, never the last word."
+    },
+    {
+      "term": "Idempotency key",
+      "def": "A unique ID on the payment call so retries never charge twice."
+    }
   ],
   "lab": {
     "prompt": "Design ticket sales for a 50,000-seat stadium where 500,000 people show up at on-sale time. Describe the seat model, how holds work, how double booking is prevented, how the waiting room protects the backend, and how failures like abandoned carts and late payments are handled.",
@@ -79,7 +546,7 @@
       "If 500,000 users each make 1 request per second, that is 500,000 requests per second; the room might cap shoppers at 5,000",
       "A unique constraint on (event_id, seat_id) can enforce one owner even if app code has a bug",
       "Ask what is lost if the hold store restarts or fails over and forgets all holds; the database row must still say who owns what",
-    "Claim multi-seat requests in one transaction, all or nothing, locking seats in a consistent order (e.g. by seat id) to avoid deadlocks",
+      "Claim multi-seat requests in one transaction, all or nothing, locking seats in a consistent order (e.g. by seat id) to avoid deadlocks",
       "Seat maps can be a cached snapshot refreshed every second or two",
       "Think about per-account ticket limits and bots when picking admission order"
     ],
@@ -87,7 +554,7 @@
       "Seat states and transitions are explicit",
       "Claim is atomic and enforced by the database",
       "Holds expire without relying on the user",
-    "Seat rows store held_by and held_until so a hold-store restart cannot cause double holds",
+      "Seat rows store held_by and held_until so a hold-store restart cannot cause double holds",
       "Backend load is capped by admission control",
       "Late payment on an expired hold is handled with a refund or re-check",
       "Stale seat map views cannot cause double booking"

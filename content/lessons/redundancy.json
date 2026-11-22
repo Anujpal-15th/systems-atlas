@@ -293,7 +293,7 @@
     {
       "tag": "CONCEPT",
       "title": "Active-passive for stateful parts",
-      "body": "A database is harder to duplicate than a stateless server, because two copies must not both accept conflicting writes. The common answer is active-passive: one primary takes writes and streams every change to a standby that only follows. Replication is often asynchronous, so the standby can lag by milliseconds to seconds. That lag is the data you could lose in a crash.",
+      "body": "A database is harder to duplicate than a stateless server, because two copies must not both accept conflicting writes. The common answer is active-passive: one primary takes writes and streams every change to a standby that only follows. Replication is often asynchronous, so the standby can lag by milliseconds to seconds. That lag is the data you could lose in a crash. (Assume server A has been repaired and is back in rotation.)",
       "idea": "Active-passive keeps one writer to avoid conflicts; asynchronous replication trades a little possible data loss for speed.",
       "caption": "Primary streams changes to an idle standby.",
       "focus": [
@@ -327,7 +327,7 @@
     {
       "tag": "FLOW",
       "title": "Failing over the database",
-      "body": "The primary dies. The standby sees its change stream stop and the health checker probes the primary to confirm. Before promoting, the old primary must be fenced off (cut off from storage or the network), or a half-alive primary and the new one will both accept writes, a failure called split-brain. Then the standby starts accepting writes and the apps find it. Say about 30 seconds; real systems range from seconds to a couple of minutes. Writes in that window fail or queue, and un-replicated changes may be lost. We now assume the standby is promoted.",
+      "body": "The primary dies. The standby sees its change stream stop and the health checker probes the primary to confirm. Before promoting, the old primary must be fenced off (cut off from storage or the network), or a half-alive primary and the new one will both accept writes, a failure called split-brain. Then the standby starts accepting writes and the apps find it. Say about 30 seconds; real systems range from seconds to a couple of minutes. Writes in that window fail or queue, and un-replicated changes may be lost. We now assume the standby is promoted. Counting the single load balancer and the failovers, the whole system now sits near 99.99%, roughly 55 minutes a year.",
       "idea": "Stateful failover is slower and can lose recent writes, so measure it rather than assume it is instant.",
       "caption": "Standby is promoted; apps move their writes over.",
       "focus": [

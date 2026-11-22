@@ -12,56 +12,499 @@
     "How the error budget decides whether to ship, experiment or freeze"
   ],
   "nodes": [
-    {"id": "users", "label": "Shoppers", "kind": "user", "x": 8, "y": 50},
-    {"id": "checkout", "label": "Checkout service", "kind": "service", "x": 31, "y": 50},
-    {"id": "payments", "label": "Payments service", "kind": "service", "x": 57, "y": 20},
-    {"id": "inventory", "label": "Inventory DB", "kind": "db", "x": 57, "y": 84},
-    {"id": "metrics", "label": "Metrics store", "kind": "storage", "x": 84, "y": 50},
-    {"id": "alerts", "label": "On-call alerts", "kind": "external", "x": 84, "y": 14},
-    {"id": "chaos", "label": "Chaos tool", "kind": "worker", "x": 31, "y": 88}
+    {
+      "id": "users",
+      "label": "Shoppers",
+      "kind": "user",
+      "x": 8,
+      "y": 50
+    },
+    {
+      "id": "checkout",
+      "label": "Checkout service",
+      "kind": "service",
+      "x": 31,
+      "y": 50
+    },
+    {
+      "id": "payments",
+      "label": "Payments service",
+      "kind": "service",
+      "x": 57,
+      "y": 20
+    },
+    {
+      "id": "inventory",
+      "label": "Inventory DB",
+      "kind": "db",
+      "x": 57,
+      "y": 84
+    },
+    {
+      "id": "metrics",
+      "label": "Metrics store",
+      "kind": "storage",
+      "x": 84,
+      "y": 50
+    },
+    {
+      "id": "alerts",
+      "label": "On-call alerts",
+      "kind": "external",
+      "x": 84,
+      "y": 14
+    },
+    {
+      "id": "chaos",
+      "label": "Chaos tool",
+      "kind": "worker",
+      "x": 31,
+      "y": 88
+    }
   ],
   "edges": [
-    {"from": "users", "to": "checkout"},
-    {"from": "checkout", "to": "payments"},
-    {"from": "checkout", "to": "inventory"},
-    {"from": "checkout", "to": "metrics"},
-    {"from": "metrics", "to": "alerts"},
-    {"from": "chaos", "to": "payments", "label": "inject"},
-    {"from": "chaos", "to": "metrics", "label": "watch"}
+    {
+      "from": "users",
+      "to": "checkout"
+    },
+    {
+      "from": "checkout",
+      "to": "payments"
+    },
+    {
+      "from": "checkout",
+      "to": "inventory"
+    },
+    {
+      "from": "checkout",
+      "to": "metrics"
+    },
+    {
+      "from": "metrics",
+      "to": "alerts"
+    },
+    {
+      "from": "chaos",
+      "to": "payments",
+      "label": "inject"
+    },
+    {
+      "from": "chaos",
+      "to": "metrics",
+      "label": "watch"
+    }
   ],
   "metrics": [
-    {"id": "sli", "label": "30-day SLI", "unit": "%"},
-    {"id": "budget", "label": "Budget left", "unit": "min"},
-    {"id": "burn", "label": "Burn rate", "unit": "x"},
-    {"id": "blast", "label": "Users hit", "unit": "%"}
+    {
+      "id": "sli",
+      "label": "30-day SLI",
+      "unit": "%"
+    },
+    {
+      "id": "budget",
+      "label": "Budget left",
+      "unit": "min"
+    },
+    {
+      "id": "burn",
+      "label": "Burn rate",
+      "unit": "x"
+    },
+    {
+      "id": "blast",
+      "label": "Users hit",
+      "unit": "%"
+    }
   ],
   "steps": [
-    {"tag": "QUESTION", "title": "How reliable is reliable enough?", "body": "Your checkout service will fail sometimes, because every dependency does. The useful questions are: how often is failure acceptable, how do we know, and how do we find weak spots before customers do? Asking for 100% is not an answer, since each extra nine costs far more than the last and users cannot tell the difference past a point.", "idea": "Reliability is a target you choose and measure, not a thing you maximise.", "caption": "Shoppers depend on checkout, which depends on payments and inventory.", "focus": ["users", "checkout", "payments", "inventory"], "flows": [], "metrics": {"sli": "100", "budget": "43", "burn": "0", "blast": "0"}},
-    {"tag": "SLI", "title": "Measure what users feel", "body": "A service level indicator (SLI) is a number that says how well the service is doing, usually a ratio: good events divided by valid events. For checkout, a good event is an order request that returns a non-error response (not a 5xx) in under 800 ms. Valid means requests that should count, not health checks or the user's own bad input. It is measured at the edge or load balancer, as close to the user as practical, and the result is shipped to the metrics store. CPU or memory are poor SLIs because a busy server can still serve users fine.", "idea": "A good SLI is a ratio of good to valid requests, measured as close to the user as practical.", "caption": "Every request is counted as good or bad and sent to metrics.", "focus": ["users", "checkout", "payments", "metrics"], "flows": [{"from": "users", "to": "checkout", "kind": "request", "label": "place order"}, {"from": "checkout", "to": "payments", "kind": "request", "label": "charge"}, {"from": "payments", "to": "checkout", "kind": "response", "label": "ok"}, {"from": "checkout", "to": "metrics", "kind": "async", "label": "good / total"}], "metrics": {"sli": "100"}},
-    {"tag": "SLO", "title": "Set the target and the budget", "body": "A service level objective (SLO) is the goal for the SLI over a window. Say checkout must be good for 99.9% of requests over 30 days. The other 0.1% is the error budget. A 30-day window is 43,200 minutes, so 0.1% is about 43 minutes of full outage, or the equivalent in partial failures. That budget is not a failure; it is room to ship changes and take risks.", "idea": "SLO = target for the SLI. Error budget = 100% minus the SLO, expressed as allowed badness.", "caption": "Target 99.9% over 30 days leaves about 43 minutes of budget.", "focus": ["checkout", "metrics"], "flows": [], "metrics": {"sli": "100", "budget": "43"}},
-    {"tag": "BUDGET", "title": "An outage spends the budget", "body": "Earlier this month a bad deploy made payments fail for 13 minutes. All checkouts in that window were bad events, so, assuming steady traffic, roughly 13 of the 43 budget minutes are gone and the 30-day SLI is now about 99.97%. About 30 minutes remain. The budget turns a vague feeling of 'we have had a rough month' into a number that engineers and product owners can both read.", "idea": "Every bad minute is a withdrawal; the remaining budget says how much risk you can still afford.", "caption": "Payments failed for 13 minutes; budget drops to 30.", "focus": ["checkout", "payments", "metrics"], "flows": [{"from": "checkout", "to": "payments", "kind": "fail", "label": "charge error"}, {"from": "checkout", "to": "metrics", "kind": "async", "label": "bad events"}], "metrics": {"sli": "99.97", "budget": "30"}},
-    {"tag": "BURN RATE", "title": "Alert on how fast you burn", "body": "Paging on every error is noisy, and paging only when the budget is gone is too late. Burn rate is the error rate divided by the allowed error rate. If 1.44% of requests fail against a 0.1% budget, the burn rate is 14.4. At that speed the whole 30-day budget lasts about 50 hours, and 2% of it is gone in one hour. A common pattern is to page on a fast burn (around 14x over an hour) and open a ticket on a slow burn (around 1x over a few days). Alerts are usually checked over a long and a short window together, so they reset quickly.", "idea": "Burn rate tells you how long until the budget is gone, so alerts match urgency.", "caption": "A fast burn pages the on-call engineer.", "focus": ["metrics", "alerts"], "flows": [{"from": "metrics", "to": "alerts", "kind": "async", "label": "burn 14.4x"}], "metrics": {"burn": "14.4"}},
-    {"tag": "CHAOS", "title": "Break it on purpose, with a hypothesis", "body": "Chaos engineering injects real failure to test whether the system behaves as you believe. Start with a steady state, such as 'checkout p99 stays under 800 ms and success stays above 99.9%'. Checkout p99 is about 450 ms, so +300 ms still fits under 800 ms. Hypothesis: 'if payments gets 300 ms slower, checkout still meets both'. Faults can be latency, errors, killed instances or blocked dependencies, injected by a proxy, service mesh or agent. The tool watches the same SLI. It is an experiment, not vandalism.", "idea": "A chaos experiment tests a written hypothesis against a measurable steady state.", "caption": "The chaos tool adds 300 ms of delay to payments.", "focus": ["chaos", "payments", "metrics"], "flows": [{"from": "chaos", "to": "payments", "kind": "fail", "label": "+300 ms delay"}, {"from": "chaos", "to": "metrics", "kind": "request", "label": "read SLI"}, {"from": "metrics", "to": "chaos", "kind": "response", "label": "steady"}], "metrics": {"burn": "0.1", "blast": "1"}},
-    {"tag": "BLAST RADIUS", "title": "Keep the blast radius small", "body": "Blast radius is how many users and systems an experiment can hurt. Begin with the smallest slice that still teaches you something: one instance, one test account or 1% of traffic, for a few minutes, off peak but with owners at their desks. Widen only after each smaller run passes. Staging is useful for finding tooling bugs, but it rarely has real traffic or dependencies, so many of the lessons that matter only show up in production, once monitoring and an abort switch are in place.", "idea": "Start tiny, widen step by step, and never expand while a run is failing.", "caption": "Only 1% of checkouts go through the delayed payments path.", "focus": ["users", "checkout", "payments"], "flows": [{"from": "users", "to": "checkout", "kind": "request", "label": "1% sampled"}, {"from": "checkout", "to": "payments", "kind": "request", "label": "slow charge"}, {"from": "payments", "to": "checkout", "kind": "response", "label": "ok, +300 ms"}], "metrics": {"blast": "1"}},
-    {"tag": "FINDING", "title": "The experiment finds a weakness", "body": "At 1% the hypothesis holds. At 5%, slow charges hold connections and threads longer, the pool to payments saturates, requests queue, and some pass 800 ms and count as bad. The call has no tight timeout or fallback, so checkout waits instead of failing fast or accepting the order and retrying the charge later. A planned test at this size costs well under a tenth of a minute of budget, which a 2 a.m. incident would not.", "idea": "A failed hypothesis is a win: you found the flaw cheaply and on your own schedule.", "caption": "At 5% blast radius, slow payments push checkout past 800 ms.", "focus": ["chaos", "checkout", "payments", "metrics"], "flows": [{"from": "chaos", "to": "payments", "kind": "fail", "label": "+300 ms delay"}, {"from": "payments", "to": "checkout", "kind": "response", "label": "slow"}, {"from": "checkout", "to": "metrics", "kind": "async", "label": "some bad"}], "metrics": {"sli": "99.97", "budget": "30", "burn": "5", "blast": "5"}},
-    {"tag": "ABORT", "title": "Abort rules and game days", "body": "Every experiment needs an automatic stop: abort at 3x burn measured over a few minutes, or if the SLI drops below a floor, and the chaos tool removes the fault at once. Guardrails use a short window, unlike hour-long paging windows. Here the burn reaches 5x within a couple of minutes at 5%, so the tool halts the run. A game day is a scheduled exercise where the team runs several experiments together, with owners watching and a rollback plan ready; people write the game-day notes afterwards.", "idea": "Safe chaos has a kill switch tied to the same SLI that defines normal.", "caption": "Burn limit crossed, the chaos tool stops injecting.", "focus": ["chaos", "payments", "metrics", "alerts"], "flows": [{"from": "metrics", "to": "chaos", "kind": "response", "label": "limit hit"}, {"from": "chaos", "to": "payments", "kind": "response", "label": "remove fault"}, {"from": "metrics", "to": "alerts", "kind": "async", "label": "abort notice"}], "metrics": {"burn": "0.1", "blast": "0"}},
-    {"tag": "RECAP", "title": "Measure, spend, test, learn", "body": "An SLI measures user-visible goodness, an SLO sets the target, and the error budget is what remains to spend. Burn-rate alerts say how urgent a problem is. Chaos experiments test a hypothesis with a small blast radius and an abort rule, and game days practise this as a team. A simple policy: with plenty of budget left, ship and run experiments; when it is nearly spent, ship only low-risk changes and pause new experiments, since chaos runs spend budget too; at zero, freeze feature launches until the 30-day window recovers. Thresholds are a team choice.", "idea": "Reliability is managed like money: set a budget, track it, and spend it on learning.", "caption": "The full loop from metric to experiment.", "focus": [], "flows": [], "metrics": {"sli": "99.97", "budget": "30", "burn": "0.1", "blast": "0"}}
+    {
+      "tag": "QUESTION",
+      "title": "How reliable is reliable enough?",
+      "body": "Your checkout service will fail sometimes, because every dependency does. The useful questions are: how often is failure acceptable, how do we know, and how do we find weak spots before customers do? Asking for 100% is not an answer, since each extra nine costs far more than the last and users cannot tell the difference past a point.",
+      "idea": "Reliability is a target you choose and measure, not a thing you maximise.",
+      "caption": "Shoppers depend on checkout, which depends on payments and inventory.",
+      "focus": [
+        "users",
+        "checkout",
+        "payments",
+        "inventory"
+      ],
+      "flows": [],
+      "metrics": {
+        "sli": "100",
+        "budget": "43",
+        "burn": "0",
+        "blast": "0"
+      }
+    },
+    {
+      "tag": "SLI",
+      "title": "Measure what users feel",
+      "body": "A service level indicator (SLI) is a number that says how well the service is doing, usually a ratio: good events divided by valid events. For checkout, a good event is an order request that returns a non-error response (not a 5xx) in under 800 ms. Valid means requests that should count, not health checks or the user's own bad input. It is measured at the edge or load balancer, as close to the user as practical, and the result is shipped to the metrics store. CPU or memory are poor SLIs because a busy server can still serve users fine.",
+      "idea": "A good SLI is a ratio of good to valid requests, measured as close to the user as practical.",
+      "caption": "Every request is counted as good or bad and sent to metrics.",
+      "focus": [
+        "users",
+        "checkout",
+        "payments",
+        "metrics"
+      ],
+      "flows": [
+        {
+          "from": "users",
+          "to": "checkout",
+          "kind": "request",
+          "label": "place order"
+        },
+        {
+          "from": "checkout",
+          "to": "payments",
+          "kind": "request",
+          "label": "charge"
+        },
+        {
+          "from": "payments",
+          "to": "checkout",
+          "kind": "response",
+          "label": "ok"
+        },
+        {
+          "from": "checkout",
+          "to": "metrics",
+          "kind": "async",
+          "label": "good / total"
+        }
+      ],
+      "metrics": {
+        "sli": "100"
+      }
+    },
+    {
+      "tag": "SLO",
+      "title": "Set the target and the budget",
+      "body": "A service level objective (SLO) is the goal for the SLI over a window. Say checkout must be good for 99.9% of requests over 30 days. The other 0.1% is the error budget. A 30-day window is 43,200 minutes, so 0.1% is about 43 minutes of full outage, or the equivalent in partial failures. That budget is not a failure; it is room to ship changes and take risks.",
+      "idea": "SLO = target for the SLI. Error budget = 100% minus the SLO, expressed as allowed badness.",
+      "caption": "Target 99.9% over 30 days leaves about 43 minutes of budget.",
+      "focus": [
+        "checkout",
+        "metrics"
+      ],
+      "flows": [],
+      "metrics": {
+        "sli": "100",
+        "budget": "43"
+      }
+    },
+    {
+      "tag": "BUDGET",
+      "title": "An outage spends the budget",
+      "body": "Earlier this month a bad deploy made payments fail for 13 minutes. All checkouts in that window were bad events, so, assuming steady traffic, roughly 13 of the 43 budget minutes are gone and the 30-day SLI is now about 99.97%. About 30 minutes remain. The budget turns a vague feeling of 'we have had a rough month' into a number that engineers and product owners can both read.",
+      "idea": "Every bad minute is a withdrawal; the remaining budget says how much risk you can still afford.",
+      "caption": "Payments failed for 13 minutes; budget drops to 30.",
+      "focus": [
+        "checkout",
+        "payments",
+        "metrics"
+      ],
+      "flows": [
+        {
+          "from": "checkout",
+          "to": "payments",
+          "kind": "request",
+          "label": "charge"
+        },
+        {
+          "from": "payments",
+          "to": "checkout",
+          "kind": "fail",
+          "label": "charge error"
+        },
+        {
+          "from": "checkout",
+          "to": "metrics",
+          "kind": "async",
+          "label": "bad events"
+        }
+      ],
+      "metrics": {
+        "sli": "99.97",
+        "budget": "30"
+      }
+    },
+    {
+      "tag": "BURN RATE",
+      "title": "Alert on how fast you burn",
+      "body": "Paging on every error is noisy, and paging only when the budget is gone is too late. Burn rate is the error rate divided by the allowed error rate. If 1.44% of requests fail against a 0.1% budget, the burn rate is 14.4. At that speed the whole 30-day budget lasts about 50 hours, and 2% of it is gone in one hour. A common pattern is to page on a fast burn (around 14x over an hour) and open a ticket on a slow burn (around 1x over a few days). Alerts are usually checked over a long and a short window together, so they reset quickly.",
+      "idea": "Burn rate tells you how long until the budget is gone, so alerts match urgency.",
+      "caption": "A fast burn pages the on-call engineer.",
+      "focus": [
+        "metrics",
+        "alerts"
+      ],
+      "flows": [
+        {
+          "from": "metrics",
+          "to": "alerts",
+          "kind": "async",
+          "label": "burn 14.4x"
+        }
+      ],
+      "metrics": {
+        "burn": "14.4"
+      }
+    },
+    {
+      "tag": "CHAOS",
+      "title": "Break it on purpose, with a hypothesis",
+      "body": "Chaos engineering injects real failure to test whether the system behaves as you believe. Start with a steady state, such as 'checkout p99 stays under 800 ms and success stays above 99.9%'. Checkout p99 is about 450 ms, so +300 ms still fits under 800 ms. Hypothesis: 'if payments gets 300 ms slower, checkout still meets both'. Faults can be latency, errors, killed instances or blocked dependencies, injected by a proxy, service mesh or agent. The tool watches the same SLI. It is an experiment, not vandalism.",
+      "idea": "A chaos experiment tests a written hypothesis against a measurable steady state.",
+      "caption": "The chaos tool adds 300 ms of delay to payments.",
+      "focus": [
+        "chaos",
+        "payments",
+        "metrics"
+      ],
+      "flows": [
+        {
+          "from": "chaos",
+          "to": "payments",
+          "kind": "fail",
+          "label": "+300 ms delay"
+        },
+        {
+          "from": "chaos",
+          "to": "metrics",
+          "kind": "request",
+          "label": "read SLI"
+        },
+        {
+          "from": "metrics",
+          "to": "chaos",
+          "kind": "response",
+          "label": "steady"
+        }
+      ],
+      "metrics": {
+        "burn": "0.1",
+        "blast": "1"
+      }
+    },
+    {
+      "tag": "BLAST RADIUS",
+      "title": "Keep the blast radius small",
+      "body": "Blast radius is how many users and systems an experiment can hurt. Begin with the smallest slice that still teaches you something: one instance, one test account or 1% of traffic, for a few minutes, off peak but with owners at their desks. Widen only after each smaller run passes. Staging is useful for finding tooling bugs, but it rarely has real traffic or dependencies, so many of the lessons that matter only show up in production, once monitoring and an abort switch are in place.",
+      "idea": "Start tiny, widen step by step, and never expand while a run is failing.",
+      "caption": "Only 1% of checkouts go through the delayed payments path.",
+      "focus": [
+        "users",
+        "checkout",
+        "payments"
+      ],
+      "flows": [
+        {
+          "from": "users",
+          "to": "checkout",
+          "kind": "request",
+          "label": "1% sampled"
+        },
+        {
+          "from": "checkout",
+          "to": "payments",
+          "kind": "request",
+          "label": "slow charge"
+        },
+        {
+          "from": "payments",
+          "to": "checkout",
+          "kind": "response",
+          "label": "ok, +300 ms"
+        }
+      ],
+      "metrics": {
+        "blast": "1"
+      }
+    },
+    {
+      "tag": "FINDING",
+      "title": "The experiment finds a weakness",
+      "body": "At 1% the hypothesis holds. At 5%, slow charges hold connections and threads longer, the pool to payments saturates, requests queue, and some pass 800 ms and count as bad. The call has no tight timeout or fallback, so checkout waits instead of failing fast or accepting the order and retrying the charge later. A planned test at this size costs well under a tenth of a minute of budget, which a 2 a.m. incident would not.",
+      "idea": "A failed hypothesis is a win: you found the flaw cheaply and on your own schedule.",
+      "caption": "At 5% blast radius, slow payments push checkout past 800 ms.",
+      "focus": [
+        "chaos",
+        "checkout",
+        "payments",
+        "metrics"
+      ],
+      "flows": [
+        {
+          "from": "chaos",
+          "to": "payments",
+          "kind": "fail",
+          "label": "+300 ms delay"
+        },
+        {
+          "from": "payments",
+          "to": "checkout",
+          "kind": "response",
+          "label": "slow"
+        },
+        {
+          "from": "checkout",
+          "to": "metrics",
+          "kind": "async",
+          "label": "some bad"
+        }
+      ],
+      "metrics": {
+        "sli": "99.97",
+        "budget": "30",
+        "burn": "5",
+        "blast": "5"
+      }
+    },
+    {
+      "tag": "ABORT",
+      "title": "Abort rules and game days",
+      "body": "Every experiment needs an automatic stop: abort at 3x burn measured over a few minutes, or if the SLI drops below a floor, and the chaos tool removes the fault at once. Guardrails use a short window, unlike hour-long paging windows. Here the burn reaches 5x within a couple of minutes at 5%, so the tool halts the run. A game day is a scheduled exercise where the team runs several experiments together, with owners watching and a rollback plan ready; people write the game-day notes afterwards.",
+      "idea": "Safe chaos has a kill switch tied to the same SLI that defines normal.",
+      "caption": "Burn limit crossed, the chaos tool stops injecting.",
+      "focus": [
+        "chaos",
+        "payments",
+        "metrics",
+        "alerts"
+      ],
+      "flows": [
+        {
+          "from": "metrics",
+          "to": "chaos",
+          "kind": "response",
+          "label": "limit hit"
+        },
+        {
+          "from": "chaos",
+          "to": "payments",
+          "kind": "response",
+          "label": "remove fault"
+        },
+        {
+          "from": "metrics",
+          "to": "alerts",
+          "kind": "async",
+          "label": "abort notice"
+        }
+      ],
+      "metrics": {
+        "burn": "0.1",
+        "blast": "0"
+      }
+    },
+    {
+      "tag": "RECAP",
+      "title": "Measure, spend, test, learn",
+      "body": "An SLI measures user-visible goodness, an SLO sets the target, and the error budget is what remains to spend. Burn-rate alerts say how urgent a problem is. Chaos experiments test a hypothesis with a small blast radius and an abort rule, and game days practise this as a team. A simple policy: with plenty of budget left, ship and run experiments; when it is nearly spent, ship only low-risk changes and pause new experiments, since chaos runs spend budget too; at zero, freeze feature launches until the 30-day window recovers. Thresholds are a team choice.",
+      "idea": "Reliability is managed like money: set a budget, track it, and spend it on learning.",
+      "caption": "The full loop from metric to experiment.",
+      "focus": [],
+      "flows": [],
+      "metrics": {
+        "sli": "99.97",
+        "budget": "30",
+        "burn": "0.1",
+        "blast": "0"
+      }
+    }
   ],
   "quiz": [
-    {"q": "Your SLO is 99.9% good requests over 30 days. About how much full-outage time does the error budget allow?", "options": ["About 4 minutes", "About 43 minutes", "About 7 hours", "About 43 hours"], "answer": 1, "why": "30 days is 43,200 minutes. 0.1% of that is about 43 minutes. 99.99% would give about 4 minutes, and 99% about 7 hours."},
-    {"q": "Which is the best SLI for a checkout API?", "options": ["Average CPU use across servers", "Number of servers running", "Share of order requests that succeed in under 800 ms", "Total requests per day"], "answer": 2, "why": "A good SLI is a ratio of good to valid events measured from the user's side. CPU, server count and raw volume do not say whether users were served well."},
-    {"q": "An alert shows a burn rate of 14.4 against a 30-day SLO. What does that mean?", "options": ["The budget will last about 50 hours if this continues", "14.4% of requests are failing", "The budget lasts 14.4 days", "The SLO is 14.4 nines"], "answer": 0, "why": "Burn rate is the actual error rate divided by the allowed error rate. At 14.4x, 30 days divided by 14.4 is about 2 days, so roughly 50 hours."},
-    {"q": "You want to test how checkout copes with slow payments. Which plan is safest and most useful?", "options": ["Slow payments for all users at peak time, to see real impact", "Run it only in staging and assume production behaves the same", "Slow 1% of traffic briefly, auto-stop if the SLI breaches a floor", "Kill payments entirely and watch what the on-call does"], "answer": 2, "why": "State a hypothesis, start with a small blast radius, watch the steady-state SLI, and stop automatically on breach. Staging alone misses real traffic, and full outages at peak are reckless."},
-    {"q": "Mid-month the error budget is almost used up. What does a sensible error-budget policy do?", "options": ["Raise the SLO so the numbers look better", "Pause risky launches and chaos runs, and prioritise reliability work", "Ignore it until the window resets", "Add alerts on every single error"], "answer": 1, "why": "The budget's job is to steer trade-offs. When it is nearly spent, the team slows risk-taking and fixes reliability until the window recovers."}
+    {
+      "q": "Your SLO is 99.9% good requests over 30 days. About how much full-outage time does the error budget allow?",
+      "options": [
+        "About 4 minutes",
+        "About 43 minutes",
+        "About 7 hours",
+        "About 43 hours"
+      ],
+      "answer": 1,
+      "why": "30 days is 43,200 minutes. 0.1% of that is about 43 minutes. 99.99% would give about 4 minutes, and 99% about 7 hours."
+    },
+    {
+      "q": "Which is the best SLI for a checkout API?",
+      "options": [
+        "Average CPU use across servers",
+        "Number of servers running",
+        "Share of order requests that succeed in under 800 ms",
+        "Total requests per day"
+      ],
+      "answer": 2,
+      "why": "A good SLI is a ratio of good to valid events measured from the user's side. CPU, server count and raw volume do not say whether users were served well."
+    },
+    {
+      "q": "An alert shows a burn rate of 14.4 against a 30-day SLO. What does that mean?",
+      "options": [
+        "The budget will last about 50 hours if this continues",
+        "14.4% of requests are failing",
+        "The budget lasts 14.4 days",
+        "The SLO is 14.4 nines"
+      ],
+      "answer": 0,
+      "why": "Burn rate is the actual error rate divided by the allowed error rate. At 14.4x, 30 days divided by 14.4 is about 2 days, so roughly 50 hours."
+    },
+    {
+      "q": "You want to test how checkout copes with slow payments. Which plan is safest and most useful?",
+      "options": [
+        "Slow payments for all users at peak time, to see real impact",
+        "Run it only in staging and assume production behaves the same",
+        "Slow 1% of traffic briefly, auto-stop if the SLI breaches a floor",
+        "Kill payments entirely and watch what the on-call does"
+      ],
+      "answer": 2,
+      "why": "State a hypothesis, start with a small blast radius, watch the steady-state SLI, and stop automatically on breach. Staging alone misses real traffic, and full outages at peak are reckless."
+    },
+    {
+      "q": "Mid-month the error budget is almost used up. What does a sensible error-budget policy do?",
+      "options": [
+        "Raise the SLO so the numbers look better",
+        "Pause risky launches and chaos runs, and prioritise reliability work",
+        "Ignore it until the window resets",
+        "Add alerts on every single error"
+      ],
+      "answer": 1,
+      "why": "The budget's job is to steer trade-offs. When it is nearly spent, the team slows risk-taking and fixes reliability until the window recovers."
+    }
   ],
   "cheatsheet": [
-    {"term": "SLI", "def": "Service level indicator: a measured ratio of good events to valid events, such as fast successful checkouts over all checkouts."},
-    {"term": "SLO", "def": "Service level objective: the target for an SLI over a window, for example 99.9% over 30 days."},
-    {"term": "SLA", "def": "Service level agreement: a contract with consequences, often refunds, if a promised level is missed. Usually looser than the internal SLO."},
-    {"term": "Error budget", "def": "100% minus the SLO. At 99.9% over 30 days it is about 43 minutes of full outage, available to spend on risk. A policy ties it to action: ship and experiment while plenty is left, slow down when nearly spent, freeze launches at zero."},
-    {"term": "Burn rate", "def": "Actual error rate divided by allowed error rate. 1x spends the budget exactly over the window; 14.4x empties it in about 50 hours."},
-    {"term": "Steady state", "def": "The measurable normal behaviour, such as the SLI staying above target, that a chaos experiment tries to keep intact."},
-    {"term": "Blast radius", "def": "How many users or systems an experiment can affect. Start small, such as 1% of traffic, and widen only after passing."},
-    {"term": "Game day", "def": "A planned team exercise that runs failure experiments with owners watching, an abort plan and a written follow-up."}
+    {
+      "term": "SLI",
+      "def": "Service level indicator: a measured ratio of good events to valid events, such as fast successful checkouts over all checkouts."
+    },
+    {
+      "term": "SLO",
+      "def": "Service level objective: the target for an SLI over a window, for example 99.9% over 30 days."
+    },
+    {
+      "term": "SLA",
+      "def": "Service level agreement: a contract with consequences, often refunds, if a promised level is missed. Usually looser than the internal SLO."
+    },
+    {
+      "term": "Error budget",
+      "def": "100% minus the SLO. At 99.9% over 30 days it is about 43 minutes of full outage, available to spend on risk. A policy ties it to action: ship and experiment while plenty is left, slow down when nearly spent, freeze launches at zero."
+    },
+    {
+      "term": "Burn rate",
+      "def": "Actual error rate divided by allowed error rate. 1x spends the budget exactly over the window; 14.4x empties it in about 50 hours."
+    },
+    {
+      "term": "Steady state",
+      "def": "The measurable normal behaviour, such as the SLI staying above target, that a chaos experiment tries to keep intact."
+    },
+    {
+      "term": "Blast radius",
+      "def": "How many users or systems an experiment can affect. Start small, such as 1% of traffic, and widen only after passing."
+    },
+    {
+      "term": "Game day",
+      "def": "A planned team exercise that runs failure experiments with owners watching, an abort plan and a written follow-up."
+    }
   ]
 }

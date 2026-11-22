@@ -126,7 +126,13 @@
       "body": "A five-node cluster stores data and must route around machines that fail. One node, A, is the leader that coordinates writes. But no node can look at another's power light. All it can see is messages arriving or not arriving. Silence could mean a crash, a slow disk, a long garbage-collection pause, or a broken network cable. This lesson shows how a cluster turns silence into a decision.",
       "idea": "Over an unreliable network, failure detection is inference from missing messages, never direct observation.",
       "caption": "Five peers and a client; nobody can see another node's health.",
-      "focus": [],
+      "focus": [
+        "a",
+        "b",
+        "c",
+        "d",
+        "e"
+      ],
       "flows": [],
       "metrics": {
         "gap": "0",
@@ -349,7 +355,7 @@
       "metrics": {
         "gap": "20000",
         "phi": "8.7",
-        "aware": "2",
+        "aware": "3",
         "leaders": "2"
       }
     },
@@ -380,8 +386,8 @@
           "label": "commit 3 of 5"
         },
         {
-          "from": "client",
-          "to": "e",
+          "from": "e",
+          "to": "client",
           "kind": "fail",
           "label": "no quorum"
         }

@@ -303,7 +303,7 @@
           "from": "doc",
           "to": "app",
           "kind": "response",
-          "label": "orders, products"
+          "label": "3 result sets"
         }
       ],
       "metrics": {
@@ -328,6 +328,12 @@
           "to": "kv",
           "kind": "request",
           "label": "GET first"
+        },
+        {
+          "from": "kv",
+          "to": "app",
+          "kind": "response",
+          "label": "miss"
         },
         {
           "from": "app",

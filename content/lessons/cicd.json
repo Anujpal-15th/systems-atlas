@@ -12,52 +12,383 @@
     "How rollback works and why it should be the fastest thing your pipeline does"
   ],
   "nodes": [
-    {"id": "dev", "label": "Developer", "kind": "user", "x": 8, "y": 50},
-    {"id": "repo", "label": "Git trunk (main)", "kind": "service", "x": 25, "y": 50},
-    {"id": "ci", "label": "CI runner", "kind": "worker", "x": 42, "y": 22},
-    {"id": "registry", "label": "Artifact registry", "kind": "storage", "x": 62, "y": 22},
-    {"id": "staging", "label": "Staging", "kind": "service", "x": 62, "y": 78},
-    {"id": "prod", "label": "Production", "kind": "server", "x": 88, "y": 50}
+    {
+      "id": "dev",
+      "label": "Developer",
+      "kind": "user",
+      "x": 8,
+      "y": 50
+    },
+    {
+      "id": "repo",
+      "label": "Git trunk (main)",
+      "kind": "service",
+      "x": 25,
+      "y": 50
+    },
+    {
+      "id": "ci",
+      "label": "CI runner",
+      "kind": "worker",
+      "x": 42,
+      "y": 22
+    },
+    {
+      "id": "registry",
+      "label": "Artifact registry",
+      "kind": "storage",
+      "x": 62,
+      "y": 22
+    },
+    {
+      "id": "staging",
+      "label": "Staging",
+      "kind": "service",
+      "x": 62,
+      "y": 78
+    },
+    {
+      "id": "prod",
+      "label": "Production",
+      "kind": "server",
+      "x": 88,
+      "y": 50
+    }
   ],
   "edges": [
-    {"from": "dev", "to": "repo", "label": "push"},
-    {"from": "repo", "to": "ci", "label": "webhook"},
-    {"from": "ci", "to": "registry", "label": "publish"},
-    {"from": "registry", "to": "staging", "label": "deploy"},
-    {"from": "registry", "to": "prod", "label": "deploy"},
-    {"from": "staging", "to": "prod", "label": "promote"}
+    {
+      "from": "dev",
+      "to": "repo",
+      "label": "push"
+    },
+    {
+      "from": "repo",
+      "to": "ci",
+      "label": "webhook"
+    },
+    {
+      "from": "ci",
+      "to": "registry",
+      "label": "publish"
+    },
+    {
+      "from": "registry",
+      "to": "staging",
+      "label": "deploy"
+    },
+    {
+      "from": "registry",
+      "to": "prod",
+      "label": "deploy"
+    },
+    {
+      "from": "staging",
+      "to": "prod",
+      "label": "promote"
+    }
   ],
   "metrics": [
-    {"id": "pipeline", "label": "Pipeline time", "unit": "min"},
-    {"id": "tests", "label": "Tests passed", "unit": "count"},
-    {"id": "errors", "label": "Prod errors", "unit": "%"}
+    {
+      "id": "pipeline",
+      "label": "Pipeline time",
+      "unit": "min"
+    },
+    {
+      "id": "tests",
+      "label": "Tests passed",
+      "unit": "count"
+    },
+    {
+      "id": "errors",
+      "label": "Prod errors",
+      "unit": "%"
+    }
   ],
   "steps": [
-    {"tag": "QUESTION", "title": "How does code reach users?", "body": "A developer finishes a 40-line change. Old-style teams batch changes for weeks, then hand a release to an ops team and hope. A CI/CD pipeline replaces that hope with a fixed, automated path from commit to production. Continuous integration means merging often and checking every merge. Continuous delivery means every passing merge is ready to ship.", "idea": "A pipeline turns 'ship it' from a risky event into a boring, repeatable routine.", "caption": "One small change is ready to leave the laptop.", "focus": ["dev"], "flows": [], "metrics": {"pipeline": "0", "tests": "0", "errors": "0.2"}},
-    {"tag": "TRUNK", "title": "Merge small, merge often", "body": "In trunk-based development everyone merges into one main branch at least daily. Branches live hours, not weeks, so they rarely diverge and merge conflicts stay tiny. Unfinished work is hidden behind a feature flag (a runtime on/off switch for new code) instead of a long-lived branch. Each push to main triggers the pipeline through a webhook (an HTTP call the repo makes to CI). Teams also run a quick subset of checks on the pull request first.", "idea": "Small changes are easier to review, to test and to undo, so trunk-based development makes everything downstream cheaper.", "caption": "Push lands on main and fires a webhook.", "focus": ["dev", "repo", "ci"], "flows": [{"from": "dev", "to": "repo", "kind": "request", "label": "git push"}, {"from": "repo", "to": "ci", "kind": "async", "label": "webhook"}], "metrics": {}},
-    {"tag": "BUILD", "title": "Build in a clean runner", "body": "The CI runner checks out the exact commit on a fresh machine, restores cached dependencies, compiles the code and packages it as a candidate image tagged with the commit SHA (the commit's unique hash), shop-api:a1b2c3d. A clean machine catches 'works on my laptop' bugs. Linting fails in seconds, so a typo never waits behind a long suite. In this example, with caching, the build takes about 2 minutes.", "idea": "Build in a clean, pinned environment (exact dependency and tool versions, not 'latest') so the result depends only on the commit.", "caption": "Clean runner builds commit a1b2c3d.", "focus": ["ci"], "flows": [], "metrics": {"pipeline": "2"}},
-    {"tag": "TEST", "title": "Run the gates", "body": "Tests and scans run against that exact candidate image. Lint, unit tests and fast security and dependency scans run first, then slower integration tests. Any failure stops the pipeline, so the release goes no further, and a red main is stop-the-line: fix or revert immediately. Say 1,240 tests pass in about 6 minutes on parallel runners. Keep this stage under roughly 10 minutes. Test design is covered in the testing lesson.", "idea": "Order stages cheapest-first and fail fast, so feedback arrives in minutes.", "caption": "All 1,240 tests pass on parallel runners.", "focus": ["ci"], "flows": [], "metrics": {"pipeline": "8", "tests": "1240"}},
-    {"tag": "ARTIFACT", "title": "Publish the tested artifact", "body": "CI pushes the same container image (a packaged app plus its dependencies) that passed the gates to the artifact registry, so nothing is rebuilt after testing. A tag can be re-pointed, so deployments reference the content digest (a hash of the image) or the registry enforces immutable tags. Every environment runs this image; configuration and secrets are injected at deploy time, not baked in. Rebuilding could pull different dependencies than you tested.", "idea": "Build once, test that artifact, then promote it everywhere; only injected configuration differs between environments.", "caption": "Image shop-api:a1b2c3d is stored in the registry.", "focus": ["ci", "registry"], "flows": [{"from": "ci", "to": "registry", "kind": "request", "label": "push image"}, {"from": "registry", "to": "ci", "kind": "response", "label": "stored, sha256"}], "metrics": {"pipeline": "10"}},
-    {"tag": "DEPLOY", "title": "Staging, then production", "body": "The pipeline first deploys the image to staging, a production-like environment, and runs smoke tests: log in, load a page, place a test order. If they pass, the same image is promoted to production, automatically (continuous deployment) or after a human approval (continuous delivery). The pipeline definition lives in the repo as YAML: changes get pull request review, you can diff, revert and reproduce the pipeline for any commit, and secrets are injected at run time, never committed. Canary rollouts are in the deploys lesson.", "idea": "Pipeline as code makes the delivery process reviewable, versioned and identical on every run.", "caption": "Same image runs in staging, then production.", "focus": ["registry", "staging", "prod"], "flows": [{"from": "registry", "to": "staging", "kind": "request", "label": "deploy a1b2c3d"}, {"from": "staging", "to": "prod", "kind": "request", "label": "promote"}, {"from": "registry", "to": "prod", "kind": "response", "label": "pull image"}], "metrics": {"pipeline": "14", "errors": "0.2"}},
-    {"tag": "WHAT IF", "title": "The release is bad", "body": "Suppose the change passed every test but has a bug that only real traffic exposes, and the error rate climbs from 0.2% to 6%. Tests cannot catch everything, which is why production monitoring is part of the pipeline's feedback loop. A fix-forward patch needs time to write and review the fix, then another full pipeline run (about 14 minutes here), while customers keep failing. Observability is its own lesson; here the point is that something has to trigger the next move.", "idea": "Passing tests means 'probably fine'; production signals decide whether it really is.", "caption": "Errors in production jump to 6%.", "focus": ["prod"], "flows": [], "metrics": {"errors": "6"}},
-    {"tag": "ROLLBACK", "title": "Redeploy the last good image", "body": "Because the registry still holds the previous artifact, a rollback is just a deploy of shop-api:9f8e7d6, with no rebuild and no new tests. It can finish in about a minute. Roll back configuration changes too, and watch health checks and the error rate after the redeploy. This works only if old artifacts are kept and the release was backward compatible with the data it touched; a one-way database change makes rollback unsafe, and that is why expand/contract migrations exist. Rolling back first, then debugging calmly, is the standard habit.", "idea": "Rollback should be a one-step redeploy of a stored artifact, usually much faster than fixing forward.", "caption": "Production pulls the previous image; healthy again, errors 0.2%.", "focus": ["registry", "prod"], "flows": [{"from": "registry", "to": "prod", "kind": "response", "label": "pull 9f8e7d6"}], "metrics": {"pipeline": "1", "errors": "0.2"}},
-    {"tag": "RECAP", "title": "The path from commit to users", "body": "Merge small changes to trunk often. The pipeline builds one candidate in a clean runner, tests it cheapest-first, publishes that same artifact, and promotes it through staging to production. The pipeline is code in the repo. When production signals go bad, redeploy the previous artifact first and investigate second.", "idea": "Small changes, one artifact, automated gates, and a fast way back.", "caption": "Commit to production in about 14 minutes.", "focus": ["dev", "repo", "ci", "registry", "staging", "prod"], "flows": [], "metrics": {"pipeline": "14", "tests": "1240", "errors": "0.2"}}
+    {
+      "tag": "QUESTION",
+      "title": "How does code reach users?",
+      "body": "A developer finishes a 40-line change. Old-style teams batch changes for weeks, then hand a release to an ops team and hope. A CI/CD pipeline replaces that hope with a fixed, automated path from commit to production. Continuous integration means merging often and checking every merge. Continuous delivery means every passing merge is ready to ship.",
+      "idea": "A pipeline turns 'ship it' from a risky event into a boring, repeatable routine.",
+      "caption": "One small change is ready to leave the laptop.",
+      "focus": [
+        "dev"
+      ],
+      "flows": [],
+      "metrics": {
+        "pipeline": "0",
+        "tests": "0",
+        "errors": "0.2"
+      }
+    },
+    {
+      "tag": "TRUNK",
+      "title": "Merge small, merge often",
+      "body": "In trunk-based development everyone merges into one main branch at least daily. Branches live hours, not weeks, so they rarely diverge and merge conflicts stay tiny. Unfinished work is hidden behind a feature flag (a runtime on/off switch for new code) instead of a long-lived branch. Each push to main triggers the pipeline through a webhook (an HTTP call the repo makes to CI). Teams also run a quick subset of checks on the pull request first.",
+      "idea": "Small changes are easier to review, to test and to undo, so trunk-based development makes everything downstream cheaper.",
+      "caption": "Push lands on main and fires a webhook.",
+      "focus": [
+        "dev",
+        "repo",
+        "ci"
+      ],
+      "flows": [
+        {
+          "from": "dev",
+          "to": "repo",
+          "kind": "request",
+          "label": "git push"
+        },
+        {
+          "from": "repo",
+          "to": "ci",
+          "kind": "async",
+          "label": "webhook"
+        }
+      ],
+      "metrics": {}
+    },
+    {
+      "tag": "BUILD",
+      "title": "Build in a clean runner",
+      "body": "The CI runner checks out the exact commit on a fresh machine, restores cached dependencies, compiles the code and packages it as a candidate image tagged with the commit SHA (the commit's unique hash), shop-api:a1b2c3d. A clean machine catches 'works on my laptop' bugs. Linting fails in seconds, so a typo never waits behind a long suite. In this example, with caching, the build takes about 2 minutes.",
+      "idea": "Build in a clean, pinned environment (exact dependency and tool versions, not 'latest') so the result depends only on the commit.",
+      "caption": "Clean runner builds commit a1b2c3d.",
+      "focus": [
+        "ci"
+      ],
+      "flows": [],
+      "metrics": {
+        "pipeline": "2"
+      }
+    },
+    {
+      "tag": "TEST",
+      "title": "Run the gates",
+      "body": "Tests and scans run against that exact candidate image. Lint, unit tests and fast security and dependency scans run first, then slower integration tests. Any failure stops the pipeline, so the release goes no further, and a red main is stop-the-line: fix or revert immediately. Say 1,240 tests pass in about 6 minutes on parallel runners. Keep this stage under roughly 10 minutes. Test design is covered in the testing lesson.",
+      "idea": "Order stages cheapest-first and fail fast, so feedback arrives in minutes.",
+      "caption": "All 1,240 tests pass on parallel runners.",
+      "focus": [
+        "ci"
+      ],
+      "flows": [],
+      "metrics": {
+        "pipeline": "8",
+        "tests": "1240"
+      }
+    },
+    {
+      "tag": "ARTIFACT",
+      "title": "Publish the tested artifact",
+      "body": "CI pushes the same container image (a packaged app plus its dependencies) that passed the gates to the artifact registry, so nothing is rebuilt after testing. A tag can be re-pointed, so deployments reference the content digest (a hash of the image) or the registry enforces immutable tags. Every environment runs this image; configuration and secrets are injected at deploy time, not baked in. Rebuilding could pull different dependencies than you tested. Pushing and verifying the image adds about 2 minutes here.",
+      "idea": "Build once, test that artifact, then promote it everywhere; only injected configuration differs between environments.",
+      "caption": "Image shop-api:a1b2c3d is stored in the registry.",
+      "focus": [
+        "ci",
+        "registry"
+      ],
+      "flows": [
+        {
+          "from": "ci",
+          "to": "registry",
+          "kind": "request",
+          "label": "push image"
+        },
+        {
+          "from": "registry",
+          "to": "ci",
+          "kind": "response",
+          "label": "stored, sha256"
+        }
+      ],
+      "metrics": {
+        "pipeline": "10"
+      }
+    },
+    {
+      "tag": "DEPLOY",
+      "title": "Staging, then production",
+      "body": "The pipeline first deploys the image to staging, a production-like environment, and runs smoke tests: log in, load a page, place a test order. If they pass, the same image is promoted to production, automatically (continuous deployment) or after a human approval (continuous delivery). The pipeline definition lives in the repo as YAML: changes get pull request review, you can diff, revert and reproduce the pipeline for any commit, and secrets are injected at run time, never committed. Canary rollouts are in the deploys lesson. Deploying to staging, smoke tests and the production rollout add about 4 minutes, which brings the total to about 14.",
+      "idea": "Pipeline as code makes the delivery process reviewable, versioned and identical on every run.",
+      "caption": "Same image runs in staging, then production.",
+      "focus": [
+        "registry",
+        "staging",
+        "prod"
+      ],
+      "flows": [
+        {
+          "from": "registry",
+          "to": "staging",
+          "kind": "request",
+          "label": "deploy a1b2c3d"
+        },
+        {
+          "from": "staging",
+          "to": "prod",
+          "kind": "request",
+          "label": "promote"
+        },
+        {
+          "from": "registry",
+          "to": "prod",
+          "kind": "response",
+          "label": "pull image"
+        }
+      ],
+      "metrics": {
+        "pipeline": "14",
+        "errors": "0.2"
+      }
+    },
+    {
+      "tag": "WHAT IF",
+      "title": "The release is bad",
+      "body": "Suppose the change passed every test but has a bug that only real traffic exposes, and the error rate climbs from 0.2% to 6%. Tests cannot catch everything, which is why production monitoring is part of the pipeline's feedback loop. A fix-forward patch needs time to write and review the fix, then another full pipeline run (about 14 minutes here), while customers keep failing. Observability is its own lesson; here the point is that something has to trigger the next move.",
+      "idea": "Passing tests means 'probably fine'; production signals decide whether it really is.",
+      "caption": "Errors in production jump to 6%.",
+      "focus": [
+        "prod"
+      ],
+      "flows": [],
+      "metrics": {
+        "errors": "6"
+      }
+    },
+    {
+      "tag": "ROLLBACK",
+      "title": "Redeploy the last good image",
+      "body": "Because the registry still holds the previous artifact, a rollback is just a deploy of shop-api:9f8e7d6, with no rebuild and no new tests. It can finish in about a minute. Roll back configuration changes too, and watch health checks and the error rate after the redeploy. This works only if old artifacts are kept and the release was backward compatible with the data it touched; a one-way database change makes rollback unsafe, and that is why expand/contract migrations exist. Rolling back first, then debugging calmly, is the standard habit.",
+      "idea": "Rollback should be a one-step redeploy of a stored artifact, usually much faster than fixing forward.",
+      "caption": "Production pulls the previous image; healthy again, errors 0.2%.",
+      "focus": [
+        "registry",
+        "prod"
+      ],
+      "flows": [
+        {
+          "from": "registry",
+          "to": "prod",
+          "kind": "response",
+          "label": "pull 9f8e7d6"
+        }
+      ],
+      "metrics": {
+        "pipeline": "1",
+        "errors": "0.2"
+      }
+    },
+    {
+      "tag": "RECAP",
+      "title": "The path from commit to users",
+      "body": "Merge small changes to trunk often. The pipeline builds one candidate in a clean runner, tests it cheapest-first, publishes that same artifact, and promotes it through staging to production. The pipeline is code in the repo. When production signals go bad, redeploy the previous artifact first and investigate second.",
+      "idea": "Small changes, one artifact, automated gates, and a fast way back.",
+      "caption": "Commit to production in about 14 minutes.",
+      "focus": [
+        "dev",
+        "repo",
+        "ci",
+        "registry",
+        "staging",
+        "prod"
+      ],
+      "flows": [],
+      "metrics": {
+        "pipeline": "14",
+        "tests": "1240",
+        "errors": "0.2"
+      }
+    }
   ],
   "quiz": [
-    {"q": "Staging passed all smoke tests, but the pipeline then rebuilds the code from source for production. What is the main risk?", "options": ["Production will be slower to start", "The production build may differ from what was tested, for example through newer dependency versions", "Staging data will leak into production", "The registry will run out of space"], "answer": 1, "why": "Rebuilding creates a new artifact that was never tested. Building once and promoting the same image guarantees production runs exactly what staging validated."},
-    {"q": "Your pipeline runs a 25-minute end-to-end suite before the 30-second lint check. What is the best change?", "options": ["Remove the lint check", "Run the end-to-end suite only after deploying to production", "Skip tests on small changes", "Run lint and unit tests first to fail fast, and parallelise or trim the slow suite"], "answer": 3, "why": "Cheapest-first ordering gives quick failure feedback. Keep slow suites in the pipeline, but shard them in parallel or trim them, instead of removing the per-change gate."},
-    {"q": "A team keeps feature branches open for three weeks, then merges. Which problem does trunk-based development mainly address?", "options": ["Slow network speed to the registry", "Missing database indexes", "Large, conflict-prone merges and big risky releases", "Too many environments"], "answer": 2, "why": "Long-lived branches diverge, causing painful merges and large untested batches. Merging small changes daily keeps integration cheap and each release small."},
-    {"q": "A release raises production errors to 6%. The previous image is still in the registry. What is usually the best first move?", "options": ["Write and ship a fix through the full pipeline", "Redeploy the previous artifact, then investigate", "Delete the failing tests", "Rebuild the old commit from source"], "answer": 1, "why": "Redeploying a stored, known-good artifact restores service in about a minute. Fix-forward takes a full pipeline run while users keep failing."},
-    {"q": "When might rolling back the application image NOT be enough to undo a release?", "options": ["When the image was tagged with a commit SHA", "When staging is down", "When tests ran in parallel", "When the release also ran a one-way database migration that the old code cannot work with"], "answer": 3, "why": "Code rolls back easily, but data changes do not. Backward-compatible, expand/contract migrations keep the old version working against the new schema."}
+    {
+      "q": "Staging passed all smoke tests, but the pipeline then rebuilds the code from source for production. What is the main risk?",
+      "options": [
+        "Production will be slower to start",
+        "The production build may differ from what was tested, for example through newer dependency versions",
+        "Staging data will leak into production",
+        "The registry will run out of space"
+      ],
+      "answer": 1,
+      "why": "Rebuilding creates a new artifact that was never tested. Building once and promoting the same image guarantees production runs exactly what staging validated."
+    },
+    {
+      "q": "Your pipeline runs a 25-minute end-to-end suite before the 30-second lint check. What is the best change?",
+      "options": [
+        "Remove the lint check",
+        "Run the end-to-end suite only after deploying to production",
+        "Skip tests on small changes",
+        "Run lint and unit tests first to fail fast, and parallelise or trim the slow suite"
+      ],
+      "answer": 3,
+      "why": "Cheapest-first ordering gives quick failure feedback. Keep slow suites in the pipeline, but shard them in parallel or trim them, instead of removing the per-change gate."
+    },
+    {
+      "q": "A team keeps feature branches open for three weeks, then merges. Which problem does trunk-based development mainly address?",
+      "options": [
+        "Slow network speed to the registry",
+        "Missing database indexes",
+        "Large, conflict-prone merges and big risky releases",
+        "Too many environments"
+      ],
+      "answer": 2,
+      "why": "Long-lived branches diverge, causing painful merges and large untested batches. Merging small changes daily keeps integration cheap and each release small."
+    },
+    {
+      "q": "A release raises production errors to 6%. The previous image is still in the registry. What is usually the best first move?",
+      "options": [
+        "Write and ship a fix through the full pipeline",
+        "Redeploy the previous artifact, then investigate",
+        "Delete the failing tests",
+        "Rebuild the old commit from source"
+      ],
+      "answer": 1,
+      "why": "Redeploying a stored, known-good artifact restores service in about a minute. Fix-forward takes a full pipeline run while users keep failing."
+    },
+    {
+      "q": "When might rolling back the application image NOT be enough to undo a release?",
+      "options": [
+        "When the image was tagged with a commit SHA",
+        "When staging is down",
+        "When tests ran in parallel",
+        "When the release also ran a one-way database migration that the old code cannot work with"
+      ],
+      "answer": 3,
+      "why": "Code rolls back easily, but data changes do not. Backward-compatible, expand/contract migrations keep the old version working against the new schema."
+    }
   ],
   "cheatsheet": [
-    {"term": "Continuous integration", "def": "Merge to a shared main branch often, and automatically build and test every merge."},
-    {"term": "Delivery vs deployment", "def": "Delivery: every passing change is ready to ship, release is a button. Deployment: it ships to production automatically."},
-    {"term": "Trunk-based development", "def": "Everyone merges to main at least daily; unfinished work hides behind feature flags, not long branches."},
-    {"term": "Immutable artifact", "def": "A versioned build output (image, package) tagged by commit SHA, built once and promoted unchanged through environments."},
-    {"term": "Pipeline as code", "def": "The pipeline definition (YAML) lives in the repo, so it is reviewed, versioned and reproducible."},
-    {"term": "Fail fast", "def": "Order stages cheapest-first (lint, unit, integration, e2e) so most failures show up within minutes."},
-    {"term": "Rollback", "def": "Redeploy the previous known-good artifact. Needs retained artifacts and backward-compatible data changes."},
-    {"term": "Speed targets (rules of thumb)", "def": "Aim for commit to test result in under 10 minutes and a rollback in a few minutes at most; these are guidelines, not standards."}
+    {
+      "term": "Continuous integration",
+      "def": "Merge to a shared main branch often, and automatically build and test every merge."
+    },
+    {
+      "term": "Delivery vs deployment",
+      "def": "Delivery: every passing change is ready to ship, release is a button. Deployment: it ships to production automatically."
+    },
+    {
+      "term": "Trunk-based development",
+      "def": "Everyone merges to main at least daily; unfinished work hides behind feature flags, not long branches."
+    },
+    {
+      "term": "Immutable artifact",
+      "def": "A versioned build output (image, package) tagged by commit SHA, built once and promoted unchanged through environments."
+    },
+    {
+      "term": "Pipeline as code",
+      "def": "The pipeline definition (YAML) lives in the repo, so it is reviewed, versioned and reproducible."
+    },
+    {
+      "term": "Fail fast",
+      "def": "Order stages cheapest-first (lint, unit, integration, e2e) so most failures show up within minutes."
+    },
+    {
+      "term": "Rollback",
+      "def": "Redeploy the previous known-good artifact. Needs retained artifacts and backward-compatible data changes."
+    },
+    {
+      "term": "Speed targets (rules of thumb)",
+      "def": "Aim for commit to test result in under 10 minutes and a rollback in a few minutes at most; these are guidelines, not standards."
+    }
   ]
 }

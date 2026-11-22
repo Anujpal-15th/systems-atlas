@@ -11,53 +11,488 @@
     "Why multi-tenant data needs isolation enforced below the application code"
   ],
   "nodes": [
-    {"id": "client", "label": "Alice's browser", "kind": "client", "x": 8, "y": 50},
-    {"id": "gateway", "label": "API gateway", "kind": "gateway", "x": 28, "y": 50},
-    {"id": "pdp", "label": "Policy service", "kind": "service", "x": 52, "y": 18},
-    {"id": "store", "label": "Policy data", "kind": "db", "x": 82, "y": 18},
-    {"id": "app", "label": "Docs service", "kind": "server", "x": 56, "y": 66},
-    {"id": "db", "label": "Tenant database", "kind": "db", "x": 85, "y": 66}
+    {
+      "id": "client",
+      "label": "Alice's browser",
+      "kind": "client",
+      "x": 8,
+      "y": 50
+    },
+    {
+      "id": "gateway",
+      "label": "API gateway",
+      "kind": "gateway",
+      "x": 28,
+      "y": 50
+    },
+    {
+      "id": "pdp",
+      "label": "Policy service",
+      "kind": "service",
+      "x": 52,
+      "y": 18
+    },
+    {
+      "id": "store",
+      "label": "Policy data",
+      "kind": "db",
+      "x": 82,
+      "y": 18
+    },
+    {
+      "id": "app",
+      "label": "Docs service",
+      "kind": "server",
+      "x": 56,
+      "y": 66
+    },
+    {
+      "id": "db",
+      "label": "Tenant database",
+      "kind": "db",
+      "x": 85,
+      "y": 66
+    }
   ],
   "edges": [
-    {"from": "client", "to": "gateway"},
-    {"from": "gateway", "to": "pdp"},
-    {"from": "pdp", "to": "store"},
-    {"from": "gateway", "to": "app"},
-    {"from": "app", "to": "pdp"},
-    {"from": "app", "to": "db"}
+    {
+      "from": "client",
+      "to": "gateway"
+    },
+    {
+      "from": "gateway",
+      "to": "pdp"
+    },
+    {
+      "from": "pdp",
+      "to": "store"
+    },
+    {
+      "from": "gateway",
+      "to": "app"
+    },
+    {
+      "from": "app",
+      "to": "pdp"
+    },
+    {
+      "from": "app",
+      "to": "db"
+    }
   ],
   "metrics": [
-    {"id": "decision", "label": "Decision", "unit": "ms"},
-    {"id": "rows", "label": "Rows returned", "unit": "rows"},
-    {"id": "foreign", "label": "Other-tenant", "unit": "rows"}
+    {
+      "id": "decision",
+      "label": "Decision",
+      "unit": "ms"
+    },
+    {
+      "id": "rows",
+      "label": "Rows returned",
+      "unit": "rows"
+    },
+    {
+      "id": "foreign",
+      "label": "Other-tenant",
+      "unit": "rows"
+    }
   ],
   "steps": [
-    {"tag": "QUESTION", "title": "Logged in is not allowed", "body": "Alice works at Acme and has just logged in. She asks for document 42. The system already knows who she is, because authentication is covered in another lesson. The new question is different: is she allowed to read this particular document, and could she see Globex's documents by mistake?", "idea": "Authentication answers 'who are you?'; authorization answers 'what may you do, to which thing?'", "caption": "Alice is identified but not yet permitted.", "focus": ["client"], "flows": [], "metrics": {}},
-    {"tag": "FLOW", "title": "The request arrives", "body": "Alice's browser sends GET /docs/42 with a signed token that names her user ID and her tenant, acme. The gateway checks the token is genuine, then has to decide whether to let the call through. It does not own the rules itself. It asks a dedicated policy service, which is the only place those rules live.", "idea": "The caller's identity is an input to the decision, never the decision itself.", "caption": "Gateway receives the request and a verified identity.", "focus": ["client", "gateway"], "flows": [{"from": "client", "to": "gateway", "kind": "request", "label": "GET /docs/42"}], "metrics": {}},
-    {"tag": "RBAC", "title": "Roles: what job does she have?", "body": "In role-based access control (RBAC), permissions attach to roles and users attach to roles. Alice is an editor, and editors may read and edit documents. It is simple to explain and audit: list the roles, list who holds them. It strains when rules depend on context, because you end up inventing roles like 'editor-of-project-7-in-EU'. Numbers in this lesson are illustrative, assuming the policy service sits in the same region, about 1 ms per network hop; a rule of thumb, not a law.", "idea": "RBAC is easy to audit but cannot say 'only her own team's files' without role explosion.", "caption": "Policy service looks up Alice's roles.", "focus": ["gateway", "pdp", "store"], "flows": [{"from": "gateway", "to": "pdp", "kind": "request", "label": "alice docs:read?"}, {"from": "pdp", "to": "store", "kind": "request", "label": "roles of alice"}, {"from": "store", "to": "pdp", "kind": "response", "label": "editor"}], "metrics": {"decision": "4"}},
-    {"tag": "ABAC", "title": "Attributes: what is the context?", "body": "Attribute-based access control (ABAC) evaluates rules over facts about the user, the resource, and the situation. For example: allow read if user.tenant equals doc.tenant and doc.classification is not 'secret' and the request comes from a managed device. One rule covers millions of documents. The cost is that rules are harder to reason about and to test than a role list. Request facts such as device state arrive with the call from the gateway.", "idea": "ABAC expresses context-dependent rules compactly, at the price of harder-to-predict outcomes.", "caption": "Rules compare user, document, and request facts.", "focus": ["pdp", "store"], "flows": [{"from": "pdp", "to": "store", "kind": "request", "label": "doc:42 attrs"}, {"from": "store", "to": "pdp", "kind": "response", "label": "tenant=acme"}], "metrics": {"decision": "6"}},
-    {"tag": "REBAC", "title": "Relationships: how is she connected?", "body": "Relationship-based access control (ReBAC) stores links such as 'doc 42 is in folder Q3', 'folder Q3 is viewable by group eng', and 'Alice is in eng'. A check walks that graph from Alice to the document. Zanzibar-style systems popularised this for Google Drive style sharing, and it handles nested folders and groups naturally. As a rule of thumb, the store should answer these graph queries in under about 10 ms, because every request waits on it.", "idea": "ReBAC grants access by following chains of relationships, which fits sharing and hierarchies.", "caption": "Check walks Alice, group eng, folder Q3, doc 42.", "focus": ["pdp", "store"], "flows": [{"from": "pdp", "to": "store", "kind": "request", "label": "alice -> eng -> Q3"}, {"from": "store", "to": "pdp", "kind": "response", "label": "path found"}], "metrics": {"decision": "8"}},
-    {"tag": "CENTRAL", "title": "One brain, many enforcers", "body": "The policy service is the policy decision point (PDP); the gateway and the Docs service are policy enforcement points (PEPs) that must obey it. The gateway checks coarse rules ('may she call the docs API at all'). The Docs service checks the specific object, because only it knows which document the call touches. Decisions can be cached for a few seconds to a minute, for example 30 seconds, trading staleness after a revoke for speed. If the policy service is unreachable, enforcers must fail closed (deny), so run it redundantly or as a local sidecar.", "idea": "Decide centrally so rules stay consistent; enforce at every door so none can be skipped.", "caption": "Gateway allows, then the service re-checks the object.", "focus": ["gateway", "app", "pdp"], "flows": [{"from": "gateway", "to": "pdp", "kind": "request", "label": "alice docs:read?"}, {"from": "pdp", "to": "gateway", "kind": "response", "label": "allow"}, {"from": "gateway", "to": "app", "kind": "request", "label": "GET /docs/42"}, {"from": "app", "to": "pdp", "kind": "request", "label": "read doc:42?"}, {"from": "pdp", "to": "app", "kind": "response", "label": "allow"}], "metrics": {"decision": "5"}},
-    {"tag": "TENANT", "title": "Isolating tenants", "body": "In a multi-tenant system many customers share the same servers and tables, so every query must be scoped to the caller's tenant. Take the tenant ID from the verified token, or if the user picks a tenant, check that pick against the token's memberships; never trust a tenant ID the client merely asserts. Have the database enforce it too, for instance with Postgres row-level security, where the app connects as a role that cannot bypass the policy and sets the tenant for each request. Then the query returns one row.", "idea": "Tenant scope comes from the verified identity and is enforced by the data layer, not just by app code.", "caption": "Query is restricted to tenant acme.", "focus": ["app", "db"], "flows": [{"from": "app", "to": "db", "kind": "request", "label": "tenant=acme, id=42"}, {"from": "db", "to": "app", "kind": "response", "label": "1 row"}], "metrics": {"rows": "1", "foreign": "0"}},
-    {"tag": "WHAT IF", "title": "A developer forgets the filter", "body": "Now suppose a new list endpoint ships without the tenant condition, and the database has no row-level rule backing it up. Say the table holds 1,200 documents and Alice owns one of them. The request returns documents from every customer; even with pagination, the first page already contains foreign rows. No attacker was needed. Isolation must not rest on every developer remembering a WHERE clause.", "idea": "If isolation lives only in application code, one missed filter becomes a cross-customer data breach.", "caption": "Unscoped query returns other tenants' rows.", "focus": ["app", "db"], "flows": [{"from": "app", "to": "db", "kind": "fail", "label": "no tenant filter"}, {"from": "db", "to": "app", "kind": "fail", "label": "all rows"}], "metrics": {"rows": "1200", "foreign": "1199"}},
-    {"tag": "TRADE-OFF", "title": "Least privilege and default deny", "body": "Give each user, token, and service only what its job needs, and make 'no matching rule' mean deny. Alice's token carries a narrow scope (a permission label baked into the token) such as docs:read, so a leaked token cannot delete anything. The same goes for services: the Docs service's database login should not be able to drop tables. Now Alice asks for a Globex document: the Docs service asks the policy service, no rule allows it, the answer is deny, and she gets a 403 (many multi-tenant APIs return 404 instead, so outsiders cannot confirm the document exists).", "idea": "Default deny plus narrow grants turns mistakes and stolen credentials into small incidents.", "caption": "Object-level check finds no matching rule, so it is refused.", "focus": ["client", "gateway", "app", "pdp"], "flows": [{"from": "client", "to": "gateway", "kind": "request", "label": "GET /docs/9001"}, {"from": "gateway", "to": "app", "kind": "request", "label": "GET /docs/9001"}, {"from": "app", "to": "pdp", "kind": "request", "label": "alice read 9001?"}, {"from": "pdp", "to": "app", "kind": "fail", "label": "deny"}, {"from": "app", "to": "gateway", "kind": "fail", "label": "403"}, {"from": "gateway", "to": "client", "kind": "fail", "label": "403 Forbidden"}], "metrics": {"decision": "3", "rows": "0", "foreign": "0"}},
-    {"tag": "RECAP", "title": "Who may do what", "body": "Authorization checks a verified identity against rules. RBAC uses roles, ABAC uses attributes, and ReBAC uses relationships, and real systems often mix them. Keep decisions in one policy service, enforce at each service boundary, default to deny, grant the minimum, and enforce tenant scope in the database as well as in code.", "idea": "Centralize the decision, enforce everywhere, deny by default, and isolate tenants below the app.", "caption": "Every layer can say no.", "focus": ["client", "gateway", "pdp", "store", "app", "db"], "flows": [], "metrics": {"decision": "3", "rows": "0", "foreign": "0"}}
+    {
+      "tag": "QUESTION",
+      "title": "Logged in is not allowed",
+      "body": "Alice works at Acme and has just logged in. She asks for document 42. The system already knows who she is, because authentication is covered in another lesson. The new question is different: is she allowed to read this particular document, and could she see Globex's documents by mistake?",
+      "idea": "Authentication answers 'who are you?'; authorization answers 'what may you do, to which thing?'",
+      "caption": "Alice is identified but not yet permitted.",
+      "focus": [
+        "client"
+      ],
+      "flows": [],
+      "metrics": {}
+    },
+    {
+      "tag": "FLOW",
+      "title": "The request arrives",
+      "body": "Alice's browser sends GET /docs/42 with a signed token that names her user ID and her tenant, acme. The gateway checks the token is genuine, then has to decide whether to let the call through. It does not own the rules itself. It asks a dedicated policy service, which is the only place those rules live.",
+      "idea": "The caller's identity is an input to the decision, never the decision itself.",
+      "caption": "Gateway receives the request and a verified identity.",
+      "focus": [
+        "client",
+        "gateway"
+      ],
+      "flows": [
+        {
+          "from": "client",
+          "to": "gateway",
+          "kind": "request",
+          "label": "GET /docs/42"
+        }
+      ],
+      "metrics": {}
+    },
+    {
+      "tag": "RBAC",
+      "title": "Roles: what job does she have?",
+      "body": "In role-based access control (RBAC), permissions attach to roles and users attach to roles. Alice is an editor, and editors may read and edit documents. It is simple to explain and audit: list the roles, list who holds them. It strains when rules depend on context, because you end up inventing roles like 'editor-of-project-7-in-EU'. Numbers in this lesson are illustrative, assuming the policy service sits in the same region, about 1 ms per network hop; a rule of thumb, not a law.",
+      "idea": "RBAC is easy to audit but cannot say 'only her own team's files' without role explosion.",
+      "caption": "Policy service looks up Alice's roles.",
+      "focus": [
+        "gateway",
+        "pdp",
+        "store"
+      ],
+      "flows": [
+        {
+          "from": "gateway",
+          "to": "pdp",
+          "kind": "request",
+          "label": "alice docs:read?"
+        },
+        {
+          "from": "pdp",
+          "to": "store",
+          "kind": "request",
+          "label": "roles of alice"
+        },
+        {
+          "from": "store",
+          "to": "pdp",
+          "kind": "response",
+          "label": "editor"
+        }
+      ],
+      "metrics": {
+        "decision": "4"
+      }
+    },
+    {
+      "tag": "ABAC",
+      "title": "Attributes: what is the context?",
+      "body": "Attribute-based access control (ABAC) evaluates rules over facts about the user, the resource, and the situation. For example: allow read if user.tenant equals doc.tenant and doc.classification is not 'secret' and the request comes from a managed device. One rule covers millions of documents. The cost is that rules are harder to reason about and to test than a role list. Request facts such as device state arrive with the call from the gateway.",
+      "idea": "ABAC expresses context-dependent rules compactly, at the price of harder-to-predict outcomes.",
+      "caption": "Rules compare user, document, and request facts.",
+      "focus": [
+        "pdp",
+        "store"
+      ],
+      "flows": [
+        {
+          "from": "pdp",
+          "to": "store",
+          "kind": "request",
+          "label": "doc:42 attrs"
+        },
+        {
+          "from": "store",
+          "to": "pdp",
+          "kind": "response",
+          "label": "tenant=acme"
+        }
+      ],
+      "metrics": {
+        "decision": "6"
+      }
+    },
+    {
+      "tag": "REBAC",
+      "title": "Relationships: how is she connected?",
+      "body": "Relationship-based access control (ReBAC) stores links such as 'doc 42 is in folder Q3', 'folder Q3 is viewable by group eng', and 'Alice is in eng'. A check walks that graph from Alice to the document. Zanzibar-style systems popularised this for Google Drive style sharing, and it handles nested folders and groups naturally. As a rule of thumb, the store should answer these graph queries in under about 10 ms, because every request waits on it.",
+      "idea": "ReBAC grants access by following chains of relationships, which fits sharing and hierarchies.",
+      "caption": "Check walks Alice, group eng, folder Q3, doc 42.",
+      "focus": [
+        "pdp",
+        "store"
+      ],
+      "flows": [
+        {
+          "from": "pdp",
+          "to": "store",
+          "kind": "request",
+          "label": "alice -> eng -> Q3"
+        },
+        {
+          "from": "store",
+          "to": "pdp",
+          "kind": "response",
+          "label": "path found"
+        }
+      ],
+      "metrics": {
+        "decision": "8"
+      }
+    },
+    {
+      "tag": "CENTRAL",
+      "title": "One brain, many enforcers",
+      "body": "The policy service is the policy decision point (PDP); the gateway and the Docs service are policy enforcement points (PEPs) that must obey it. The gateway checks coarse rules ('may she call the docs API at all'). The Docs service checks the specific object, because only it knows which document the call touches. Decisions can be cached for a few seconds to a minute, for example 30 seconds, trading staleness after a revoke for speed. If the policy service is unreachable, enforcers must fail closed (deny), so run it redundantly or as a local sidecar.",
+      "idea": "Decide centrally so rules stay consistent; enforce at every door so none can be skipped.",
+      "caption": "Gateway allows, then the service re-checks the object.",
+      "focus": [
+        "gateway",
+        "app",
+        "pdp"
+      ],
+      "flows": [
+        {
+          "from": "gateway",
+          "to": "pdp",
+          "kind": "request",
+          "label": "alice docs:read?"
+        },
+        {
+          "from": "pdp",
+          "to": "gateway",
+          "kind": "response",
+          "label": "allow"
+        },
+        {
+          "from": "gateway",
+          "to": "app",
+          "kind": "request",
+          "label": "GET /docs/42"
+        },
+        {
+          "from": "app",
+          "to": "pdp",
+          "kind": "request",
+          "label": "read doc:42?"
+        },
+        {
+          "from": "pdp",
+          "to": "app",
+          "kind": "response",
+          "label": "allow"
+        }
+      ],
+      "metrics": {
+        "decision": "5"
+      }
+    },
+    {
+      "tag": "TENANT",
+      "title": "Isolating tenants",
+      "body": "In a multi-tenant system many customers share the same servers and tables, so every query must be scoped to the caller's tenant. Take the tenant ID from the verified token, or if the user picks a tenant, check that pick against the token's memberships; never trust a tenant ID the client merely asserts. Have the database enforce it too, for instance with Postgres row-level security, where the app connects as a role that cannot bypass the policy and sets the tenant for each request. Then the query returns one row.",
+      "idea": "Tenant scope comes from the verified identity and is enforced by the data layer, not just by app code.",
+      "caption": "Query is restricted to tenant acme.",
+      "focus": [
+        "app",
+        "db"
+      ],
+      "flows": [
+        {
+          "from": "app",
+          "to": "db",
+          "kind": "request",
+          "label": "tenant=acme, id=42"
+        },
+        {
+          "from": "db",
+          "to": "app",
+          "kind": "response",
+          "label": "1 row"
+        }
+      ],
+      "metrics": {
+        "rows": "1",
+        "foreign": "0"
+      }
+    },
+    {
+      "tag": "WHAT IF",
+      "title": "A developer forgets the filter",
+      "body": "Now suppose a new list endpoint ships without the tenant condition, and the database has no row-level rule backing it up. Say the table holds 1,200 documents and Alice owns one of them. The request returns every row in the table, 1,200 documents from every customer; with pagination, the first page would already contain foreign rows. No attacker was needed. Isolation must not rest on every developer remembering a WHERE clause.",
+      "idea": "If isolation lives only in application code, one missed filter becomes a cross-customer data breach.",
+      "caption": "Unscoped query returns other tenants' rows.",
+      "focus": [
+        "app",
+        "db"
+      ],
+      "flows": [
+        {
+          "from": "app",
+          "to": "db",
+          "kind": "fail",
+          "label": "no tenant filter"
+        },
+        {
+          "from": "db",
+          "to": "app",
+          "kind": "fail",
+          "label": "all rows"
+        }
+      ],
+      "metrics": {
+        "rows": "1200",
+        "foreign": "1199"
+      }
+    },
+    {
+      "tag": "TRADE-OFF",
+      "title": "Least privilege and default deny",
+      "body": "Give each user, token, and service only what its job needs, and make 'no matching rule' mean deny. Alice's token carries a narrow scope (a permission label baked into the token) such as docs:read, so a leaked token cannot delete anything. The same goes for services: the Docs service's database login should not be able to drop tables. Now Alice asks for a Globex document: the Docs service asks the policy service, no rule allows it, the answer is deny, and she gets a 403 (many multi-tenant APIs return 404 instead, so outsiders cannot confirm the document exists).",
+      "idea": "Default deny plus narrow grants turns mistakes and stolen credentials into small incidents.",
+      "caption": "Object-level check finds no matching rule, so it is refused.",
+      "focus": [
+        "client",
+        "gateway",
+        "app",
+        "pdp"
+      ],
+      "flows": [
+        {
+          "from": "client",
+          "to": "gateway",
+          "kind": "request",
+          "label": "GET /docs/9001"
+        },
+        {
+          "from": "gateway",
+          "to": "app",
+          "kind": "request",
+          "label": "GET /docs/9001"
+        },
+        {
+          "from": "app",
+          "to": "pdp",
+          "kind": "request",
+          "label": "alice read 9001?"
+        },
+        {
+          "from": "pdp",
+          "to": "app",
+          "kind": "fail",
+          "label": "deny"
+        },
+        {
+          "from": "app",
+          "to": "gateway",
+          "kind": "fail",
+          "label": "403"
+        },
+        {
+          "from": "gateway",
+          "to": "client",
+          "kind": "fail",
+          "label": "403 Forbidden"
+        }
+      ],
+      "metrics": {
+        "decision": "3",
+        "rows": "0",
+        "foreign": "0"
+      }
+    },
+    {
+      "tag": "RECAP",
+      "title": "Who may do what",
+      "body": "Authorization checks a verified identity against rules. RBAC uses roles, ABAC uses attributes, and ReBAC uses relationships, and real systems often mix them. Keep decisions in one policy service, enforce at each service boundary, default to deny, grant the minimum, and enforce tenant scope in the database as well as in code.",
+      "idea": "Centralize the decision, enforce everywhere, deny by default, and isolate tenants below the app.",
+      "caption": "Every layer can say no.",
+      "focus": [
+        "client",
+        "gateway",
+        "pdp",
+        "store",
+        "app",
+        "db"
+      ],
+      "flows": [],
+      "metrics": {
+        "decision": "3",
+        "rows": "0",
+        "foreign": "0"
+      }
+    }
   ],
   "quiz": [
-    {"q": "A company's rule is 'managers may approve expenses only for people in their own reporting chain.' Which model fits most naturally?", "options": ["RBAC with a single 'manager' role", "ReBAC, following manager-of links in the org graph", "Authentication with MFA", "Encrypting the expense table"], "answer": 1, "why": "The permission depends on how two people are connected. A plain 'manager' role would let every manager approve for everyone; relationships express the chain directly."},
-    {"q": "Your RBAC system now has 400 roles such as 'viewer-project-12-eu'. What is the best diagnosis?", "options": ["Roles are too coarse and rules depend on context, so attributes or relationships fit better", "You need longer passwords", "The policy service is too fast", "Users should share one admin role"], "answer": 0, "why": "Role explosion signals that the real rule involves resource or context facts. ABAC or ReBAC encode those directly instead of minting a role per combination."},
-    {"q": "Why does the Docs service re-check permission even though the gateway already allowed the request?", "options": ["The gateway's allow decision only counts if the service re-signs it with a new token", "Tokens cannot be verified twice", "Re-checking is required by the TLS handshake", "Only the service knows which specific object the call touches, and a bypassed gateway must not mean open access"], "answer": 3, "why": "Coarse checks at the edge cannot cover object-level rules, and defense in depth means an internal caller or a gateway misconfiguration does not skip authorization."},
-    {"q": "An endpoint reads tenant_id from a JSON field in the request body to scope its query. What is the flaw?", "options": ["JSON is slow to parse", "The database cannot filter by tenant", "A caller can set the field to another tenant's ID; tenant must come from the verified token", "It breaks least privilege only for admins"], "answer": 2, "why": "Anything the client sends is attacker-controlled. Tenant scope must derive from verified identity, and ideally be enforced again by row-level security."},
-    {"q": "After Alice is removed from group eng, she can still read files for about 30 seconds. What is the most likely cause?", "options": ["A cached policy decision has not yet expired", "RBAC forbids revocation", "Row-level security is disabled", "Her password is still valid"], "answer": 0, "why": "Caching decisions speeds checks but delays revocation by up to the cache lifetime. Short TTLs or explicit invalidation shrink that window."}
+    {
+      "q": "A company's rule is 'managers may approve expenses only for people in their own reporting chain.' Which model fits most naturally?",
+      "options": [
+        "RBAC with a single 'manager' role",
+        "ReBAC, following manager-of links in the org graph",
+        "Authentication with MFA",
+        "Encrypting the expense table"
+      ],
+      "answer": 1,
+      "why": "The permission depends on how two people are connected. A plain 'manager' role would let every manager approve for everyone; relationships express the chain directly."
+    },
+    {
+      "q": "Your RBAC system now has 400 roles such as 'viewer-project-12-eu'. What is the best diagnosis?",
+      "options": [
+        "Roles are too coarse and rules depend on context, so attributes or relationships fit better",
+        "You need longer passwords",
+        "The policy service is too fast",
+        "Users should share one admin role"
+      ],
+      "answer": 0,
+      "why": "Role explosion signals that the real rule involves resource or context facts. ABAC or ReBAC encode those directly instead of minting a role per combination."
+    },
+    {
+      "q": "Why does the Docs service re-check permission even though the gateway already allowed the request?",
+      "options": [
+        "The gateway's allow decision only counts if the service re-signs it with a new token",
+        "Tokens cannot be verified twice",
+        "Re-checking is required by the TLS handshake",
+        "Only the service knows which specific object the call touches, and a bypassed gateway must not mean open access"
+      ],
+      "answer": 3,
+      "why": "Coarse checks at the edge cannot cover object-level rules, and defense in depth means an internal caller or a gateway misconfiguration does not skip authorization."
+    },
+    {
+      "q": "An endpoint reads tenant_id from a JSON field in the request body to scope its query. What is the flaw?",
+      "options": [
+        "JSON is slow to parse",
+        "The database cannot filter by tenant",
+        "A caller can set the field to another tenant's ID; tenant must come from the verified token",
+        "It breaks least privilege only for admins"
+      ],
+      "answer": 2,
+      "why": "Anything the client sends is attacker-controlled. Tenant scope must derive from verified identity, and ideally be enforced again by row-level security."
+    },
+    {
+      "q": "After Alice is removed from group eng, she can still read files for about 30 seconds. What is the most likely cause?",
+      "options": [
+        "A cached policy decision has not yet expired",
+        "RBAC forbids revocation",
+        "Row-level security is disabled",
+        "Her password is still valid"
+      ],
+      "answer": 0,
+      "why": "Caching decisions speeds checks but delays revocation by up to the cache lifetime. Short TTLs or explicit invalidation shrink that window."
+    }
   ],
   "cheatsheet": [
-    {"term": "Authn vs authz", "def": "Authentication proves who you are. Authorization decides what that identity may do to a specific resource."},
-    {"term": "RBAC", "def": "Permissions attach to roles, users get roles. Simple and auditable, but role counts explode when context matters."},
-    {"term": "ABAC", "def": "Rules over attributes of user, resource, and environment. Flexible and compact, but harder to test and explain."},
-    {"term": "ReBAC", "def": "Access follows relationship paths (user, group, folder, doc). Natural for sharing and hierarchies."},
-    {"term": "PDP / PEP", "def": "Policy decision point computes allow or deny; policy enforcement points (gateway, services) obey it."},
-    {"term": "Least privilege", "def": "Grant the minimum access needed, with narrow token scopes and default deny when no rule matches."},
-    {"term": "Tenant isolation", "def": "Take tenant ID from the verified identity and enforce it in the data layer (row-level security, per-tenant schemas or databases)."},
-    {"term": "Decision caching", "def": "Caching allow/deny for seconds cuts latency but delays revocation; choose the TTL by how bad stale access is."}
+    {
+      "term": "Authn vs authz",
+      "def": "Authentication proves who you are. Authorization decides what that identity may do to a specific resource."
+    },
+    {
+      "term": "RBAC",
+      "def": "Permissions attach to roles, users get roles. Simple and auditable, but role counts explode when context matters."
+    },
+    {
+      "term": "ABAC",
+      "def": "Rules over attributes of user, resource, and environment. Flexible and compact, but harder to test and explain."
+    },
+    {
+      "term": "ReBAC",
+      "def": "Access follows relationship paths (user, group, folder, doc). Natural for sharing and hierarchies."
+    },
+    {
+      "term": "PDP / PEP",
+      "def": "Policy decision point computes allow or deny; policy enforcement points (gateway, services) obey it."
+    },
+    {
+      "term": "Least privilege",
+      "def": "Grant the minimum access needed, with narrow token scopes and default deny when no rule matches."
+    },
+    {
+      "term": "Tenant isolation",
+      "def": "Take tenant ID from the verified identity and enforce it in the data layer (row-level security, per-tenant schemas or databases)."
+    },
+    {
+      "term": "Decision caching",
+      "def": "Caching allow/deny for seconds cuts latency but delays revocation; choose the TTL by how bad stale access is."
+    }
   ]
 }

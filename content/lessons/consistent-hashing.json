@@ -110,6 +110,14 @@
     {
       "from": "d",
       "to": "db"
+    },
+    {
+      "from": "a",
+      "to": "d"
+    },
+    {
+      "from": "a",
+      "to": "c"
     }
   ],
   "metrics": [
@@ -273,6 +281,7 @@
       "idea": "Adding a node moves only the keys it takes over, about 1/N of the total, and they all come from one neighbour.",
       "caption": "D takes over the arc just before it; those keys came from A.",
       "focus": [
+        "ring",
         "c",
         "d",
         "a"
@@ -283,6 +292,12 @@
           "to": "d",
           "kind": "request",
           "label": "D joins ring"
+        },
+        {
+          "from": "a",
+          "to": "d",
+          "kind": "async",
+          "label": "arc keys (~25%)"
         }
       ],
       "metrics": {
@@ -298,6 +313,7 @@
       "idea": "Removing a node affects only the keys it owned; every other node keeps its data.",
       "caption": "B's keys fall to C; A and D are unaffected.",
       "focus": [
+        "ring",
         "b",
         "c",
         "db"
@@ -335,6 +351,7 @@
       "idea": "With one point per server, ring positions are luck, and a dead node's load goes to a single neighbour.",
       "caption": "C absorbs all of B's load and runs far above average.",
       "focus": [
+        "ring",
         "c"
       ],
       "flows": [
@@ -358,6 +375,7 @@
       "idea": "Many small arcs per server turn random imbalance into a near-even split, and spread a failure across all survivors.",
       "caption": "Each server owns many scattered arcs; load is nearly even.",
       "focus": [
+        "ring",
         "a",
         "b",
         "c",
@@ -414,7 +432,7 @@
           "label": "replica 2"
         },
         {
-          "from": "b",
+          "from": "a",
           "to": "c",
           "kind": "replicate",
           "label": "replica 3"

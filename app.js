@@ -232,193 +232,27 @@ function updateStep(l, i) {
   $('#changes').innerHTML = ch.length ? `<b>What changed</b><ul>${ch.slice(0, 5).map(([k, t]) => `<li class="c-${k}">${icon(k)}<span>${esc(t)}</span></li>`).join('')}</ul>` : '';
   // "You'll learn" ticks fill in as the lesson progresses.
   document.querySelectorAll('#learn li').forEach((li, k, all) => li.classList.toggle('got', done.has(l.slug) || (i + 1) / n >= (k + 1) / all.length));
-  for (const m of l.metrics) setMetric(m, metricAt(l, m.id, i), l.style === 'illustrated');
-  drawDiagram(l, s);
+  for (const m of l.metrics) setMetric(m, metricAt(l, m.id, i));
+  drawIllustrated(l, s);
   $('#live').textContent = `Step ${i + 1} of ${n}: ${s.title}`;
   fitGuide();
 }
 
-function setMetric(m, v, ill) {
+function setMetric(m, v) {
   const el = document.getElementById('m-' + m.id);
   if (!el) return;
   const unit = m.unit ? ` ${m.unit}` : '';
   if (v == null) { el.textContent = '—'; shownMetrics[m.id] = null; return; }
   const prev = shownMetrics[m.id], from = parseFloat(prev), to = Number(v);
   shownMetrics[m.id] = v;
-  if (ill && prev !== v && !reducedMotion) { const box = el.parentElement; box.classList.remove('is-changed'); void box.offsetWidth; box.classList.add('is-changed'); }
+  if (prev !== v && !reducedMotion) { const box = el.parentElement; box.classList.remove('is-changed'); void box.offsetWidth; box.classList.add('is-changed'); }
   if (reducedMotion || !Number.isFinite(to) || !Number.isFinite(from) || from === to) { el.textContent = v + unit; return; }
-  const t0 = performance.now(), dec = (v.split('.')[1] || '').length, dur = ill ? 900 : 500;
+  const t0 = performance.now(), dec = (v.split('.')[1] || '').length, dur = 900;
   const tick = t => { const p = Math.min((t - t0) / dur, 1), e = 1 - (1 - p) ** 3; if (shownMetrics[m.id] !== v) return; el.textContent = (p < 1 ? (from + (to - from) * e).toFixed(dec) : v) + unit; if (p < 1) requestAnimationFrame(tick); };
   requestAnimationFrame(tick);
 }
 
-// ---------- diagram: illustrated isometric scene in SVG; packets use SMIL so pause/replay are native ----------
-const W = 900, H = 520;
-let K = 1; // auto "fit" scale baked into iso() so strokes keep their weight
-const iso = (u, v, z = 0) => [K * 0.866 * (u - v), K * (0.5 * (u + v) - z)];
-const pts = a => a.map(p => p[0].toFixed(1) + ',' + p[1].toFixed(1)).join(' ');
-const poly = (c, a, x = '') => `<polygon class="s f-${c}" points="${pts(a)}"${x}/>`;
-const box = (u0, u1, v0, v1, z0, z1, x = '') =>
-  poly('left', [iso(u0, v1, z0), iso(u1, v1, z0), iso(u1, v1, z1), iso(u0, v1, z1)], x) + poly('right', [iso(u1, v1, z0), iso(u1, v0, z0), iso(u1, v0, z1), iso(u1, v1, z1)], x) + poly('top', [iso(u0, v0, z1), iso(u1, v0, z1), iso(u1, v1, z1), iso(u0, v1, z1)], x);
-const seg = (a, b) => `<path class="d" d="M${a[0].toFixed(1)} ${a[1].toFixed(1)}L${b[0].toFixed(1)} ${b[1].toFixed(1)}"/>`;
-function cyl(r, z0, z1, bands = []) {
-  const rx = K * 1.2247 * r, ry = K * 0.7071 * r, y0 = -K * z0, y1 = -K * z1;
-  return `<path class="s f-left" d="M${-rx},${y0}A${rx},${ry} 0 0 0 ${rx},${y0}L${rx},${y1}L${-rx},${y1}Z"/>`
-    + bands.map(z => `<path class="d" d="M${-rx},${-K * z}A${rx},${ry} 0 0 0 ${rx},${-K * z}"/>`).join('') + `<ellipse class="s f-top" cy="${y1}" rx="${rx}" ry="${ry}"/>`;
-}
-// per-kind illustration: [svg, ground-front y (unscaled) where the label pill hangs], or null for a labelled prism
-function art(kind) {
-  const led = (u, v, z) => { const [x, y] = iso(u, v, z); return `<circle class="led" cx="${x}" cy="${y}" r="${2.4 * Math.max(K, .8)}"/>`; };
-  if (kind === 'client') {
-    let s = box(-44, 44, -44, 44, 0, 8) + box(-22, -18, -22, 22, 12, 46) + box(-16, 24, -24, 24, 8, 12);
-    for (const z of [24, 30, 36, 42]) s += seg(iso(-18, -14, z), iso(-18, z % 12 ? 14 : 6, z));
-    return [s + [-8, 4, 14].map(u => seg(iso(u, -16, 12), iso(u, 16, 12))).join(''), 44];
-  }
-  if (kind === 'user') { const [hx, hy] = iso(0, 0, 40); return [cyl(26, 0, 5) + cyl(10, 5, 28) + `<circle class="s f-top" cx="${hx}" cy="${hy}" r="${9 * K}"/>`, 20]; }
-  if (kind === 'db' || kind === 'storage') return [cyl(30, 0, 42, kind === 'db' ? [14, 28] : [10, 21, 32]), 21];
-  if (kind === 'queue') { let s = ''; for (let i = 0; i < 4; i++) s += box(-36 + i * 18, -26 + i * 18, -22, 22, 0, 26) + seg(iso(-26 + i * 18, -14, 13), iso(-26 + i * 18, 14, 13)); return [s, 29]; }
-  if (kind === 'region') return [box(-72, 72, -72, 72, 0, 5, ' stroke-dasharray="7 5"'), 72];
-  return null;
-}
-// camera: the viewBox tweens between per-step frames; last frame is remembered per lesson
-const cam = { slug: null, vb: null, raf: 0 }, lastDraw = { slug: null, focus: new Set() };
-const easeIO = p => p < .5 ? 4 * p * p * p : 1 - (-2 * p + 2) ** 3 / 2;
-function flyTo(svg, to, slug) {
-  cancelAnimationFrame(cam.raf);
-  const from = cam.slug === slug && cam.vb && !reducedMotion ? cam.vb : to, set = v => svg.setAttribute('viewBox', v.map(x => x.toFixed(1)).join(' '));
-  cam.slug = slug; cam.vb = from; set(from);
-  if (from === to) return;
-  const t0 = performance.now();
-  const tick = t => { const p = Math.min((t - t0) / 650, 1), e = easeIO(p); cam.vb = p < 1 ? from.map((v, k) => v + (to[k] - v) * e) : to; set(cam.vb); if (p < 1) cam.raf = requestAnimationFrame(tick); };
-  cam.raf = requestAnimationFrame(tick);
-}
-function drawDiagram(l, s) {
-  if (l.style === 'illustrated') return drawIllustrated(l, s);
-  let PX = n => ({ x: 90 + n.x / 100 * (W - 180), y: 100 + n.y / 100 * (H - 190) });
-  const P = id => PX(l.nodes.find(x => x.id === id));
-  K = 1;
-  const real = l.nodes.filter(n => n.kind !== 'region');
-  for (let a = 0; a < real.length; a++) for (let b = a + 1; b < real.length; b++) {
-    const p = PX(real[a]), q = PX(real[b]);
-    K = Math.min(K, Math.max(Math.abs(p.x - q.x) / 180, Math.abs(p.y - q.y) / 178));
-  }
-  K = Math.max(0.62, Math.min(1.3, K * 0.98));
-  // fit layout: keep blocks at natural size (K=1, ~170 units wide) and spread the nodes instead of shrinking them
-  const dg = $('#diagram'), cw = dg.clientWidth, ch = dg.clientHeight, fitLayout = matchMedia('(min-width:1281px)').matches && cw > 200 && ch > 100;
-  if (fitLayout) { const S = 1 / K, P0 = PX; K = 1; PX = n => { const p = P0(n); return { x: 450 + (p.x - 450) * S, y: 265 + (p.y - 265) * S }; }; }
-  const focus = new Set(s.focus || []), flows = s.flows || [];
-  const si = l.steps.indexOf(s), first = firstSeen(l);
-  const prevFocus = !reducedMotion && lastDraw.slug === l.slug ? lastDraw.focus : null;
-  lastDraw.slug = l.slug; lastDraw.focus = focus;
-  const vis = n => first[n.id] <= si, shown = l.nodes.filter(vis), shownIds = new Set(shown.map(n => n.id));
-  const slot = 1.15, T = Math.max(flows.length, 1) * slot + 0.9;
-  const key = (a, b) => [a, b].sort().join('|');
-  // iso-routed elbow along the two iso axes (rounded corner), canonical per sorted pair; straight when the detour would be large
-  // single-elbow route along the two iso axes with a quadratic rounded corner; of the two possible elbows pick the one that keeps clear of other blocks
-  const routes = {}, U = [.866, .5], V = [.866, -.5], R = 22;
-  const route = (ida, idb) => {
-    const [i1, i2] = [ida, idb].sort(), ck = i1 + '|' + i2; if (routes[ck]) return routes[ck];
-    const a = P(i1), b = P(i2), dx = b.x - a.x, dy = b.y - a.y, du = (dx / .866 + 2 * dy) / 2, dv = (dx / .866 - 2 * dy) / 2;
-    const c = Math.hypot(dx, dy) || 1, nrm = [-dy / c, dx / c], straight = { i1, i2, d: `M${a.x},${a.y}L${b.x},${b.y}`, mid: [(a.x + b.x) / 2, (a.y + b.y) / 2], n: nrm };
-    const m1 = { x: a.x + du * U[0], y: a.y + du * U[1] }, off = Math.abs((m1.x - a.x) * dy - (m1.y - a.y) * dx) / c, r = Math.min(R, Math.abs(du) / 2, Math.abs(dv) / 2);
-    if (off > 90 || r < 2) return routes[ck] = straight;
-    const mk = (first, s1, s2, e1, e2) => { const m = { x: a.x + first[0] * s1, y: a.y + first[1] * s1 }, rr = Math.min(R, Math.abs(s1) / 2, Math.abs(s2) / 2), q1 = [Math.sign(s1) * e1[0], Math.sign(s1) * e1[1]], q2 = [Math.sign(s2) * e2[0], Math.sign(s2) * e2[1]]; return { i1, i2, m, n: nrm, mid: [m.x, m.y], d: `M${a.x},${a.y}L${m.x - rr * q1[0]},${m.y - rr * q1[1]}Q${m.x},${m.y} ${m.x + rr * q2[0]},${m.y + rr * q2[1]}L${b.x},${b.y}`, a, b }; };
-    const A = mk(U, du, dv, U, V), B = mk(V, dv, du, V, U);
-    const bad = o => { let k = 0; const p = document.createElementNS(NS, 'path'); p.setAttribute('d', o.d); const L = p.getTotalLength(); for (let t = 0; t <= L; t += 4) { const q = p.getPointAtLength(t); const NR = typeof nodeRect === "undefined" ? {} : nodeRect; for (const id in NR) { if (id === i1 || id === i2) continue; const r4 = NR[id]; if (q.x > r4[0] - 10 && q.x < r4[2] + 10 && q.y > r4[1] - 10 && q.y < r4[3] + 10) k++; } } return k; };
-    return routes[ck] = bad(B) < bad(A) ? B : A;
-  };
-  const hot = new Map(); flows.forEach(f => { if (!hot.has(key(f.from, f.to))) hot.set(key(f.from, f.to), { kind: f.kind, fwd: route(f.from, f.to).fwd }); });
-  const clsFor = (n, fs) => (fs.size ? (fs.has(n.id) ? ' focus' : ' dim') : '') + (first[n.id] === si && !reducedMotion ? ' rise' : '');
-  const prisms = new Set();
-  const nodeSvg = n => {
-    const { x, y } = PX(n), a = art(n.kind), rg = n.kind === 'region';
-    const c1 = clsFor(n, focus), c0 = prevFocus ? clsFor(n, prevFocus) : c1;
-    let g = `<ellipse class="shadow" cy="${K * 8}" rx="${K * (rg ? 90 : 92)}" ry="${K * (rg ? 48 : 52)}"/>`;
-    if (focus.has(n.id) && !rg) g += `<ellipse class="ring" cy="${K * 4}" rx="${K * 98}" ry="${K * 58}"/>`;
-    if (a) {
-      // name pill: panel fill, ink border, leading icon (user / globe / db ...)
-      const ic = { client: 'cdn', user: 'user', db: 'db', storage: 'storage', queue: 'queue', region: 'region' }[n.kind] || 'cdn', tw = n.label.length * 8.6, w = tw + 54, py = K * a[1] + 14;
-      g += a[0] + `<g class="pill"><rect x="${-w / 2}" y="${py}" width="${w}" height="34" rx="17"/><g class="pico" transform="translate(${-w / 2 + 11},${py + 8}) scale(.75)">${I[ic]}</g><text x="${12}" y="${py + 22.5}">${esc(n.label)}</text></g>`;
-    } else {
-      // hexagonal prism seen from above: flat-top hexagon (rounded) + side depth under the three lower edges; label inside the top face
-      prisms.add(n.kind);
-      const tiers = n.kind === 'server' ? 2 : 1, D = 26 * K, Rr = 85 * K, H = tiers * D, ico = 26 * K, hw = (dy) => Rr - Math.abs(dy) / 1.732;
-      const hex = oy => { const v = [0, 1, 2, 3, 4, 5].map(i => [Rr * Math.cos(i * Math.PI / 3), oy + Rr * Math.sin(i * Math.PI / 3)]), t = 10 * K * .577; let d = '';
-        v.forEach((p, i) => { const pr = v[(i + 5) % 6], nx = v[(i + 1) % 6], u = (q) => { const l = Math.hypot(q[0] - p[0], q[1] - p[1]); return [(q[0] - p[0]) / l * t, (q[1] - p[1]) / l * t]; }, a1 = u(pr), b1 = u(nx);
-          d += `${i ? 'L' : 'M'}${(p[0] + a1[0]).toFixed(1)},${(p[1] + a1[1]).toFixed(1)}Q${p[0].toFixed(1)},${p[1].toFixed(1)} ${(p[0] + b1[0]).toFixed(1)},${(p[1] + b1[1]).toFixed(1)}`; });
-        return d + 'Z'; };
-      for (let t = 0; t < tiers; t++) g += `<path class="s f-left" d="${hex(-t * D)}"/>`;
-      g += `<path class="s" fill="url(#gr-${esc(n.kind)})" d="${hex(-H)}"/>`;
-      const cy = -H, w1 = n.label.split(' ')[0], w2 = n.label.slice(w1.length).trim(), f1 = Math.max(9, Math.min(17 * Math.max(K, .8), K * 120 / (w1.length * .6))), f2 = w2 ? Math.max(8, Math.min(13 * Math.max(K, .8), K * 126 / (w2.length * .56))) : 0;
-      const iy = cy - (w2 ? 30 : 20) * K;
-      g += `<g class="nico" transform="translate(${-ico / 2},${iy - ico / 2}) scale(${ico / 24})">${I[KIND_ICON[n.kind]] || I.service}</g>`
-        + `<text class="lbl" font-size="${f1.toFixed(1)}" x="0" y="${(cy + (w2 ? 12 : 16) * K).toFixed(1)}">${esc(w1)}</text>` + (w2 ? `<text class="lbl l2" font-size="${f2.toFixed(1)}" x="0" y="${(cy + 12 * K + f1 * 1.05).toFixed(1)}">${esc(w2)}</text>` : '');
-    }
-    return `<g class="node kind-${esc(n.kind)}${c0}"${c0 !== c1 ? ` data-c="${c1}"` : ''} transform="translate(${x.toFixed(1)},${y.toFixed(1)})"><g class="body">${g}</g></g>`;
-  };
-  // camera: frame only the visible nodes, with a minimum size, keeping the canvas aspect
-  const fids = new Set([...focus, ...flows.flatMap(f => [f.from, f.to])].filter(id => shownIds.has(id))), cn = fids.size ? shown.filter(n => fids.has(n.id)) : (shown.length ? shown : l.nodes.slice(0, 1));
-  const sp = cn.map(PX), x0 = Math.min(...sp.map(p => p.x)) - 150 * K - 40, x1 = Math.max(...sp.map(p => p.x)) + 150 * K + 40;
-  const y0 = Math.min(...sp.map(p => p.y)) - 150 * K - 50, y1 = Math.max(...sp.map(p => p.y)) + 95 * K + 40;
-  let vw = Math.max(x1 - x0, 600), vh = y1 - y0; const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
-  if (vw / vh < W / H) vw = vh * W / H; else vh = vw * H / W;
-  let target = [cx - vw / 2, cy - vh / 2, vw, vh];
-  // fit layout: fixed comfortable scale (1 SVG unit = 1 CSS px), only zooming out when the visible nodes would not fit
-  if (fitLayout) {
-    const ext = ns => { const q = ns.map(PX), X0 = Math.min(...q.map(p => p.x)) - 115, X1 = Math.max(...q.map(p => p.x)) + 115, Y0 = Math.min(...q.map(p => p.y)) - 120, Y1 = Math.max(...q.map(p => p.y)) + 125; return { X0, X1, Y0, Y1, sc: Math.min(1, cw / (X1 - X0), ch / (Y1 - Y0)) }; };
-    const e1 = ext(cn), e2 = ext(shown), e = shown.length && e2.sc >= .75 ? e2 : e1; // prefer framing everything revealed so far when it still reads at a comfortable scale
-    const ex = (e.X0 + e.X1) / 2, ey = (e.Y0 + e.Y1) / 2;
-    target = [ex - cw / e.sc / 2, ey - ch / e.sc / 2, cw / e.sc, ch / e.sc];
-  }
-  let body = '';
-  const order = [...shown].sort((a, b) => a.y - b.y || a.x - b.x);
-  for (const n of order) if (n.kind === 'region') body += nodeSvg(n);
-  for (const e of l.edges) if (shownIds.has(e.from) && shownIds.has(e.to)) {
-    const k = hot.get(key(e.from, e.to)), isNew = Math.max(first[e.from], first[e.to]) === si && !reducedMotion;
-    body += `<path class="edge${k ? ' hot k-' + k.kind : ''}${isNew ? ' new' : ''}"${k ? ` data-f="${k.fwd ? 'f' : 'r'}"` : ''} d="${route(e.from, e.to).d}"/>`;
-  }
-  for (const n of order) if (n.kind !== 'region') body += nodeSvg(n);
-  // flow labels beside the path midpoint (offset along the normal, clear of the line), stacked when several share an edge
-  const used = {};
-  flows.forEach((f, fi) => {
-    if (!f.label) return;
-    const rt = route(f.from, f.to), k = used[key(f.from, f.to)] = (used[key(f.from, f.to)] || 0) + 1, w = f.label.length * 9.2 + 30;
-    let [nx, ny] = rt.n; if (ny > 0) { nx = -nx; ny = -ny; }
-    const d = Math.abs(nx) * w / 2 + Math.abs(ny) * 18 + 14 + (k - 1) * 40, mx = rt.mid[0] + nx * d, my = rt.mid[1] + ny * d;
-    body += `<g class="flabel k-${esc(f.kind)}"><rect x="${mx - w / 2}" y="${my - 18}" width="${w}" height="36" rx="18"/><text x="${mx}" y="${my + 5.5}">${esc(f.label)}</text></g>`;
-  });
-  // packets: two dots per flow (staggered), SMIL motion with eased spline timing inside the flow's slot
-  flows.forEach((f, i) => {
-    const rt = route(f.from, f.to), kp = rt.fwd ? '0;0;1;1' : '1;1;0;0';
-    for (const dl of [0, 0.18]) {
-      const t1 = ((i * slot + dl) / T).toFixed(3), t2 = ((i * slot + 0.95 + dl) / T).toFixed(3), kt = `0;${t1};${t2};1`;
-      body += `<g class="packet k-${esc(f.kind)}" opacity="0"><animateMotion dur="${T}s" repeatCount="indefinite" path="${rt.d}" keyPoints="${kp}" keyTimes="${kt}" calcMode="spline" keySplines="0 0 1 1;.45 0 .2 1;0 0 1 1"/><animate attributeName="opacity" dur="${T}s" repeatCount="indefinite" keyTimes="0;${t1};${t1};${t2};${t2};1" values="0;0;1;1;0;0" calcMode="discrete"/><circle r="7"/></g>`;
-    }
-  });
-  const defs = [...prisms].map(k => `<g class="kind-${esc(k)}"><linearGradient id="gr-${esc(k)}" x1="0" y1="0" x2="1" y2="1"><stop class="gs-a" offset="0"/><stop class="gs-b" offset="1"/></linearGradient></g>`).join('');
-  $('#diagram').innerHTML = `<svg id="svg" viewBox="${target.map(v => v.toFixed(1)).join(' ')}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${esc(l.title)} diagram" aria-describedby="svg-desc"><desc id="svg-desc">${esc(s.caption)} Components: ${esc(shown.map(n => n.label).join(', '))}.${flows.length ? ' Messages: ' + esc(flows.map(f => `${nodeLabel(l, f.from)} to ${nodeLabel(l, f.to)}${f.label ? ' (' + f.label + ')' : ''}`).join('; ')) + '.' : ''}</desc><defs>${defs}</defs>${body}</svg>`;
-  const el = $('#svg');
-  // measure edges: draw-in length for new ones; trim hot ones short of the node and add an arrowhead at the destination
-  const R0 = 82 * K;
-  el.querySelectorAll('.edge').forEach(p => {
-    const L = p.getTotalLength(), dir = p.dataset.f;
-    if (p.classList.contains('new')) p.style.setProperty('--len', L.toFixed(1));
-    if (!dir) return;
-    const R = Math.min(R0, L / 3), at = dir === 'f' ? L - R : R, sg = dir === 'f' ? 1 : -1;
-    const q = p.getPointAtLength(at), a = p.getPointAtLength(Math.max(at - 2, 0)), b = p.getPointAtLength(Math.min(at + 2, L));
-    const ang = Math.atan2(sg * (b.y - a.y), sg * (b.x - a.x)) * 180 / Math.PI;
-    p.style.strokeDasharray = dir === 'f' ? `${L - R} ${L}` : `0 ${R} ${L - R} ${L}`;
-    const ar = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-    ar.setAttribute('class', 'arrow' + (p.classList.contains('new') ? ' new' : '')); ar.setAttribute('d', 'M-14,-8L4,0L-14,8Z');
-    ar.setAttribute('transform', `translate(${q.x.toFixed(1)} ${q.y.toFixed(1)}) rotate(${ang.toFixed(1)})`);
-    el.insertBefore(ar, el.querySelector('.flabel,.packet'));
-  });
-  flyTo(el, target, l.slug);
-  if (prevFocus) { el.getBoundingClientRect(); el.querySelectorAll('.node[data-c]').forEach(n => n.setAttribute('class', `node kind-${n.getAttribute('class').match(/kind-(\S+)/)[1]}${n.dataset.c}`)); }
-  if (paused) { el.setCurrentTime(0.5); el.pauseAnimations(); }
-  syncPause();
-}
-// ---------- illustrated style (opt-in per lesson: "style": "illustrated"): scene-graph renderer, numbers from evidence/animation-spec.md ----------
+// ---------- diagram: scene-graph renderer (iso blocks, grid layout, packets), numbers from evidence/animation-spec.md ----------
 // A step is a full scene {ents, links, routes}; goTo(scene) diffs by id (exit / move / enter), the camera tweens its viewBox, packets spawn forever until the next step.
 const NS = 'http://www.w3.org/2000/svg';
 const ILL_ICON = { dns: 'cdn', cdn: 'external' };
@@ -438,46 +272,97 @@ const RC = { // [top a, top b, side a, side b]
   orange: ['#fee6cc', '#fcd4ad', '#f9c697', '#f3b47f'], yellow: ['#fff3d6', '#fee7b8', '#fcdb9c', '#f6cd82'], blue: ['#e6f0fc', '#d0e2f8', '#bcd5f2', '#9fc2e8'],
   purple: ['#f1e8fc', '#e1d2f6', '#d3c1f0', '#bba2e6'], green: ['#e8f6df', '#d3edc5', '#c3e4b1', '#a5d28e'], slab: ['#fbf8f2', '#ece6da', '#ddd5c6', '#c9bfac']
 };
-const KCOL = { server: 'orange', dns: 'yellow', lb: 'blue', db: 'purple', storage: 'purple', cdn: 'green', client: 'slab' };
-const PK = { req: { r: 4.3, f: '#f3b47f', s: '#211e1b', w: 1.5 }, slow: { r: 4.3, f: '#efb041', s: '#211e1b', w: 1.5 }, push: { r: 4.3, f: '#9fd28f', s: '#211e1b', w: 1.5 }, ping: { r: 3.6, f: '#f4fbef', s: '#2f8a43', w: 2.1 } };
+const KCOL = { server: 'orange', service: 'orange', worker: 'green', gateway: 'blue', lb: 'blue', cache: 'yellow', dns: 'yellow', cdn: 'green', external: 'slab', client: 'slab', user: 'orange', db: 'purple', storage: 'purple', queue: 'purple', region: 'slab' };
+const RTYPE = { client: 'device', user: 'user', db: 'db', storage: 'db', queue: 'queue', region: 'region' }, rxType = k => RTYPE[k] || 'block';
+const PK = { req: { r: 4.3, f: '#f3b47f', s: '#211e1b', w: 1.5 }, slow: { r: 4.3, f: '#efb041', s: '#211e1b', w: 1.5 }, push: { r: 4.3, f: '#9fd28f', s: '#211e1b', w: 1.5 }, ping: { r: 3.6, f: '#f4fbef', s: '#2f8a43', w: 2.1 }, kill: { r: 3.6, f: '#fde3df', s: '#c0392b', w: 2.1 },
+  msg: { q: 9.6, rx: 2.4, f: '#efb041', s: '#211e1b', w: 1.5 }, write: { q: 8.4, rx: 2, f: '#5d5466', s: '#211e1b', w: 1.5 } };
+const PKIND = { handshake: 'ping', response: 'push', async: 'msg', replicate: 'write', fail: 'kill' }, LSTYLE = { fail: 'cut', async: 'dashed', replicate: 'dashed' };
 const PKSPEED = { slow: .32, ping: .85 };
-const REXT = { block: { top: -74, bot: 28, hw: 56 }, db: { top: -55, bot: 17, hw: 34 }, device: { top: -100, bot: 42, hw: 84 } };
-const ZL = { block: 120, db: 120, device: 40 };
+const REXT = { block: { top: -74, bot: 28, hw: 56 }, db: { top: -55, bot: 17, hw: 34 }, device: { top: -100, bot: 42, hw: 84 }, user: { top: -58, bot: 22, hw: 42 }, queue: { top: -48, bot: 34, hw: 68 }, region: { top: -42, bot: 42, hw: 84 } };
+const ZL = { block: 120, db: 120, device: 40, user: 60, queue: 80, region: 0 };
 const pinPoly = (x, y, pl) => { let c = false; for (let i = 0, j = pl.length - 1; i < pl.length; j = i++) if ((pl[i][1] > y) !== (pl[j][1] > y) && x < (pl[j][0] - pl[i][0]) * (y - pl[i][1]) / (pl[j][1] - pl[i][1]) + pl[i][0]) c = !c; return c; };
 const RX = { svg: null, slug: '', key: '', si: 0, sc: [], cams: [], cur: { ents: {}, links: {}, routes: [] }, ents: new Map(), links: new Map(), pks: [], fxs: [], flows: [], vb: [0, 0, 900, 520], camTw: null, end: 0, settled: true, spotIds: [], raf: 0, last: 0, W: 900, H: 520, L: {} };
 
-// scenes: one per step, built from the lesson JSON (nodes gx/gy are grid cells; chips become pills; flows become routes)
+// ---- layout: lessons without gx/gy get iso grid cells from each node's x,y (% of the 1000x560 canvas): invert j(), snap to a cell, then nudge colliding blocks (and linked blocks that leave no room for the link label) to the nearest free cell, left to right. gx/gy on a node pin it. ----
+const RGS = [9, 6]; // canvas % -> screen px
+const rxSplit = s => { const w = s.split(' '); if (w.length < 3) return w.length > 1 ? [w[0], w[1]] : [s]; let k = 1, d = 1e9; for (let i = 1; i < w.length; i++) { const e = Math.abs(w.slice(0, i).join(' ').length - w.slice(i).join(' ').length); if (e < d) { d = e; k = i; } } return [w.slice(0, k).join(' '), w.slice(k).join(' ')]; };
+const rxPillLabel = n => { const t = rxType(n.kind); return t === 'db' ? rxSplit(n.label).some(w => w.length > 10) : t !== 'block'; }; // blocks and short db names carry their name on the body, everything else gets a name pill below
+function rxTags(n, s) {
+  const tags = []; if (n.url) tags.push({ text: n.url });
+  if (rxPillLabel(n)) tags.push({ text: n.label, tone: 'gray', below: true });
+  for (const c of s.chips || []) if (c.node === n.id && typeof c.text === 'string') tags.push({ text: c.text, tone: c.tone || 'paper', cpu: c.kind === 'progress' ? +c.value || 0 : undefined, below: c.at === 'bottom' });
+  return tags;
+}
+function rxGrid(l) {
+  const lw = {}, fp = {}, pos = {}, placed = [];
+  for (const s of l.steps) { const seen = {}; for (const f of s.flows || []) { const k = [f.from, f.to].sort().join('|'); if (!seen[k]) { seen[k] = 1; lw[k] = Math.max(lw[k] || 0, f.label ? f.label.length * 5.8 + 18 : 0); } } }
+  for (const n of l.nodes) { // footprint = body + the most pills ever stacked above / below it, same in every step
+    let up = 0, dn = 0, wd = 0; for (const s of l.steps) { const t = rxTags(n, s); up = Math.max(up, t.filter(q => !q.below).length); dn = Math.max(dn, t.filter(q => q.below).length); for (const q of t) wd = Math.max(wd, pw(q)); }
+    const x = REXT[rxType(n.kind)]; fp[n.id] = [Math.max(x.hw, wd / 2) + 8, x.top - (up ? 8 + up * 26 : 0) - 8, x.bot + (dn ? 8 + dn * 26 : 0) + 8];
+  }
+  const rect = (n, c) => { const [X, Y] = jx(c[0], c[1]), f = fp[n.id]; return [X - f[0], Y + f[1], X + f[0], Y + f[2]]; };
+  const clash = (n, c) => placed.some(p => { // overlap, or linked blocks with less room than the label needs (side by side, or stacked)
+    const a = rect(n, c), b = rect(p, pos[p.id]), k = [n.id, p.id].sort().join('|'), need = k in lw ? [lw[k] + 12, lw[k] ? 37 : 12] : [0, 0];
+    return Math.max(a[0] - b[2], b[0] - a[2]) < need[0] && Math.max(a[1] - b[3], b[1] - a[3]) < need[1];
+  });
+  const fixed = l.nodes.filter(n => n.gx != null && n.gy != null), rest = l.nodes.filter(n => !fixed.includes(n)).sort((a, b) => a.x - b.x || a.y - b.y);
+  for (const n of fixed) { pos[n.id] = [n.gx, n.gy]; placed.push(n); }
+  for (const n of rest) {
+    const X = (n.x - 50) * RGS[0], Y = (n.y - 50) * RGS[1], g0 = Math.round((X / 14 + Y / 7) / 2), h0 = Math.round((X / 14 - Y / 7) / 2); let best = null;
+    for (let R = 8; !best; R += 16) for (let a = g0 - R; a <= g0 + R; a++) for (let b = h0 - R; b <= h0 + R; b++) {
+      if (clash(n, [a, b])) continue;
+      const [cx, cy] = jx(a, b); let cost = Math.hypot(cx - X, cy - Y);
+      for (const p of placed) { const px = jx(...pos[p.id])[0]; if ((p.x < n.x - 1 && px > cx + 14) || (p.x > n.x + 1 && px < cx - 14)) cost += 300; } // keep left-to-right order
+      if (!best || cost < best.cost) best = { cost, c: [a, b] };
+    }
+    pos[n.id] = best.c; placed.push(n);
+  }
+  return pos;
+}
+// how many sample points of a polyline run through the bodies of other nodes (used to pick the better of the two elbows)
+function rxCross(l, pos, ids, pts) {
+  let c = 0; for (let i = 1; i < pts.length; i++) for (let t = 0; t < 1; t += .1) {
+    const x = pts[i - 1][0] + (pts[i][0] - pts[i - 1][0]) * t, y = pts[i - 1][1] + (pts[i][1] - pts[i - 1][1]) * t;
+    for (const n of l.nodes) if (!ids.includes(n.id)) { const [cx, cy] = jx(...pos[n.id]), e = REXT[rxType(n.kind)]; if (Math.abs(x - cx) < e.hw - 6 && y > cy + e.top + 6 && y < cy + e.bot - 6) c++; }
+  }
+  return c;
+}
+// scenes: one per step, built from the lesson JSON (chips become pills; flows become routes)
 function rxScenes(l) {
-  const first = firstSeen(l), seen = new Map(), key = (a, b) => [a, b].sort().join('|'), nd = id => l.nodes.find(n => n.id === id);
+  const first = firstSeen(l), seen = new Map(), key = (a, b) => [a, b].sort().join('|'), nd = id => l.nodes.find(n => n.id === id), pos = rxGrid(l), auto = l.nodes.some(n => n.gx == null || n.gy == null);
   return l.steps.map((s, i) => {
     const ents = {}, links = {}, flows = s.flows || [];
-    for (const n of l.nodes) if (first[n.id] <= i) {
-      const tags = [], cl = n.kind === 'client';
-      if (n.url) tags.push({ text: n.url });
-      if (cl) tags.push({ text: n.label, tone: 'gray', below: true });
-      for (const c of s.chips || []) if (c.node === n.id && typeof c.text === 'string') tags.push({ text: c.text, tone: c.tone || 'paper', cpu: c.kind === 'progress' ? +c.value || 0 : undefined, below: c.at === 'bottom' });
-      ents[n.id] = { id: n.id, type: cl ? 'device' : (n.kind === 'db' || n.kind === 'storage') ? 'db' : 'block', color: KCOL[n.kind] || 'orange', kind: n.kind, label: n.label, x: n.gx || 0, y: n.gy || 0, tags };
-    }
+    for (const n of l.nodes) if (first[n.id] <= i) { const t = rxType(n.kind); ents[n.id] = { id: n.id, type: t, color: KCOL[n.kind] || 'orange', kind: n.kind, label: n.label, x: pos[n.id][0], y: pos[n.id][1], tags: rxTags(n, s) }; }
     const now = new Map();
     for (const f of flows) {
       const k = key(f.from, f.to); (now.get(k) || now.set(k, []).get(k)).push(f);
-      if (!seen.has(k)) { const a = nd(f.from), b = nd(f.to); seen.set(k, { a: f.from, b: f.to, via: a.gx !== b.gx && a.gy !== b.gy ? [b.gx, a.gy] : null }); }
+      if (!seen.has(k)) {
+        const A = pos[f.from], B = pos[f.to]; let via = A[0] !== B[0] && A[1] !== B[1] ? [B[0], A[1]] : null;
+        if (via && auto) { const v2 = [A[0], B[1]], pt = v => [A, v, B].map(q => jx(...q)), ids = [f.from, f.to]; if (rxCross(l, pos, ids, pt(v2)) < rxCross(l, pos, ids, pt(via))) via = v2; }
+        seen.set(k, { a: f.from, b: f.to, via });
+      }
     }
-    for (const [k, v] of seen) { const fs = now.get(k); links[k] = { id: k, a: v.a, b: v.b, via: v.via, style: fs || !flows.length ? 'solid' : 'off', heads: fs && fs.some(f => f.kind === 'handshake') ? 'both' : 'end', label: fs && fs[0].label || '' }; }
+    for (const [k, v] of seen) {
+      const fs = now.get(k), st = fs ? new Set(fs.map(f => LSTYLE[f.kind] || 'solid')) : null;
+      links[k] = { id: k, a: v.a, b: v.b, via: v.via, style: !fs ? (flows.length ? 'off' : 'solid') : st.size === 1 ? [...st][0] : 'solid', heads: fs && fs.some(f => f.kind === 'handshake') ? 'both' : 'end', label: fs && fs[0].label || '' };
+    }
     // routes: a request/response pair over the same links is one packet that bounces; a chain is walked link by link
     const fl = flows.map(f => ({ link: key(f.from, f.to), rev: seen.get(key(f.from, f.to)).a !== f.from, kind: f.kind, pkt: f.pkt, from: f.from, to: f.to })), n = fl.length;
     const chain = a => a.every((x, k) => !k || a[k - 1].to === x.from), pal = n >= 2 && n % 2 === 0 && fl.every((x, k) => x.link === fl[n - 1 - k].link && x.rev !== fl[n - 1 - k].rev);
-    const mk = (legs, bounce) => { const f0 = legs[0], kind = f0.pkt || (f0.kind === 'handshake' ? 'ping' : f0.kind === 'response' ? 'push' : 'req'); return { legs: legs.map(x => ({ link: x.link, rev: x.rev })), bounce, kind, rate: kind === 'ping' ? 1.3 : .8, speed: 1, hold: kind === 'slow' && bounce ? .8 : 0 }; };
+    const mk = (legs, bounce) => { const f0 = legs[0], kind = f0.pkt || PKIND[f0.kind] || 'req'; return { legs: legs.map(x => ({ link: x.link, rev: x.rev })), bounce, kind, fail: legs[legs.length - 1].kind === 'fail', rate: kind === 'ping' ? 1.3 : .8, speed: 1, hold: kind === 'slow' && bounce ? .8 : 0 }; };
     const routes = !n ? [] : pal ? [mk(fl.slice(0, n / 2), true)] : chain(fl) ? [mk(fl, false)] : fl.map(x => mk([x], false));
     return { ents, links, routes, title: s.caption };
   });
 }
 const rxExt = e => REXT[e.type];
-const rxBox = e => { const [cx, cy] = jx(e.x, e.y), x = rxExt(e), up = e.tags.filter(t => !t.below).length, dn = e.tags.filter(t => t.below).length; return [cx - Math.max(x.hw, 60), cy + x.top - (up ? 8 + up * 26 : 0), cx + Math.max(x.hw, 60), cy + x.bot + (dn ? 8 + dn * 26 : 0)]; };
+const rxBox = e => { const [cx, cy] = jx(e.x, e.y), x = rxExt(e), up = e.tags.filter(t => !t.below).length, dn = e.tags.filter(t => t.below).length, hw = Math.max(x.hw, 60, ...e.tags.map(t => pw(t) / 2)); return [cx - hw, cy + x.top - (up ? 8 + up * 26 : 0), cx + hw, cy + x.bot + (dn ? 8 + dn * 26 : 0)]; };
 function rxSil(e) {
   const [cx, cy] = jx(e.x, e.y), sh = pl => pl.map(p => [cx + p[0], cy + p[1]]);
   if (e.type === 'block') return [sh([[-56, -46], [0, -74], [56, -46], [56, 0], [0, 28], [-56, 0]])];
   if (e.type === 'db') { const q = []; for (let i = 0; i <= 16; i++) { const t = Math.PI + Math.PI * i / 16; q.push([33.66 * Math.cos(t), -38 + 16.83 * Math.sin(t)]); } for (let i = 0; i <= 16; i++) { const t = Math.PI * i / 16; q.push([33.66 * Math.cos(t), 16.83 * Math.sin(t)]); } return [sh(q)]; }
+  if (e.type === 'user') return [sh([[-42, -8], [0, -29], [42, -8], [42, 0], [0, 21], [-42, 0]]), sh([[-12, -8], [-12, -56], [12, -56], [12, -8]])];
+  if (e.type === 'queue') return [sh([[-67.2, -3.6], [16.8, -45.6], [67.2, -20.4], [67.2, -8.4], [-16.8, 33.6], [-67.2, 8.4]])];
+  if (e.type === 'region') return [sh([[-84, 0], [0, -42], [84, 0], [0, 42]])];
   return [sh([[-84, -16], [0, -58], [84, -16], [84, 0], [0, 42], [-84, 0]]), sh([[-2.4, -2.4, 19], [-2.4, 2.4, 19], [-2.4, 2.4, 66], [-2.4, -2.4, 66]].map(([x, y, z]) => jx(x, y, z)))];
 }
 const pw = t => t.cpu != null ? 86 : t.text.length * 6.3 + 18, PH = 21;
@@ -512,7 +397,7 @@ function rxBody(e) {
   if (e.type === 'db') {
     const rx = 33.66, ry = rx / 2, h = 38, body = `M${-rx},${-h}L${-rx},0A${rx},${ry} 0 0 0 ${rx},0L${rx},${-h}`;
     return `<path d="${body}Z" fill="url(#rx-s-${c})"/><path d="${body}Z" fill="url(#rx-cs)"/><ellipse cy="${-h}" rx="${rx}" ry="${ry}" fill="url(#rx-t-${c})"/><ellipse cy="${-h - 1}" rx="${rx * .6}" ry="${ry * .5}" fill="#fff" fill-opacity=".22" filter="url(#rx-b2)"/><path class="ol" d="${body}"/><ellipse class="ol" cy="${-h}" rx="${rx}" ry="${ry}"/>`
-      + `<g class="gl" transform="translate(-8,${-h - 8}) scale(.667)">${I.db}</g><text class="bl" y="-10" font-size="12">${esc(e.label)}</text>`;
+      + `<g class="gl" transform="translate(-8,${-h - 8}) scale(.667)">${ico}</g>${rxPillLabel(e) ? '' : rxSplit(e.label).length > 1 ? rxSplit(e.label).map((t, i) => `<text class="bl" y="${i ? -4 : -15}" font-size="10">${esc(t)}</text>`).join('') : `<text class="bl" y="-10" font-size="${Math.min(12, 60 / (e.label.length * .6)).toFixed(1)}">${esc(e.label)}</text>`}`;
   }
   if (e.type === 'device') {
     const sy = 2.2, pxs = 14 * sy;
@@ -520,8 +405,15 @@ function rxBody(e) {
       + `<g transform="matrix(1 -.5 0 1 ${(14 * -2.2).toFixed(1)} ${(7 * -2.2).toFixed(1)})"><rect x="${-pxs + 2}" y="-64" width="${2 * pxs - 4}" height="43" rx="2" fill="#f6f1e6"/><rect x="${-pxs + 2}" y="-64" width="${2 * pxs - 4}" height="8" rx="2" fill="#e4dccb"/>`
       + `<circle cx="${-pxs + 8}" cy="-60" r="1.8" fill="#E5534B"/><circle cx="${-pxs + 14}" cy="-60" r="1.8" fill="#EFB041"/><circle cx="${-pxs + 20}" cy="-60" r="1.8" fill="#7FC278"/><rect x="${-pxs + 8}" y="-48" width="${pxs}" height="5" rx="2.5" fill="#d9cfb8"/><rect x="${-pxs + 8}" y="-39" width="${pxs * 1.3}" height="5" rx="2.5" fill="#e4dccb"/><rect x="${-pxs + 8}" y="-30" width="${pxs * .8}" height="5" rx="2.5" fill="#e4dccb"/></g>`;
   }
-  const w = e.label.split(' '), l1 = w.length > 1 ? w[0] : e.label, l2 = w.length > 1 ? w.slice(1).join(' ') : '';
-  return prism(56, 46, c, cid) + `<g class="gl" transform="translate(-7,-69) scale(.583)">${ico}</g><text class="bl" y="-44" font-size="13.5">${esc(l1)}</text>` + (l2 ? `<text class="bl s2" y="-33" font-size="10">${esc(l2)}</text>` : '');
+  if (e.type === 'user') {
+    const h = 36, rx = 11, ry = 5.5, body = `M${-rx},${-h}L${-rx},-8A${rx},${ry} 0 0 0 ${rx},-8L${rx},${-h}`;
+    return prism(42, 8, 'slab', cid, 'ol2') + `<path d="${body}Z" fill="url(#rx-s-${c})"/><path d="${body}Z" fill="url(#rx-cs)"/><ellipse cy="${-h}" rx="${rx}" ry="${ry}" fill="url(#rx-t-${c})"/><path class="ol" d="${body}"/><ellipse class="ol" cy="${-h}" rx="${rx}" ry="${ry}"/>`
+      + `<circle cy="-46" r="9" fill="url(#rx-t-${c})"/><circle class="ol" cy="-46" r="9"/><ellipse cx="-3" cy="-49" rx="3" ry="2" fill="#fff" fill-opacity=".5"/>`;
+  }
+  if (e.type === 'queue') { let q = ''; for (let i = 0; i < 4; i++) q += prs(-1.8, 1.8, 1.8 - 1.6 * i, 3 - 1.6 * i, 0, 12, c); return q; }
+  if (e.type === 'region') { const d = roundPoly([[-84, 0], [0, -42], [84, 0], [0, 42]], 12); return `<path d="${d}" fill="url(#rx-t-${c})" fill-opacity=".55"/><path class="ol2" d="${d}" stroke-dasharray="7 5"/><g class="gl" transform="translate(-9,-9) scale(.75)">${ico}</g>`; }
+  const [l1, l2 = ''] = rxSplit(e.label), f1 = Math.min(13.5, 98 / (l1.length * .66)), f2 = Math.min(10, 98 / (l2.length * .62 || 1));
+  return prism(56, 46, c, cid) + `<g class="gl" transform="translate(-7,-69) scale(.583)">${ico}</g><text class="bl" y="-44" font-size="${f1.toFixed(1)}">${esc(l1)}</text>` + (l2 ? `<text class="bl s2" y="-33" font-size="${f2.toFixed(1)}">${esc(l2)}</text>` : '');
 }
 const rxDefs = () => {
   let s = '<filter id="rx-b6" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="6.5"/></filter><filter id="rx-b2" x="-20%" y="-20%" width="140%" height="140%"><feGaussianBlur stdDeviation="2.2"/></filter>'
@@ -546,45 +438,51 @@ function rxLinkGeom(lk, sc) {
   const n = Math.max(2, Math.ceil((b - a) / 2)), q = []; for (let i = 0; i <= n; i++) { const o = t.getPointAtLength(a + (b - a) * i / n); q.push([o.x, o.y]); }
   return { d: 'M' + q.map(o => o[0].toFixed(1) + ',' + o[1].toFixed(1)).join('L'), pts: q };
 }
-// link labels: candidate slots along the path on 4 sides, lowest overlap cost wins
+// link labels: candidate slots along the path on 4 sides (two distances), lowest overlap cost wins; the rectangles are kept on the scene so the camera can frame them
 function rxPlaceLabels(sc) {
   const boxes = [], obst = Object.values(sc.ents).map(e => { const [cx, cy] = jx(e.x, e.y), x = rxExt(e); return [cx - x.hw, cy + x.top, cx + x.hw, cy + x.bot]; }), pos = {};
   for (const e of Object.values(sc.ents)) { const [cx, cy] = jx(e.x, e.y), x = rxExt(e); let u = 0, d = 0; for (const t of e.tags) { const w = pw(t), yy = t.below ? cy + x.bot + 8 + 10.5 + 26 * d++ : cy + x.top - 8 - 10.5 - 26 * u++; boxes.push([cx - w / 2, yy - 10.5, cx + w / 2, yy + 10.5]); } }
-  const geo = Object.values(sc.links).map(k => RX.L[k.id] || (RX.L[k.id] = rxLinkGeom(k, sc))), ov = (r, q) => r[0] < q[2] && r[2] > q[0] && r[1] < q[3] && r[3] > q[1];
+  const geo = Object.values(sc.links).map(k => RX.L[k.id] || (RX.L[k.id] = rxLinkGeom(k, sc))), lap = (r, q, mg) => r[0] < q[2] + mg && r[2] > q[0] - mg && r[1] < q[3] + mg && r[3] > q[1] - mg, clash = r => obst.some(o => lap(r, o, 2)) || boxes.some(o => lap(r, o, 2));
   for (const k of Object.values(sc.links)) {
     if (!k.label) continue;
-    const g = RX.L[k.id], w = k.label.length * 5.8 + 18, h = PH, n = g.pts.length; let best = null;
-    for (const f of [.5, .4, .6, .3, .7, .2, .8]) {
-      const i = Math.min(n - 2, Math.max(0, Math.round(f * (n - 1)))), P = g.pts[i];
-      for (const [dx, dy] of [[0, -(h / 2 + 7)], [0, h / 2 + 7], [-(w / 2 + 7), 0], [w / 2 + 7, 0]]) {
-        const r = [P[0] + dx - w / 2, P[1] + dy - h / 2, P[0] + dx + w / 2, P[1] + dy + h / 2]; let cost = Math.abs(f - .5) * 60 + (dx ? 12 : 0);
-        for (const o of obst) if (ov(r, o)) cost += 170; for (const o of boxes) if (ov(r, o)) cost += 90;
-        for (const gg of geo) for (let m = 0; m < gg.pts.length; m += 4) { const q = gg.pts[m]; if (q[0] > r[0] - 3 && q[0] < r[2] + 3 && q[1] > r[1] - 3 && q[1] < r[3] + 3) cost += 18; }
-        if (!best || cost < best.cost) best = { cost, x: P[0] + dx, y: P[1] + dy, r };
+    const g = RX.L[k.id], w = k.label.length * 5.8 + 18, h = PH, n = g.pts.length;
+    const run = (F, M, mg, oc) => { let best = null; // first pass keeps the plain 7 slots; if that still collides, retry with more slots, a second distance and a safety margin
+      for (const f of F) {
+        const i = Math.min(n - 2, Math.max(0, Math.round(f * (n - 1)))), P = g.pts[i];
+        for (const m of M) for (const [dx, dy] of [[0, -(h / 2 + 7 + m)], [0, h / 2 + 7 + m], [-(w / 2 + 7 + m), 0], [w / 2 + 7 + m, 0]]) {
+          const r = [P[0] + dx - w / 2, P[1] + dy - h / 2, P[0] + dx + w / 2, P[1] + dy + h / 2], ov = q => lap(r, q, mg); let cost = Math.abs(f - .5) * 60 + (dx ? 12 : 0) + m;
+          for (const o of obst) if (ov(o)) cost += oc[0]; for (const o of boxes) if (ov(o)) cost += oc[1];
+          for (const gg of geo) for (let q = 0; q < gg.pts.length; q += 4) { const o = gg.pts[q]; if (o[0] > r[0] - 3 && o[0] < r[2] + 3 && o[1] > r[1] - 3 && o[1] < r[3] + 3) cost += 18; }
+          if (!best || cost < best.cost) best = { cost, x: P[0] + dx, y: P[1] + dy, r };
+        }
       }
-    }
+      return best;
+    };
+    let best = run([.5, .4, .6, .3, .7, .2, .8], [0], 0, [170, 90]);
+    if (clash(best.r)) { const b2 = run([.5, .4, .6, .3, .7, .2, .8, .1, .9], [0, 16, 32, 48, 64, 80], 2, [400, 400]); if (!clash(b2.r)) best = b2; }
     pos[k.id] = [best.x, best.y]; boxes.push(best.r);
   }
+  sc.lr = boxes.slice(boxes.length - Object.keys(pos).length);
   return pos;
 }
 // camera: zoom fits the bounds (16 px margin, snapped down to .05, cap 1.6); the previous camera is kept while the new bounds still fit
 function rxPlan(sc, prev) {
   const bs = Object.values(sc.ents).map(rxBox); if (!bs.length) return prev || { cx: 0, cy: 0, z: 1 };
   // extra room around the blocks for link labels and pills that hang off the lines
-  const x0 = Math.min(...bs.map(b => b[0])) - 40, y0 = Math.min(...bs.map(b => b[1])) - 12, x1 = Math.max(...bs.map(b => b[2])) + 40, y1 = Math.max(...bs.map(b => b[3])) + 48, { W, H } = RX, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
+  const lr = sc.lr || [], x0 = Math.min(...bs.map(b => b[0]) .map(v => v - 40), ...lr.map(r => r[0] - 8)), y0 = Math.min(...bs.map(b => b[1] - 12), ...lr.map(r => r[1] - 8)), x1 = Math.max(...bs.map(b => b[2] + 40), ...lr.map(r => r[2] + 8)), y1 = Math.max(...bs.map(b => b[3] + 48), ...lr.map(r => r[3] + 8)), { W, H } = RX, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
   if (prev) { const vw = W / prev.z, vh = H / prev.z, pd = 12 / prev.z; if (x0 >= prev.cx - vw / 2 + pd && x1 <= prev.cx + vw / 2 - pd && y0 >= prev.cy - vh / 2 + pd && y1 <= prev.cy + vh / 2 - pd && Math.abs(cx - prev.cx) < .15 * vw && Math.abs(cy - prev.cy) < .15 * vh) return prev; }
   return { cx, cy, z: Math.max(.3, Math.floor(Math.min(1.6, (W - 32) / (x1 - x0), (H - 32) / (y1 - y0)) / .05 + 1e-6) * .05) };
 }
 const rxVB = c => [c.cx - RX.W / c.z / 2, c.cy - RX.H / c.z / 2, RX.W / c.z, RX.H / c.z];
 function rxFrame() { // plan every step up front so the camera stays stable between steps
   const dg = $('#diagram'); RX.W = dg.clientWidth > 100 ? dg.clientWidth : 900; RX.H = dg.clientHeight > 100 ? dg.clientHeight : 520;
-  let p = null; RX.cams = RX.sc.map(s => p = rxPlan(s, p));
+  RX.L = {}; RX.sc.forEach(s => { s.lp = rxPlaceLabels(s); }); let p = null; RX.cams = RX.sc.map(s => p = rxPlan(s, p));
 }
 const rxSet = (el, a) => { for (const k in a) el.setAttribute(k, a[k]); return el; };
 const rxMk = (n, a, p) => { const e = rxSet(document.createElementNS(NS, n), a || {}); if (p) p.append(e); return e; };
 function rxMount(l) {
   const dg = $('#diagram'); cancelAnimationFrame(RX.raf);
-  RX.slug = l.slug; RX.sc = rxScenes(l); rxFrame(); RX.key = ''; RX.L = {}; RX.ents = new Map(); RX.links = new Map(); RX.pks = []; RX.fxs = []; RX.flows = []; RX.cur = { ents: {}, links: {}, routes: [] }; RX.settled = true; RX.camTw = null; RX.spotIds = [];
+  RX.slug = l.slug; RX.sc = rxScenes(l); rxFrame(); RX.key = ''; RX.ents = new Map(); RX.links = new Map(); RX.pks = []; RX.fxs = []; RX.flows = []; RX.cur = { ents: {}, links: {}, routes: [] }; RX.settled = true; RX.camTw = null; RX.spotIds = [];
   dg.innerHTML = `<svg id="svg" class="rx" viewBox="0 0 ${RX.W} ${RX.H}" preserveAspectRatio="xMidYMid meet" role="img" aria-label="${esc(l.title)} diagram" aria-describedby="svg-desc"><desc id="svg-desc"></desc><defs>${rxDefs()}</defs><g id="rx-floor"><rect x="-1400" y="-840" width="2800" height="1680" fill="url(#rx-grid)" mask="url(#rx-fm)"/></g><g id="rx-links"></g><g id="rx-pk"></g><g id="rx-ents"></g><g id="rx-over"></g></svg>`;
   RX.svg = $('#svg'); RX.last = performance.now(); RX.raf = requestAnimationFrame(rxTick);
 }
@@ -608,7 +506,7 @@ function rxGo(si, instant) {
   // sort entities back to front
   [...R.ents.values()].sort((a, b) => (a.spec.x - a.spec.y) - (b.spec.x - b.spec.y) || a.spec.x - b.spec.x).forEach(e => $('#rx-ents').append(e.g));
   // links: existing ones only change style, missing ones fade out, new ones draw in
-  const lblPos = rxPlaceLabels(sc); let p = 0;
+  const lblPos = sc.lp; let p = 0;
   for (const [id, lk] of R.links) if (!sc.links[id]) { lk.rm = now; end = Math.max(end, 300 * k); }
   for (const id in sc.links) {
     const s = sc.links[id], old = R.links.get(id), g = R.L[id] || (R.L[id] = rxLinkGeom(s, sc));
@@ -626,10 +524,10 @@ function rxGo(si, instant) {
   R.svg.querySelector('desc').textContent = `${sc.title}. Components: ${Object.values(sc.ents).map(e => e.label).join(', ')}.`;
   if (instant) { for (const e of R.ents.values()) rxEnt(e, now + 1e6); for (const lk of R.links.values()) rxLink(lk, now + 1e6); R.vb = to; R.camTw = null; R.svg.setAttribute('viewBox', to.map(v => v.toFixed(2)).join(' ')); R.settled = true; }
 }
-const rxShadow = s => { const sil = rxSil(s)[0], [cx, cy] = jx(s.x, s.y); return `<path d="M${sil.map(q => (q[0] - cx).toFixed(1) + ',' + (q[1] - cy).toFixed(1)).join('L')}Z" fill="#6b5236" fill-opacity=".26" filter="url(#rx-b6)"/>`; };
+const rxShadow = s => { if (s.type === 'region') return ''; const sil = rxSil(s)[0], [cx, cy] = jx(s.x, s.y); return `<path d="M${sil.map(q => (q[0] - cx).toFixed(1) + ',' + (q[1] - cy).toFixed(1)).join('L')}Z" fill="#6b5236" fill-opacity=".26" filter="url(#rx-b6)"/>`; };
 function rxLinkStyle(lk) {
   const s = lk.spec, off = s.style === 'off';
-  lk.path.setAttribute('class', 'lk ' + (off ? 'off' : 'on')); lk.path.setAttribute('marker-end', lk.drawn ? `url(#rx-ar${off ? '-off' : ''})` : '');
+  lk.path.setAttribute('class', 'lk ' + s.style); lk.path.setAttribute('marker-end', lk.drawn ? `url(#rx-ar${off ? '-off' : ''})` : '');
   if (s.heads === 'both') lk.path.setAttribute('marker-start', lk.drawn ? `url(#rx-ar${off ? '-off' : ''})` : ''); else lk.path.removeAttribute('marker-start');
 }
 function rxLabelPlace(lk, s, pos) {
@@ -671,7 +569,7 @@ function rxLink(lk, now) {
 function rxSettle() {
   const R = RX; R.settled = true;
   for (const id of R.spotIds) {
-    const e = R.ents.get(id); if (!e || e.dying) continue; const [cx, cy] = jx(e.x, e.y), w = e.type === 'device' ? 6 : e.type === 'db' ? 3.4 : 4, d = roundPoly([[cx - 14 * w, cy], [cx, cy - 7 * w], [cx + 14 * w, cy], [cx, cy + 7 * w]], 10);
+    const e = R.ents.get(id); if (!e || e.dying) continue; const [cx, cy] = jx(e.x, e.y), w = { device: 6, db: 3.4, user: 3, queue: 5, region: 6 }[e.spec.type] || 4, d = roundPoly([[cx - 14 * w, cy], [cx, cy - 7 * w], [cx + 14 * w, cy], [cx, cy + 7 * w]], 10);
     const sp = rxMk('path', { class: 'spot', d }, $('#rx-floor')); sp.addEventListener('animationend', () => sp.remove());
   }
   R.spotIds = [];
@@ -681,25 +579,26 @@ function rxSpawn(f) {
   const R = RX, segs = []; let ok = true;
   f.r.legs.forEach(g => { const lk = R.links.get(g.link); if (!lk) { ok = false; return; } segs.push(g.rev ? { lk, a: lk.len - 20, b: 16 } : { lk, a: 20, b: lk.len - 16 }); });
   if (!ok || !segs.length) return;
-  const k = PK[f.r.kind] || PK.req, el = rxMk('circle', { r: k.r, fill: k.f, stroke: k.s, 'stroke-width': k.w, opacity: 0 }, $('#rx-pk'));
-  R.pks.push({ el, f: f.r, segs, i: 0, s: segs[0].a, back: false, wait: 0, hold: 0, leave: 0, k, spd: 155 * f.r.speed * (PKSPEED[f.r.kind] || 1) });
+  const k = PK[f.r.kind] || PK.req, el = rxMk('g', { opacity: 0 }, $('#rx-pk')), sh = rxMk(k.q ? 'rect' : 'circle', k.q ? { x: -k.q / 2, y: -k.q / 2, width: k.q, height: k.q, rx: k.rx } : { r: k.r }, el);
+  rxSet(sh, { fill: k.f, stroke: k.s, 'stroke-width': k.w });
+  R.pks.push({ el, sh, f: f.r, segs, i: 0, s: segs[0].a, back: false, wait: 0, hold: 0, leave: 0, k, spd: 155 * f.r.speed * (PKSPEED[f.r.kind] || 1) });
 }
 function rxPackets(dt, now) {
   const R = RX;
   for (const f of R.flows) { f.acc += dt * f.r.rate; while (f.acc >= 1) { f.acc -= 1; rxSpawn(f); } }
   for (const q of R.pks.slice()) {
     if (q.leave) continue;
-    if (q.hold > 0) { q.hold -= dt; if (q.f.hold) q.el.setAttribute('stroke-width', (1.5 + 1.9 * (.5 - .5 * Math.cos(2 * Math.PI * (q.f.hold - q.hold) / .8))).toFixed(2)); if (q.hold > 0) continue; q.el.setAttribute('stroke-width', q.k.w); }
+    if (q.hold > 0) { q.hold -= dt; if (q.f.hold) q.sh.setAttribute('stroke-width', (1.5 + 1.9 * (.5 - .5 * Math.cos(2 * Math.PI * (q.f.hold - q.hold) / .8))).toFixed(2)); if (q.hold > 0) continue; q.sh.setAttribute('stroke-width', q.k.w); }
     if (q.wait > 0) { q.wait -= dt; if (q.wait > 0) continue; q.el.setAttribute('opacity', 1); }
     const sg = q.segs[q.i]; let from = q.back ? sg.b : sg.a, to = q.back ? sg.a : sg.b; const d = to >= from ? 1 : -1;
     q.s += d * q.spd * dt;
     if ((q.s - to) * d >= 0) {
       q.s = to; const last = q.back ? q.i === 0 : q.i === q.segs.length - 1;
       if (!last) { q.i += q.back ? -1 : 1; const n = q.segs[q.i]; q.s = q.back ? n.b : n.a; q.wait = .16; q.el.setAttribute('opacity', 0); }
-      else if (q.f.bounce && !q.back) { q.back = true; q.el.setAttribute('fill', '#9fd28f'); q.hold = q.f.hold || .04; } // measured: the turn at the far end holds about one frame
-      else { const o = sg.lk.path.getPointAtLength(q.s); R.fxs.push({ el: rxMk('circle', { cx: o.x, cy: o.y, r: 4.3, fill: 'none', stroke: '#3fa456', 'stroke-width': 1.6, opacity: .9 }, $('#rx-pk')), t0: now }); q.el.remove(); R.pks.splice(R.pks.indexOf(q), 1); continue; }
+      else if (q.f.bounce && !q.back) { q.back = true; q.sh.setAttribute('fill', '#9fd28f'); q.hold = q.f.hold || .04; } // measured: the turn at the far end holds about one frame
+      else { const o = sg.lk.path.getPointAtLength(q.s), x = rxMk('g', { transform: `translate(${o.x.toFixed(1)} ${o.y.toFixed(1)})` }, $('#rx-pk')); rxMk('circle', q.f.fail ? { r: 5, fill: '#e5534b', stroke: '#c0392b', 'stroke-width': 1.6 } : { r: 4.3, fill: 'none', stroke: '#3fa456', 'stroke-width': 1.6, 'vector-effect': 'non-scaling-stroke' }, x); if (q.f.fail) rxMk('path', { d: 'M-2.2,-2.2L2.2,2.2M2.2,-2.2L-2.2,2.2', stroke: '#fff', 'stroke-width': 1.5, 'stroke-linecap': 'round' }, x); R.fxs.push({ el: x, fail: q.f.fail, o, t0: now }); q.el.remove(); R.pks.splice(R.pks.indexOf(q), 1); continue; }
     }
-    const o = sg.lk.path.getPointAtLength(q.s); q.el.setAttribute('cx', o.x.toFixed(2)); q.el.setAttribute('cy', o.y.toFixed(2)); if (!q.wait && q.el.getAttribute('opacity') !== '1') q.el.setAttribute('opacity', 1);
+    const o = sg.lk.path.getPointAtLength(q.s); q.el.setAttribute('transform', `translate(${o.x.toFixed(2)} ${o.y.toFixed(2)})`); if (!q.wait && q.el.getAttribute('opacity') !== '1') q.el.setAttribute('opacity', 1);
   }
 }
 function rxTick() {
@@ -710,7 +609,7 @@ function rxTick() {
   if (!R.settled && now >= R.end) rxSettle();
   if (R.settled && !paused) rxPackets(dt, now);
   for (const q of R.pks.slice()) if (q.leave) { const p = (now - q.leave) / 260; if (p >= 1) { q.el.remove(); R.pks.splice(R.pks.indexOf(q), 1); } else q.el.setAttribute('opacity', (1 - p).toFixed(3)); }
-  for (const x of R.fxs.slice()) { const p = (now - x.t0) / 450; if (p >= 1) { x.el.remove(); R.fxs.splice(R.fxs.indexOf(x), 1); } else { const e = EZ.out(p); x.el.setAttribute('r', (4.3 * lerp(.8, 2, e)).toFixed(2)); x.el.setAttribute('opacity', (.9 * (1 - e)).toFixed(3)); } }
+  for (const x of R.fxs.slice()) { const p = (now - x.t0) / (x.fail ? 650 : 450); if (p >= 1) { x.el.remove(); R.fxs.splice(R.fxs.indexOf(x), 1); } else { const e = EZ.out(p), sc = x.fail ? (p < .35 ? lerp(.7, 1.25, p / .35) : lerp(1.25, 2.3, (p - .35) / .65)) : lerp(.8, 2, e); x.el.setAttribute('transform', `translate(${x.o.x.toFixed(1)} ${x.o.y.toFixed(1)}) scale(${sc.toFixed(3)})`); x.el.setAttribute('opacity', (x.fail ? (p < .5 ? 1 : 1 - (p - .5) / .5) : .9 * (1 - e)).toFixed(3)); } }
   R.raf = requestAnimationFrame(rxTick);
 }
 function drawIllustrated(l, s) {
@@ -733,15 +632,9 @@ function firstSeen(l) {
   return f;
 }
 const nodeLabel = (l, id) => (l.nodes.find(n => n.id === id) || {}).label || id;
-function replay() { const el = $('#svg'); if (RX.svg && RX.svg === el) rxReplay(); else if (el) el.setCurrentTime(0); if (paused) togglePause(); }
-function togglePause() { const el = $('#svg'); paused = !paused; if (!(RX.svg && RX.svg === el) && el) paused ? el.pauseAnimations() : el.unpauseAnimations(); syncPause(); }
+function replay() { rxReplay(); if (paused) togglePause(); }
+function togglePause() { paused = !paused; syncPause(); }
 function syncPause() { const b = $('#pause'); $('#diagram').classList.toggle('paused', paused); if (b) { b.innerHTML = paused ? icon('play') + 'Play' : icon('pause') + 'Pause'; b.setAttribute('aria-pressed', String(paused)); } }
-function blockLabel(label) {
-  if (label.length <= 12 || !label.includes(' ')) return [label];
-  const mid = label.length / 2; let best = -1;
-  for (let k = 0; k < label.length; k++) if (label[k] === ' ' && (best < 0 || Math.abs(k - mid) < Math.abs(best - mid))) best = k;
-  return [label.slice(0, best), label.slice(best + 1)];
-}
 
 // ---------- practice ----------
 function showPractice() {

@@ -202,16 +202,16 @@
           "label": "seek 42"
         },
         {
+          "from": "pool",
+          "to": "index",
+          "kind": "response",
+          "label": "top levels cached"
+        },
+        {
           "from": "index",
           "to": "app",
           "kind": "response",
           "label": "50 pointers"
-        },
-        {
-          "from": "index",
-          "to": "pool",
-          "kind": "response",
-          "label": "top levels cached"
         },
         {
           "from": "app",
@@ -245,6 +245,7 @@
       "idea": "A composite index serves queries that use its leading columns; put equality columns first, then the range or sort column.",
       "caption": "Entries sorted by customer, then date: 20 rows read.",
       "focus": [
+        "client",
         "app",
         "index",
         "table"
@@ -306,8 +307,8 @@
           "label": "42, date, total"
         },
         {
-          "from": "index",
-          "to": "pool",
+          "from": "pool",
+          "to": "index",
           "kind": "response",
           "label": "leaf pages in RAM"
         },

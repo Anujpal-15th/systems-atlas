@@ -147,6 +147,12 @@
           "to": "api",
           "kind": "response",
           "label": "ok"
+        },
+        {
+          "from": "api",
+          "to": "client",
+          "kind": "response",
+          "label": "200 OK"
         }
       ],
       "metrics": {
@@ -196,8 +202,14 @@
         {
           "from": "api",
           "to": "ledger",
-          "kind": "fail",
+          "kind": "request",
           "label": "INSERT $40 again"
+        },
+        {
+          "from": "ledger",
+          "to": "api",
+          "kind": "response",
+          "label": "ok (2nd charge)"
         }
       ],
       "metrics": {
@@ -269,7 +281,7 @@
     {
       "tag": "FLOW",
       "title": "The retry is recognised",
-      "body": "The reply is lost again, and the app retries with the same key. The API finds the key already stored, skips the ledger entirely, and returns the saved response from the first attempt. The customer sees success, and the ledger still shows one charge. The retry cost one cheap lookup instead of a second payment.",
+      "body": "The reply is lost again, and the app retries with the same key. The API finds the key already stored, does not insert a second charge, and returns the saved response from the first attempt. The customer sees success, and the ledger still shows one charge. The retry cost one cheap lookup instead of a second payment.",
       "idea": "A repeat returns the original result; it must not re-run the side effect.",
       "caption": "Duplicate blocked; stored reply returned.",
       "focus": [
@@ -334,6 +346,12 @@
           "to": "worker",
           "kind": "async",
           "label": "msg 91 (try 1)"
+        },
+        {
+          "from": "worker",
+          "to": "workerdb",
+          "kind": "request",
+          "label": "seen 91? no: save"
         },
         {
           "from": "queue",
@@ -434,12 +452,12 @@
       "why": "Check-then-act is a race. Both requests can pass the SELECT before either inserts. Claim the key with a unique-constraint INSERT in the same transaction as the ledger write so only one can win."
     },
     {
-      "q": "Which statement about exactly-once delivery is most accurate?",
+      "q": "Which statement about exactly-once processing is most accurate?",
       "options": [
         "Modern brokers guarantee each message is delivered exactly once over the network",
         "It is achieved by disabling retries",
         "It only matters for databases, not queues",
-        "It is achieved by at-least-once delivery combined with an idempotent consumer"
+        "Exactly-once effects come from at-least-once delivery combined with an idempotent consumer"
       ],
       "answer": 3,
       "why": "A sender cannot know if a lost ack means the message was processed, so it must redeliver. Exactly-once effect comes from deduplicating by message ID on the consumer side."

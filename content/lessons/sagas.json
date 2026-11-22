@@ -227,22 +227,40 @@
       ],
       "flows": [
         {
+          "from": "payment",
+          "to": "orch",
+          "kind": "response",
+          "label": "YES"
+        },
+        {
+          "from": "inventory",
+          "to": "orch",
+          "kind": "response",
+          "label": "YES"
+        },
+        {
+          "from": "shipping",
+          "to": "orch",
+          "kind": "response",
+          "label": "YES"
+        },
+        {
           "from": "orch",
           "to": "payment",
           "kind": "fail",
-          "label": "no decision"
+          "label": "coordinator down"
         },
         {
           "from": "orch",
           "to": "inventory",
           "kind": "fail",
-          "label": "no decision"
+          "label": "coordinator down"
         },
         {
           "from": "orch",
           "to": "shipping",
           "kind": "fail",
-          "label": "no decision"
+          "label": "coordinator down"
         }
       ],
       "metrics": {
@@ -283,7 +301,7 @@
     {
       "tag": "ORCHESTRATION",
       "title": "Orchestration: a conductor drives it",
-      "body": "Here is the flow up to the last step. In an orchestrated saga one component, here the Order service, holds the workflow. Payment was already charged in the previous step; the orchestrator now commands Inventory, then Shipping, waiting for each reply. The order of steps and the failure rules live in one place, often a persisted state machine, so it can resume after a crash. Each service just does its local job and answers.",
+      "body": "Payment is already charged; here the saga continues and Shipping is the step still in progress. In an orchestrated saga one component, here the Order service, holds the workflow. Payment was already charged in the previous step; the orchestrator now commands Inventory, then Shipping, waiting for each reply. The order of steps and the failure rules live in one place, often a persisted state machine, so it can resume after a crash. Each service just does its local job and answers.",
       "idea": "Orchestration puts the saga's flow in one place that tells each service what to do next.",
       "caption": "Orchestrator commands each step in turn.",
       "focus": [
@@ -415,7 +433,7 @@
     {
       "tag": "TRADE-OFF",
       "title": "Choosing between the two",
-      "body": "As a rule of thumb, choreography suits short sagas of two to four steps with few owners, because it is simple and loosely coupled. Past that, the event chain becomes hard to follow and cyclic dependencies creep in, so orchestration pays off: one place to read, test, time out, and monitor the flow. Orchestrators add a component to run and can attract business logic, so keep them to sequencing only. In choreography a failure is just another event: Shipping emits ShipFailed, Inventory releases stock, and Payment reacts to that to refund. (Payment could also listen to ShipFailed directly.)",
+      "body": "Watch a choreographed failure: Shipping emits ShipFailed, Inventory releases stock, and Payment reacts to that to refund (Payment could also listen to ShipFailed directly). As a rule of thumb, choreography suits short sagas of two to four steps with few owners, because it is simple and loosely coupled. Past that, the event chain becomes hard to follow and cyclic dependencies creep in, so orchestration pays off: one place to read, test, time out, and monitor the flow. Orchestrators add a component to run and can attract business logic, so keep them to sequencing only.",
       "idea": "Choreography wins on coupling for small flows; orchestration wins on visibility once flows grow or branch.",
       "caption": "Choreographed failure: ShipFailed -> stock released -> refund.",
       "focus": [
@@ -448,12 +466,18 @@
           "to": "payment",
           "kind": "async",
           "label": "StockReleased"
+        },
+        {
+          "from": "payment",
+          "to": "broker",
+          "kind": "async",
+          "label": "PaymentRefunded"
         }
       ],
       "metrics": {
         "commits": "2",
-        "undone": "1",
-        "elapsed": "50"
+        "undone": "2",
+        "elapsed": "55"
       }
     },
     {

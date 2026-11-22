@@ -121,8 +121,8 @@
       "idea": "Plain HTTP is request/response, so real-time needs a trick or a different protocol.",
       "caption": "Bob is idle; the news is on the server.",
       "focus": [
-        "bob",
-        "gw2"
+        "alice",
+        "bob"
       ],
       "flows": [],
       "metrics": {
@@ -293,6 +293,30 @@
           "to": "bob",
           "kind": "handshake",
           "label": "101 Switching"
+        },
+        {
+          "from": "bob",
+          "to": "lb",
+          "kind": "async",
+          "label": "frame: typing"
+        },
+        {
+          "from": "lb",
+          "to": "gw2",
+          "kind": "async",
+          "label": "frame: typing"
+        },
+        {
+          "from": "gw2",
+          "to": "lb",
+          "kind": "async",
+          "label": "frame: new msg"
+        },
+        {
+          "from": "lb",
+          "to": "bob",
+          "kind": "async",
+          "label": "frame: new msg"
         }
       ],
       "metrics": {
@@ -418,7 +442,7 @@
       "title": "Choosing the tool",
       "body": "Use short polling when updates are rare and caching matters, such as a job status check. Use SSE for one-way streams like notifications, prices or live logs. Use WebSockets when the client sends often and latency matters, such as chat, games or shared cursors. Whatever you pick, send a heartbeat every 20 to 30 seconds, because proxies and load balancers cut idle connections, often after 60 s.",
       "idea": "Pick the simplest option that matches your direction of traffic, and always heartbeat.",
-      "caption": "Same message, four transports, different costs.",
+      "caption": "Match the transport to the direction of traffic.",
       "focus": [
         "bob",
         "lb",

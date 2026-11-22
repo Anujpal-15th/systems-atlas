@@ -332,7 +332,7 @@
       "title": "What CRDTs cannot do",
       "body": "Merge rules work for data where combining is meaningful: counters, sets, text, flags. They cannot enforce a global rule like a balance that must stay at or above zero, or a username that must be unique, because two replicas can each approve a valid-looking write that is invalid together: a balance of 100 allows a withdrawal of 80 on A and another of 80 on B, but together they leave -60. Those cases need coordination, such as consensus or a single owner, and you pay latency for it. Bounded-counter designs hand each replica a budget in advance, which is coordination done ahead of time.",
       "idea": "CRDTs give availability and convergence; invariants that span replicas still need coordination.",
-      "caption": "Two approvals that conflict cannot be merged away.",
+      "caption": "Two conflicting approvals cannot be merged away (tiles: likes example).",
       "focus": [
         "alice",
         "ra",

@@ -157,7 +157,7 @@
         "users",
         "gw",
         "queue",
-        "db"
+        "workers"
       ],
       "flows": [
         {
@@ -214,7 +214,7 @@
     {
       "tag": "WHAT IF",
       "title": "Work nobody is waiting for",
-      "body": "API clients, proxies and impatient users often give up after a few seconds, say 5. A request that waited 30 seconds is abandoned before a worker starts it, yet the worker still does the full work and the answer is thrown away. Useful output drops toward zero while workers stay 100% busy. Draining 3,000 items at a net 20 per second takes 150 seconds. Workers can check each request's deadline first and drop expired ones, one more reason to keep queues short.",
+      "body": "Say the spike ends and arrivals fall back to 80 per second, but the 3,000-item backlog remains. API clients, proxies and impatient users often give up after a few seconds, say 5. A request that waited 30 seconds is abandoned before a worker starts it, yet the worker still does the full work and the answer is thrown away. Useful output drops toward zero while workers stay 100% busy. Draining 3,000 items at a net 20 per second takes 150 seconds. Workers can check each request's deadline first and drop expired ones, one more reason to keep queues short.",
       "idea": "Long queues make workers burn capacity on stale requests, so overload outlasts the spike that caused it.",
       "caption": "Stale requests reach workers after clients gave up.",
       "focus": [
@@ -391,7 +391,7 @@
           "from": "gw",
           "to": "users",
           "kind": "fail",
-          "label": "limit lowered"
+          "label": "503 over limit"
         }
       ],
       "metrics": {

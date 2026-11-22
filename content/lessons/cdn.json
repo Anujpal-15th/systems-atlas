@@ -326,7 +326,7 @@
     {
       "tag": "PURGE",
       "title": "Changing content that is already cached",
-      "body": "The price of product 42 changes, but copies live for up to 300 seconds. You can wait for the TTL to expire, or call the CDN's purge API to evict a URL or a group of URLs (many CDNs let you tag objects and purge by tag); this takes from under a second to a couple of minutes. The purge clears the shield too, otherwise edges would refill from its stale copy. For static files, name them app.3f9a1c.js so a new build means a new URL. Purge cannot clear copies already in browsers, so use a shorter browser max-age with a longer s-maxage for the CDN. The CDN's control plane pushes the purge to the shield and every edge.",
+      "body": "The price of product 42 changes, but copies live for up to 300 seconds. You can wait for the TTL to expire, or call the CDN's purge API to evict a URL or a group of URLs (many CDNs let you tag objects and purge by tag); this takes from under a second to a couple of minutes. The purge clears the shield too, otherwise edges would refill from its stale copy. For static files, name them app.3f9a1c.js so a new build means a new URL. Purge cannot clear copies already in browsers, so use a shorter browser max-age with a longer s-maxage for the CDN. In the diagram the purge call reaches the shield first, which fans the eviction out to every edge (a real CDN's control plane does this push for you).",
       "idea": "Short TTLs trade hit ratio for freshness; purge gives freshness on demand but sends a burst of misses to the origin; versioned file names avoid the problem for static files.",
       "caption": "Purge clears the shield and every edge.",
       "focus": [
@@ -340,7 +340,7 @@
           "from": "origin",
           "to": "shield",
           "kind": "async",
-          "label": "purge API call"
+          "label": "purge via API"
         },
         {
           "from": "shield",

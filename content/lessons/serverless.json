@@ -104,7 +104,7 @@
       "title": "Who runs your code, and when?",
       "body": "Your API handler is ready. Someone has to start it on a machine, give it CPU and memory, restart it when it crashes, and add copies when traffic grows. You can hand that job to a container orchestrator, which keeps your code running all the time, or to a functions platform, which runs it only while a request is in flight. Same code, very different trade-offs.",
       "idea": "Containers and functions are two answers to the same question: who owns starting and stopping your process?",
-      "caption": "One client, two ways to run the same handler.",
+      "caption": "A client and a gateway: where should the handler run?",
       "focus": [
         "client",
         "gw"
@@ -155,7 +155,7 @@
       "title": "Steady traffic on warm pods",
       "body": "A request arrives at the gateway, which routes it to one of the running pods. The process is already loaded with its database connections open, so the handler just runs. In this example we assume a simple request takes about 25 ms. Those 3 pods are paid for every hour, busy or idle. Adding pods is not instant: the scheduler must place each one, the node must pull the image, and the pod must pass health checks, so scaling up takes seconds to minutes.",
       "idea": "Always-on containers give predictable low latency, and you pay for capacity whether or not it is used.",
-      "caption": "Request served by an already-running pod.",
+      "caption": "Request served by one of 3 already-running pods.",
       "focus": [
         "client",
         "gw",
@@ -173,7 +173,7 @@
           "from": "gw",
           "to": "pod",
           "kind": "request",
-          "label": "route"
+          "label": "route to 1 of 3"
         },
         {
           "from": "pod",
@@ -225,6 +225,7 @@
       "idea": "A cold start is the setup tax paid by a request that arrives when no warm copy is available.",
       "caption": "Sandbox is built before the handler can run.",
       "focus": [
+        "client",
         "gw",
         "fn",
         "db"
@@ -240,13 +241,13 @@
           "from": "gw",
           "to": "fn",
           "kind": "handshake",
-          "label": "create sandbox"
+          "label": "sandbox + init"
         },
         {
           "from": "fn",
           "to": "db",
           "kind": "request",
-          "label": "new connection"
+          "label": "connect + query"
         },
         {
           "from": "db",
@@ -303,8 +304,14 @@
           "label": "rows"
         },
         {
-          "from": "fn",
-          "to": "db",
+          "from": "gw",
+          "to": "fn",
+          "kind": "request",
+          "label": "burst: 500 reqs"
+        },
+        {
+          "from": "db",
+          "to": "fn",
           "kind": "fail",
           "label": "conn limit hit"
         }
@@ -317,12 +324,12 @@
     {
       "tag": "TRADE-OFF",
       "title": "Shrinking cold starts",
-      "body": "Cold starts are reduced, not removed. Keep the package small, avoid heavy work at startup, pick a fast-starting runtime, and lazily load rarely used libraries. You can also pay for provisioned or minimum instances that stay warm, and some platforms snapshot an initialised runtime and restore it. Each fix trades money or complexity for latency, so the more you keep warm, the closer you drift toward an always-on container.",
+      "body": "Cold starts are reduced, not removed. Keep the package small, avoid heavy work at startup, pick a fast-starting runtime, and lazily load rarely used libraries. You can also pay for provisioned or minimum instances that stay warm, and some platforms snapshot an initialised runtime and restore it. Each fix trades money or complexity for latency, so the more you keep warm, the closer you drift toward an always-on container. Here we keep 5 copies provisioned.",
       "idea": "You can buy down cold starts with warm capacity, which erodes the cost advantage of scale to zero.",
       "caption": "Keeping copies warm costs money but removes the wait.",
       "focus": [
-        "fn",
-        "pod"
+        "gw",
+        "fn"
       ],
       "flows": [
         {

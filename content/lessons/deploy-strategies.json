@@ -113,7 +113,8 @@
       "focus": [
         "users",
         "router",
-        "old"
+        "old",
+        "new"
       ],
       "flows": [
         {
@@ -261,7 +262,7 @@
         "share": "0",
         "err2": "5",
         "err1": "0.2",
-        "hit": "5"
+        "hit": "0"
       }
     },
     {
@@ -269,7 +270,7 @@
       "title": "Feature flags: deploy is not release",
       "body": "A feature flag is a runtime on/off switch checked in code, such as if flags.enabled(\"new-checkout\", user). You can ship v2 to every server with the feature off, then turn it on for staff, then 1% of users, then everyone, without another deploy. Turning it off takes seconds, not a rebuild. The cost: flags are extra code paths to test, and stale flags pile up, so remove each one once the rollout is done.",
       "idea": "Flags decouple deploying code from releasing a feature, giving per-user control and a seconds-long kill switch.",
-      "caption": "v2 reads the flag service; the feature is on for 1% of users.",
+      "caption": "All traffic runs v2, but the new-checkout flag is on for only 1% of users.",
       "focus": [
         "router",
         "flags",
@@ -293,7 +294,7 @@
         "share": "100",
         "err2": "0.2",
         "err1": "0",
-        "hit": "1"
+        "hit": "100"
       }
     },
     {
@@ -303,16 +304,23 @@
       "idea": "Shadow traffic tests v2 on real load without exposing users, as long as the mirror is isolated and has no side effects.",
       "caption": "Mirrored copies, not served traffic; only v1's responses go back.",
       "focus": [
+        "users",
         "router",
         "old",
         "new"
       ],
       "flows": [
         {
+          "from": "users",
+          "to": "router",
+          "kind": "request",
+          "label": "real request"
+        },
+        {
           "from": "router",
           "to": "old",
           "kind": "request",
-          "label": "real request"
+          "label": "to v1"
         },
         {
           "from": "router",
@@ -325,6 +333,12 @@
           "to": "router",
           "kind": "response",
           "label": "answer used"
+        },
+        {
+          "from": "router",
+          "to": "users",
+          "kind": "response",
+          "label": "v1 answer only"
         }
       ],
       "metrics": {

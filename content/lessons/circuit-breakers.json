@@ -12,53 +12,586 @@
     "How to pick a fallback that degrades the page instead of breaking it"
   ],
   "nodes": [
-    {"id": "user", "label": "Shoppers", "kind": "user", "x": 8, "y": 50},
-    {"id": "shop", "label": "Shop API", "kind": "service", "x": 31, "y": 50},
-    {"id": "cb", "label": "Circuit breaker", "kind": "gateway", "x": 55, "y": 28},
-    {"id": "rec", "label": "Recommendations", "kind": "service", "x": 82, "y": 28},
-    {"id": "pay", "label": "Payments", "kind": "external", "x": 82, "y": 70},
-    {"id": "cache", "label": "Popular items cache", "kind": "cache", "x": 55, "y": 86}
+    {
+      "id": "user",
+      "label": "Shoppers",
+      "kind": "user",
+      "x": 8,
+      "y": 50
+    },
+    {
+      "id": "shop",
+      "label": "Shop API",
+      "kind": "service",
+      "x": 31,
+      "y": 50
+    },
+    {
+      "id": "cb",
+      "label": "Circuit breaker",
+      "kind": "gateway",
+      "x": 55,
+      "y": 28
+    },
+    {
+      "id": "rec",
+      "label": "Recommendations",
+      "kind": "service",
+      "x": 82,
+      "y": 28
+    },
+    {
+      "id": "pay",
+      "label": "Payments",
+      "kind": "external",
+      "x": 82,
+      "y": 70
+    },
+    {
+      "id": "cache",
+      "label": "Popular items cache",
+      "kind": "cache",
+      "x": 55,
+      "y": 86
+    }
   ],
   "edges": [
-    {"from": "user", "to": "shop"},
-    {"from": "shop", "to": "cb"},
-    {"from": "cb", "to": "rec"},
-    {"from": "shop", "to": "pay"},
-    {"from": "cb", "to": "cache"}
+    {
+      "from": "user",
+      "to": "shop"
+    },
+    {
+      "from": "shop",
+      "to": "cb"
+    },
+    {
+      "from": "cb",
+      "to": "rec"
+    },
+    {
+      "from": "shop",
+      "to": "pay"
+    },
+    {
+      "from": "cb",
+      "to": "cache"
+    }
   ],
   "metrics": [
-    {"id": "threads", "label": "Busy threads", "unit": "of 200"},
-    {"id": "errors", "label": "Page errors", "unit": "%"},
-    {"id": "p99", "label": "Page p99", "unit": "ms"},
-    {"id": "recrate", "label": "Calls to recs", "unit": "/s"}
+    {
+      "id": "threads",
+      "label": "Busy threads",
+      "unit": "of 200"
+    },
+    {
+      "id": "errors",
+      "label": "Page errors",
+      "unit": "%"
+    },
+    {
+      "id": "p99",
+      "label": "Page p99",
+      "unit": "ms"
+    },
+    {
+      "id": "recrate",
+      "label": "Calls to recs",
+      "unit": "/s"
+    }
   ],
   "steps": [
-    {"tag": "QUESTION", "title": "A nice-to-have takes down the page", "body": "Each product page on the Shop API calls Recommendations (a nice-to-have 'you may also like' row) and Payments (essential). Traffic is 500 requests per second and the Shop API has 200 worker threads. Normally recommendations answer in 40 ms, only about 20 threads are busy waiting on it at any moment (500 x 0.04 s), plus a couple for other work. Shop API threads call Recommendations through a thin wrapper that is a plain pass-through for now (the circuit breaker, explained shortly). What happens when that one optional service stops answering?", "idea": "A dependency you could live without can still sink you if you wait on it.", "caption": "Healthy baseline: 500 req/s, about 22 busy threads.", "focus": ["shop", "rec"], "flows": [{"from": "user", "to": "shop", "kind": "request", "label": "GET /product"}, {"from": "shop", "to": "cb", "kind": "request", "label": "get recs"}, {"from": "cb", "to": "rec", "kind": "request"}, {"from": "rec", "to": "cb", "kind": "response", "label": "40 ms"}, {"from": "cb", "to": "shop", "kind": "response", "label": "recs"}], "metrics": {"threads": "22", "errors": "0", "p99": "120", "recrate": "500"}},
-    {"tag": "WHAT IF", "title": "Slow is worse than down", "body": "Recommendations now hang for 30 seconds before failing. A crashed process on a live host refuses connections instantly and the caller moves on; a slow or unreachable one holds a thread until a timeout fires. By Little's law, 500 requests per second times 30 seconds wants 15,000 threads, and we only have 200. The pool is full in under half a second. Now even checkout pages, which never needed recommendations, queue for a thread and time out.", "idea": "Slow calls hold resources; resource exhaustion turns one sick dependency into a full outage (a cascading failure).", "caption": "Threads pile up waiting on Recommendations.", "focus": ["shop", "rec"], "flows": [{"from": "shop", "to": "cb", "kind": "request", "label": "get recs"}, {"from": "cb", "to": "rec", "kind": "request"}, {"from": "rec", "to": "cb", "kind": "fail", "label": "no reply"}, {"from": "user", "to": "shop", "kind": "request", "label": "GET /checkout"}, {"from": "shop", "to": "user", "kind": "fail", "label": "503"}], "metrics": {"threads": "200", "errors": "60", "p99": "30000", "recrate": "500"}},
-    {"tag": "CONCEPT", "title": "Closed: counting quietly", "body": "A circuit breaker is a small wrapper around calls to one dependency. Like the electrical kind, 'closed' means current flows: every call goes through. The breaker watches the recent results in a rolling window, say the last 10 seconds, and counts failures and timeouts. In this normal state it adds almost no cost, just a counter.", "idea": "Closed is the normal state: pass everything through and keep score.", "caption": "Breaker closed: calls pass, outcomes are counted.", "focus": ["shop", "cb", "rec"], "flows": [{"from": "shop", "to": "cb", "kind": "request", "label": "get recs"}, {"from": "cb", "to": "rec", "kind": "request"}, {"from": "rec", "to": "cb", "kind": "response", "label": "ok"}, {"from": "cb", "to": "shop", "kind": "response", "label": "ok, 1 more success"}], "metrics": {"threads": "22", "errors": "0", "p99": "120", "recrate": "500"}},
-    {"tag": "CONCEPT", "title": "Trip: closed becomes open", "body": "Suppose the rule is: with at least 20 calls in the window, open the breaker if 50% or more failed. A short per-call timeout (here 500 ms) turns hangs into counted failures, but each failure is only counted as its timeout fires and healthy results from earlier are still in the window, so the breaker trips within a few seconds, not instantly. Even a 500 ms timeout alone cannot protect a 200-thread pool at 500 req/s (about 250 calls in flight), which is why the breaker is needed. Once the threshold is crossed, the breaker trips to open. Thresholds are rules of thumb you tune from real traffic, not magic numbers.", "idea": "A timeout makes slowness countable; the failure rate threshold decides when to trip.", "caption": "Failures cross 50%: the breaker trips open.", "focus": ["cb", "rec"], "flows": [{"from": "cb", "to": "rec", "kind": "request", "label": "call"}, {"from": "rec", "to": "cb", "kind": "fail", "label": "timeout 500ms"}, {"from": "cb", "to": "rec", "kind": "request", "label": "call"}, {"from": "rec", "to": "cb", "kind": "fail", "label": "timeout 500ms"}], "metrics": {"threads": "200", "errors": "35", "p99": "600", "recrate": "500"}},
-    {"tag": "FAIL FAST", "title": "Open: reject in a millisecond", "body": "While open, the breaker does not call Recommendations at all. It answers immediately with an error that the Shop API can handle. The error rate falls as the last hung calls drain; the Shop API omits the row until a fallback is added in the next step. Each request now holds a thread for about a millisecond instead of 500 ms or more, so threads drain back to normal. The sick service also stops receiving 500 calls per second, which gives it quiet time to recover instead of drowning under 500 calls per second it cannot answer.", "idea": "Failing fast protects the caller's threads and gives the callee room to heal.", "caption": "Calls rejected locally; Recommendations is left alone.", "focus": ["shop", "cb"], "flows": [{"from": "shop", "to": "cb", "kind": "request", "label": "get recs"}, {"from": "cb", "to": "shop", "kind": "fail", "label": "open: rejected"}], "metrics": {"threads": "3", "errors": "5", "p99": "40", "recrate": "0"}},
-    {"tag": "FALLBACK", "title": "Degrade instead of erroring", "body": "A rejected call still needs an answer. For optional data, the breaker's fallback hook returns a cached list of the 20 most popular items, refreshed every few minutes, which the Shop API renders. Shoppers see a slightly less personal row, and nothing else changes. Choose fallbacks that are cheap and independent of the failing service: a cache, a default value, or hiding the widget. Do not fall back to calling another fragile service.", "idea": "Graceful degradation means a worse answer is returned instead of no answer.", "caption": "Breaker serves popular items from cache.", "focus": ["shop", "cb", "cache"], "flows": [{"from": "cb", "to": "cache", "kind": "request", "label": "top 20"}, {"from": "cache", "to": "cb", "kind": "response", "label": "popular items"}, {"from": "cb", "to": "shop", "kind": "response", "label": "fallback recs"}, {"from": "shop", "to": "user", "kind": "response", "label": "200 OK"}], "metrics": {"threads": "4", "errors": "0", "p99": "45", "recrate": "0"}},
-    {"tag": "CONCEPT", "title": "Half-open: let a few probes through", "body": "Staying open forever would be a bug, so after a cool-down (say 30 seconds) the breaker goes half-open. It lets a small number of trial calls through, for example 3, and holds back everyone else. If the probes succeed, the breaker closes and traffic resumes. In the simple model used here, if any fails, it snaps back to open and the cool-down starts again.", "idea": "Half-open tests recovery with a trickle so a healing service is not hit by the full crowd at once.", "caption": "Probes succeed: breaker closes, recs return.", "focus": ["cb", "rec"], "flows": [{"from": "cb", "to": "rec", "kind": "request", "label": "probe 1 of 3"}, {"from": "rec", "to": "cb", "kind": "response", "label": "ok 45 ms"}, {"from": "cb", "to": "rec", "kind": "request", "label": "probe 2 of 3"}, {"from": "rec", "to": "cb", "kind": "response", "label": "ok 41 ms"}, {"from": "cb", "to": "rec", "kind": "request", "label": "probe 3 of 3"}, {"from": "rec", "to": "cb", "kind": "response", "label": "ok 43 ms"}, {"from": "cb", "to": "shop", "kind": "response", "label": "closed again"}], "metrics": {"threads": "22", "errors": "0", "p99": "120", "recrate": "500"}},
-    {"tag": "BULKHEAD", "title": "Bulkheads cap the blast radius", "body": "Ships have watertight compartments so one leak cannot sink the whole hull. Do the same with pools: give Recommendations its own limit of 40 concurrent calls out of the 200 threads (normal use is about 20, so there is headroom for bursts). If it hangs again before the breaker trips, only those 40 slots fill and admitted calls still wait out the 500 ms timeout, so the breaker would soon trip; extra recommendation calls are rejected at once. Payments keeps its own pool, so checkout carries on untouched.", "idea": "A bulkhead limits how much of a shared resource any one dependency may consume.", "caption": "Recs pool full and rejecting; payments unaffected.", "focus": ["shop", "cb", "pay"], "flows": [{"from": "shop", "to": "cb", "kind": "request", "label": "get recs"}, {"from": "cb", "to": "shop", "kind": "fail", "label": "pool full: 40/40"}, {"from": "user", "to": "shop", "kind": "request", "label": "POST /pay"}, {"from": "shop", "to": "pay", "kind": "request", "label": "charge"}, {"from": "pay", "to": "shop", "kind": "response", "label": "ok"}], "metrics": {"threads": "42", "errors": "0", "p99": "600", "recrate": "80"}},
-    {"tag": "TRADE-OFF", "title": "Where breakers go wrong", "body": "Breakers trip on server errors and timeouts, not on client mistakes such as a 404 or 400. Most libraries can also trip on slow calls, not just errors, and you choose which statuses count (429 and 503 often should). A breaker per dependency, per instance, only sees its own slice of traffic; low-traffic callers may never reach the 20-call minimum. A threshold that is too tight opens on a blip, too loose reacts late. And a fallback that is silently stale needs alerts, so people notice the breaker is open. Never retry a rejection from an open breaker; it only adds load. (How to retry safely is covered in Timeouts & Retries.)", "idea": "Breakers need sensible failure definitions, minimum volume, a visible state and a harmless fallback.", "caption": "Tuning and monitoring decide whether it helps.", "focus": ["cb"], "flows": [], "metrics": {}},
-    {"tag": "RECAP", "title": "Fail fast, isolate, degrade", "body": "A slow dependency exhausts threads, so use timeouts to make slowness a countable failure. A breaker moves closed to open to half-open to stop calling a sick service and to test recovery gently. A bulkhead gives each dependency its own capped pool. A fallback turns a rejected call into a lesser but working answer. Together they keep one broken optional feature from becoming a total outage.", "idea": "Timeouts detect, breakers stop, bulkheads contain, fallbacks soften.", "caption": "Page stays up while recommendations are down.", "focus": [], "flows": [], "metrics": {}}
+    {
+      "tag": "QUESTION",
+      "title": "A nice-to-have takes down the page",
+      "body": "Each product page on the Shop API calls Recommendations (a nice-to-have 'you may also like' row) and Payments (essential). Traffic is 500 requests per second and the Shop API has 200 worker threads. Normally recommendations answer in 40 ms, only about 20 threads are busy waiting on it at any moment (500 x 0.04 s), plus a couple for other work. Shop API threads call Recommendations through a thin wrapper that is a plain pass-through for now (the circuit breaker, explained shortly). What happens when that one optional service stops answering?",
+      "idea": "A dependency you could live without can still sink you if you wait on it.",
+      "caption": "Healthy baseline: 500 req/s, about 22 busy threads.",
+      "focus": [
+        "shop",
+        "rec",
+        "pay"
+      ],
+      "flows": [
+        {
+          "from": "user",
+          "to": "shop",
+          "kind": "request",
+          "label": "GET /product"
+        },
+        {
+          "from": "shop",
+          "to": "cb",
+          "kind": "request",
+          "label": "get recs"
+        },
+        {
+          "from": "cb",
+          "to": "rec",
+          "kind": "request"
+        },
+        {
+          "from": "rec",
+          "to": "cb",
+          "kind": "response",
+          "label": "40 ms"
+        },
+        {
+          "from": "cb",
+          "to": "shop",
+          "kind": "response",
+          "label": "recs"
+        },
+        {
+          "from": "shop",
+          "to": "pay",
+          "kind": "request",
+          "label": "charge"
+        }
+      ],
+      "metrics": {
+        "threads": "22",
+        "errors": "0",
+        "p99": "120",
+        "recrate": "500"
+      }
+    },
+    {
+      "tag": "WHAT IF",
+      "title": "Slow is worse than down",
+      "body": "Recommendations now hang for 30 seconds before failing. A crashed process on a live host refuses connections instantly and the caller moves on; a slow or unreachable one holds a thread until a timeout fires. By Little's law, 500 requests per second times 30 seconds wants 15,000 threads, and we only have 200. The pool is full in under half a second. Now even checkout pages, which never needed recommendations, queue for a thread and time out.",
+      "idea": "Slow calls hold resources; resource exhaustion turns one sick dependency into a full outage (a cascading failure).",
+      "caption": "Threads pile up waiting on Recommendations.",
+      "focus": [
+        "shop",
+        "rec"
+      ],
+      "flows": [
+        {
+          "from": "shop",
+          "to": "cb",
+          "kind": "request",
+          "label": "get recs"
+        },
+        {
+          "from": "cb",
+          "to": "rec",
+          "kind": "request"
+        },
+        {
+          "from": "rec",
+          "to": "cb",
+          "kind": "fail",
+          "label": "no reply"
+        },
+        {
+          "from": "user",
+          "to": "shop",
+          "kind": "request",
+          "label": "GET /checkout"
+        },
+        {
+          "from": "shop",
+          "to": "user",
+          "kind": "fail",
+          "label": "503"
+        }
+      ],
+      "metrics": {
+        "threads": "200",
+        "errors": "60",
+        "p99": "30000",
+        "recrate": "500"
+      }
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "Closed: counting quietly",
+      "body": "Rewind to the healthy moment before trouble to see what the breaker does in its normal state. A circuit breaker is a small wrapper around calls to one dependency. Like the electrical kind, 'closed' means current flows: every call goes through. The breaker watches the recent results in a rolling window, say the last 10 seconds, and counts failures and timeouts. In this normal state it adds almost no cost, just a counter.",
+      "idea": "Closed is the normal state: pass everything through and keep score.",
+      "caption": "Breaker closed: calls pass, outcomes are counted.",
+      "focus": [
+        "shop",
+        "cb",
+        "rec"
+      ],
+      "flows": [
+        {
+          "from": "shop",
+          "to": "cb",
+          "kind": "request",
+          "label": "get recs"
+        },
+        {
+          "from": "cb",
+          "to": "rec",
+          "kind": "request"
+        },
+        {
+          "from": "rec",
+          "to": "cb",
+          "kind": "response",
+          "label": "ok"
+        },
+        {
+          "from": "cb",
+          "to": "shop",
+          "kind": "response",
+          "label": "ok, 1 more success"
+        }
+      ],
+      "metrics": {
+        "threads": "22",
+        "errors": "0",
+        "p99": "120",
+        "recrate": "500"
+      }
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "Trip: closed becomes open",
+      "body": "Suppose the rule is: with at least 20 calls in the window, open the breaker if 50% or more failed. A short per-call timeout (here 500 ms) turns hangs into counted failures, but each failure is only counted as its timeout fires and healthy results from earlier are still in the window, so the breaker trips within a few seconds, not instantly. Even a 500 ms timeout alone cannot protect a 200-thread pool at 500 req/s (about 250 calls in flight), which is why the breaker is needed. Once the threshold is crossed, the breaker trips to open. Thresholds are rules of thumb you tune from real traffic, not magic numbers.",
+      "idea": "A timeout makes slowness countable; the failure rate threshold decides when to trip.",
+      "caption": "Failures cross 50%: the breaker trips open.",
+      "focus": [
+        "cb",
+        "rec"
+      ],
+      "flows": [
+        {
+          "from": "cb",
+          "to": "rec",
+          "kind": "request",
+          "label": "call"
+        },
+        {
+          "from": "rec",
+          "to": "cb",
+          "kind": "fail",
+          "label": "timeout 500ms"
+        },
+        {
+          "from": "cb",
+          "to": "rec",
+          "kind": "request",
+          "label": "call"
+        },
+        {
+          "from": "rec",
+          "to": "cb",
+          "kind": "fail",
+          "label": "timeout 500ms"
+        }
+      ],
+      "metrics": {
+        "threads": "200",
+        "errors": "35",
+        "p99": "600",
+        "recrate": "500"
+      }
+    },
+    {
+      "tag": "FAIL FAST",
+      "title": "Open: reject in a millisecond",
+      "body": "While open, the breaker does not call Recommendations at all. It answers immediately with an error that the Shop API can handle. The error rate falls as the last hung calls drain; the Shop API omits the row until a fallback is added in the next step. Each request now holds a thread for about a millisecond instead of 500 ms or more, so busy threads fall to just a few. The sick service also stops receiving 500 calls per second, which gives it quiet time to recover.",
+      "idea": "Failing fast protects the caller's threads and gives the callee room to heal.",
+      "caption": "Calls rejected locally; Recommendations is left alone.",
+      "focus": [
+        "shop",
+        "cb"
+      ],
+      "flows": [
+        {
+          "from": "shop",
+          "to": "cb",
+          "kind": "request",
+          "label": "get recs"
+        },
+        {
+          "from": "cb",
+          "to": "shop",
+          "kind": "fail",
+          "label": "open: rejected"
+        }
+      ],
+      "metrics": {
+        "threads": "3",
+        "errors": "5",
+        "p99": "40",
+        "recrate": "0"
+      }
+    },
+    {
+      "tag": "FALLBACK",
+      "title": "Degrade instead of erroring",
+      "body": "A rejected call still needs an answer. For optional data, the breaker's fallback hook returns a cached list of the 20 most popular items, refreshed every few minutes, which the Shop API renders. Shoppers see a slightly less personal row, and nothing else changes. Choose fallbacks that are cheap and independent of the failing service: a cache, a default value, or hiding the widget. Do not fall back to calling another fragile service.",
+      "idea": "Graceful degradation means a worse answer is returned instead of no answer.",
+      "caption": "Breaker serves popular items from cache.",
+      "focus": [
+        "shop",
+        "cb",
+        "cache"
+      ],
+      "flows": [
+        {
+          "from": "cb",
+          "to": "cache",
+          "kind": "request",
+          "label": "top 20"
+        },
+        {
+          "from": "cache",
+          "to": "cb",
+          "kind": "response",
+          "label": "popular items"
+        },
+        {
+          "from": "cb",
+          "to": "shop",
+          "kind": "response",
+          "label": "fallback recs"
+        },
+        {
+          "from": "shop",
+          "to": "user",
+          "kind": "response",
+          "label": "200 OK"
+        }
+      ],
+      "metrics": {
+        "threads": "4",
+        "errors": "0",
+        "p99": "45",
+        "recrate": "0"
+      }
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "Half-open: let a few probes through",
+      "body": "Staying open forever would be a bug, so after a cool-down (say 30 seconds) the breaker goes half-open. It lets a small number of trial calls through, for example 3, and holds back everyone else. If the probes succeed, the breaker closes and traffic resumes. In the simple model used here, if any fails, it snaps back to open and the cool-down starts again.",
+      "idea": "Half-open tests recovery with a trickle so a healing service is not hit by the full crowd at once.",
+      "caption": "Probes succeed: breaker closes, recs return.",
+      "focus": [
+        "cb",
+        "rec"
+      ],
+      "flows": [
+        {
+          "from": "cb",
+          "to": "rec",
+          "kind": "request",
+          "label": "probe 1 of 3"
+        },
+        {
+          "from": "rec",
+          "to": "cb",
+          "kind": "response",
+          "label": "ok 45 ms"
+        },
+        {
+          "from": "cb",
+          "to": "rec",
+          "kind": "request",
+          "label": "probe 2 of 3"
+        },
+        {
+          "from": "rec",
+          "to": "cb",
+          "kind": "response",
+          "label": "ok 41 ms"
+        },
+        {
+          "from": "cb",
+          "to": "rec",
+          "kind": "request",
+          "label": "probe 3 of 3"
+        },
+        {
+          "from": "rec",
+          "to": "cb",
+          "kind": "response",
+          "label": "ok 43 ms"
+        },
+        {
+          "from": "cb",
+          "to": "shop",
+          "kind": "response",
+          "label": "closed again"
+        }
+      ],
+      "metrics": {
+        "threads": "22",
+        "errors": "0",
+        "p99": "120",
+        "recrate": "500"
+      }
+    },
+    {
+      "tag": "BULKHEAD",
+      "title": "Bulkheads cap the blast radius",
+      "body": "Ships have watertight compartments so one leak cannot sink the whole hull. Do the same with pools: give Recommendations its own limit of 40 concurrent calls out of the 200 threads (normal use is about 20, so there is headroom for bursts). If it hangs again before the breaker trips, only those 40 slots fill and admitted calls still wait out the 500 ms timeout, so the breaker would soon trip; extra recommendation calls are rejected at once. Payments keeps its own pool, so checkout carries on untouched.",
+      "idea": "A bulkhead limits how much of a shared resource any one dependency may consume.",
+      "caption": "Recs pool full and rejecting; payments unaffected.",
+      "focus": [
+        "shop",
+        "cb",
+        "pay"
+      ],
+      "flows": [
+        {
+          "from": "shop",
+          "to": "cb",
+          "kind": "request",
+          "label": "get recs"
+        },
+        {
+          "from": "cb",
+          "to": "shop",
+          "kind": "fail",
+          "label": "pool full: 40/40"
+        },
+        {
+          "from": "user",
+          "to": "shop",
+          "kind": "request",
+          "label": "POST /pay"
+        },
+        {
+          "from": "shop",
+          "to": "pay",
+          "kind": "request",
+          "label": "charge"
+        },
+        {
+          "from": "pay",
+          "to": "shop",
+          "kind": "response",
+          "label": "ok"
+        }
+      ],
+      "metrics": {
+        "threads": "42",
+        "errors": "0",
+        "p99": "600",
+        "recrate": "80"
+      }
+    },
+    {
+      "tag": "TRADE-OFF",
+      "title": "Where breakers go wrong",
+      "body": "Breakers trip on server errors and timeouts, not on client mistakes such as a 404 or 400. Most libraries can also trip on slow calls, not just errors, and you choose which statuses count (429 and 503 often should). A breaker per dependency, per instance, only sees its own slice of traffic; low-traffic callers may never reach the 20-call minimum. A threshold that is too tight opens on a blip, too loose reacts late. And a fallback that is silently stale needs alerts, so people notice the breaker is open. Never retry a rejection from an open breaker; it only adds load. (How to retry safely is covered in Timeouts & Retries.)",
+      "idea": "Breakers need sensible failure definitions, minimum volume, a visible state and a harmless fallback.",
+      "caption": "Tuning and monitoring decide whether it helps.",
+      "focus": [
+        "cb"
+      ],
+      "flows": [],
+      "metrics": {}
+    },
+    {
+      "tag": "RECAP",
+      "title": "Fail fast, isolate, degrade",
+      "body": "A slow dependency exhausts threads, so use timeouts to make slowness a countable failure. A breaker moves closed to open to half-open to stop calling a sick service and to test recovery gently. A bulkhead gives each dependency its own capped pool. A fallback turns a rejected call into a lesser but working answer. Together they keep one broken optional feature from becoming a total outage.",
+      "idea": "Timeouts detect, breakers stop, bulkheads contain, fallbacks soften.",
+      "caption": "Page stays up while recommendations are down.",
+      "focus": [],
+      "flows": [],
+      "metrics": {
+        "threads": "4",
+        "errors": "0",
+        "p99": "45",
+        "recrate": "0"
+      }
+    }
   ],
   "quiz": [
-    {"q": "Recommendations goes from 40 ms to hanging for 30 s. Why is that usually more dangerous than it simply being down?", "options": ["Hung calls hold threads and connections, so the caller runs out of capacity", "Hung calls use more network bandwidth than refused ones", "A hung service writes corrupted data into shared databases", "The load balancer removes the caller from rotation immediately"], "answer": 0, "why": "A dead service refuses quickly and frees the thread. A slow one keeps each thread occupied, and at 500 req/s the pool of 200 fills in well under a second."},
-    {"q": "A breaker is open. What does it do with a new call?", "options": ["Queues it until the dependency recovers", "Retries it against the dependency three times", "Rejects it immediately, or returns a fallback, without calling the dependency", "Sends it to the dependency but ignores the response"], "answer": 2, "why": "Open means the dependency is not contacted. The call returns at once with an error or fallback, which frees the thread and relieves the dependency."},
-    {"q": "Why does the half-open state allow only a few probe calls rather than all traffic?", "options": ["To measure latency percentiles accurately", "To avoid hitting a barely recovered service with full load and knocking it over again", "Because half-open only applies to read-only calls", "To keep the cache warm"], "answer": 1, "why": "A recovering service may be fragile. A trickle of trial calls tests health cheaply, and a single failure reopens the breaker."},
-    {"q": "How is a bulkhead different from a circuit breaker?", "options": ["A bulkhead reacts to failure rates; a breaker only counts threads", "They are two names for the same mechanism", "A bulkhead only works for databases", "A bulkhead is a fixed cap on concurrent use per dependency; a breaker reacts to observed failures"], "answer": 3, "why": "The bulkhead is a static limit that works even before failures are measured. The breaker is dynamic and based on outcomes. They are used together."},
-    {"q": "The checkout 'charge card' call fails. Which fallback is most appropriate?", "options": ["Tell the user clearly that payment could not be completed and let them retry", "Report the payment as successful and reconcile later without telling the user", "Show a cached list of popular items", "Silently skip payment and ship the order"], "answer": 0, "why": "Fallbacks suit optional data. Essential, money-moving operations must not pretend to succeed; the right degradation is an honest error or a retry-safe path."}
+    {
+      "q": "Recommendations goes from 40 ms to hanging for 30 s. Why is that usually more dangerous than it simply being down?",
+      "options": [
+        "Hung calls hold threads and connections, so the caller runs out of capacity",
+        "Hung calls use more network bandwidth than refused ones",
+        "A hung service writes corrupted data into shared databases",
+        "The load balancer removes the caller from rotation immediately"
+      ],
+      "answer": 0,
+      "why": "A dead service refuses quickly and frees the thread. A slow one keeps each thread occupied, and at 500 req/s the pool of 200 fills in well under a second."
+    },
+    {
+      "q": "A breaker is open. What does it do with a new call?",
+      "options": [
+        "Queues it until the dependency recovers",
+        "Retries it against the dependency three times",
+        "Rejects it immediately, or returns a fallback, without calling the dependency",
+        "Sends it to the dependency but ignores the response"
+      ],
+      "answer": 2,
+      "why": "Open means the dependency is not contacted. The call returns at once with an error or fallback, which frees the thread and relieves the dependency."
+    },
+    {
+      "q": "Why does the half-open state allow only a few probe calls rather than all traffic?",
+      "options": [
+        "To measure latency percentiles accurately",
+        "To avoid hitting a barely recovered service with full load and knocking it over again",
+        "Because half-open only applies to read-only calls",
+        "To keep the cache warm"
+      ],
+      "answer": 1,
+      "why": "A recovering service may be fragile. A trickle of trial calls tests health cheaply, and a single failure reopens the breaker."
+    },
+    {
+      "q": "How is a bulkhead different from a circuit breaker?",
+      "options": [
+        "A bulkhead reacts to failure rates; a breaker only counts threads",
+        "They are two names for the same mechanism",
+        "A bulkhead only works for databases",
+        "A bulkhead is a fixed cap on concurrent use per dependency; a breaker reacts to observed failures"
+      ],
+      "answer": 3,
+      "why": "The bulkhead is a static limit that works even before failures are measured. The breaker is dynamic and based on outcomes. They are used together."
+    },
+    {
+      "q": "The checkout 'charge card' call fails. Which fallback is most appropriate?",
+      "options": [
+        "Tell the user clearly that payment could not be completed and let them retry",
+        "Report the payment as successful and reconcile later without telling the user",
+        "Show a cached list of popular items",
+        "Silently skip payment and ship the order"
+      ],
+      "answer": 0,
+      "why": "Fallbacks suit optional data. Essential, money-moving operations must not pretend to succeed; the right degradation is an honest error or a retry-safe path."
+    }
   ],
   "cheatsheet": [
-    {"term": "Closed", "def": "Normal state. Calls pass through while the breaker counts recent failures in a rolling window."},
-    {"term": "Open", "def": "Tripped state. Calls are rejected immediately or served a fallback; the dependency is left alone."},
-    {"term": "Half-open", "def": "After a cool-down, a few probe calls test recovery. Success closes the breaker; failure reopens it."},
-    {"term": "Example settings", "def": "Example only (libraries differ): trip at 50% failures once the window has 20+ calls, stay open 30 s, allow 3 probes. Tune from real traffic."},
-    {"term": "Timeout first", "def": "A breaker needs timeouts to turn hangs into failures it can count. Keep timeouts short."},
-    {"term": "Bulkhead", "def": "A per-dependency cap on concurrent calls, threads or connections, so one dependency cannot consume the shared pool."},
-    {"term": "Fallback", "def": "A cheap substitute answer: cache, default, or hiding the feature. Never use for money-moving writes."},
-    {"term": "What to count", "def": "Count timeouts and 5xx errors, often 429 and 503 too, and slow calls if your library supports it. Usually not 4xx client errors like 400 or 404."}
+    {
+      "term": "Closed",
+      "def": "Normal state. Calls pass through while the breaker counts recent failures in a rolling window."
+    },
+    {
+      "term": "Open",
+      "def": "Tripped state. Calls are rejected immediately or served a fallback; the dependency is left alone."
+    },
+    {
+      "term": "Half-open",
+      "def": "After a cool-down, a few probe calls test recovery. Success closes the breaker; failure reopens it."
+    },
+    {
+      "term": "Example settings",
+      "def": "Example only (libraries differ): trip at 50% failures once the window has 20+ calls, stay open 30 s, allow 3 probes. Tune from real traffic."
+    },
+    {
+      "term": "Timeout first",
+      "def": "A breaker needs timeouts to turn hangs into failures it can count. Keep timeouts short."
+    },
+    {
+      "term": "Bulkhead",
+      "def": "A per-dependency cap on concurrent calls, threads or connections, so one dependency cannot consume the shared pool."
+    },
+    {
+      "term": "Fallback",
+      "def": "A cheap substitute answer: cache, default, or hiding the feature. Never use for money-moving writes."
+    },
+    {
+      "term": "What to count",
+      "def": "Count timeouts and 5xx errors, often 429 and 503 too, and slow calls if your library supports it. Usually not 4xx client errors like 400 or 404."
+    }
   ]
 }

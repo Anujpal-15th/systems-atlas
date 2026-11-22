@@ -124,7 +124,7 @@
       "title": "Every service needs the same plumbing",
       "body": "Orders calls Payments over the network. Someone must encrypt that call, prove who is calling, set a timeout, retry safely, and record metrics. If each team writes this in its own language and library, you get 40 slightly different versions, and fixing one bug means redeploying everything. Can we move that plumbing out of the application?",
       "idea": "Cross-cutting network behavior is repeated in every service unless you pull it into shared infrastructure.",
-      "caption": "Orders must call Payments; the greyed boxes are what the mesh will add.",
+      "caption": "Orders must call Payments, which runs as two pods, A and B.",
       "focus": [
         "orders",
         "pay1",
@@ -292,6 +292,12 @@
         {
           "from": "scpay1",
           "to": "pay1",
+          "kind": "request",
+          "label": "GET /payment/42"
+        },
+        {
+          "from": "pay1",
+          "to": "scpay1",
           "kind": "fail",
           "label": "no reply"
         },
@@ -360,7 +366,9 @@
         "orders",
         "scorders",
         "scpay1",
-        "scpay2"
+        "pay1",
+        "scpay2",
+        "pay2"
       ],
       "flows": [],
       "metrics": {

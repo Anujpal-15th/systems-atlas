@@ -257,9 +257,9 @@
     {
       "tag": "TRADE-OFF",
       "title": "Sequential keys leak",
-      "body": "Plain counters give keys that are guessable and enumerable: anyone can walk through links one by one. To stop that, scramble the number across the whole 62^7 space with format-preserving encryption (a keyed shuffle that maps each number to a unique number of the same size and can be reversed), then encode and left-pad to 7 characters. Output looks random but stays unique. Scrambling is obfuscation, not access control: with billions of 7-character keys in use, random guessing still finds live links. If a leased block is lost in a crash, you skip those numbers; gaps cost nothing.",
+      "body": "Plain counters give keys that are guessable and enumerable: anyone can walk through links one by one. To stop that, scramble the number across the whole 62^7 space with format-preserving encryption (a keyed shuffle that maps each number to a unique number of the same size and can be reversed), then encode and left-pad to 7 characters. Output looks random but stays unique. Scrambling is obfuscation, not access control: random guessing can still find live links. A block lost in a crash just leaves gaps, which cost nothing. When a block runs out, the create service leases the next one from the allocator (shown); the scramble runs locally in the create service.",
       "idea": "A counter plus a reversible scramble keeps keys unique and stops people walking them in order, but short keys are still guessable, so truly private links need auth or long random tokens.",
-      "caption": "The allocator only hands out blocks, never single keys.",
+      "caption": "Create service scrambles keys locally; allocator only hands out next blocks.",
       "focus": [
         "create",
         "keygen"

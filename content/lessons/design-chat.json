@@ -255,7 +255,7 @@
     {
       "tag": "STORAGE",
       "title": "Where messages live",
-      "body": "At 46,000 messages a second, one database server cannot take the writes, so the store is sharded. Partition by conversation ID and order rows by sequence number, so one chat's history is a single range read. Every write for a conversation goes through one owner at a time, such as the shard leader or a per-conversation sequencer, which increments the counter and inserts the row only if that seq is free, so 4021 is never issued twice. Assume about 100 bytes of text payload; with IDs, timestamps and indexes budget 200-300 bytes, so 1-1.2 TB a day before replication. Media goes to separate blob storage. Plan retention.",
+      "body": "At 46,000 messages a second, one database server cannot take the writes, so the store is sharded. Partition by conversation ID and order rows by sequence number, so one chat's history is a single range read. Every write for a conversation goes through one owner at a time, such as the shard leader or a per-conversation sequencer, which increments the counter and inserts the row only if that seq is free, so 4021 is never issued twice. Assume about 100 bytes of text payload; with IDs, timestamps and indexes budget 200-300 bytes, so 0.8-1.2 TB a day before replication. Media goes to separate blob storage. Plan retention.",
       "idea": "One owner per conversation allocates seq; partition by conversation, order by seq.",
       "caption": "Store is sharded by conversation, rows ordered by seq.",
       "focus": [
@@ -405,7 +405,7 @@
     {
       "tag": "OFFLINE",
       "title": "Bob's phone is off",
-      "body": "Now Bob has no socket, so the route table has no entry for him. The message is already stored, so nothing is lost. The chat service asks the push provider to send a notification that wakes his phone. The push carries little or no content; it only says there is something new. Push is best effort and may be delayed or dropped. Presence can lag, so if no delivered receipt comes back within a few seconds, the service sends the push anyway.",
+      "body": "Replay the same send, but Bob's phone is off when m1 (seq 4021) arrives. Now Bob has no socket, so the route table has no entry for him. The message is already stored, so nothing is lost. The chat service asks the push provider to send a notification that wakes his phone. The push carries little or no content; it only says there is something new. Push is best effort and may be delayed or dropped. Presence can lag, so if no delivered receipt comes back within a few seconds, the service sends the push anyway.",
       "idea": "The stored message is the truth; push is only a nudge to come and get it.",
       "caption": "No route found, so a push nudge goes out.",
       "focus": [

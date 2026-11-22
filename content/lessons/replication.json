@@ -12,58 +12,569 @@
     "What happens during failover, including lost writes and split brain"
   ],
   "nodes": [
-    {"id": "leader2", "label": "Leader (region 2)", "kind": "db", "x": 38, "y": 14},
-    {"id": "app", "label": "App server", "kind": "server", "x": 9, "y": 50},
-    {"id": "leader", "label": "Leader (primary)", "kind": "db", "x": 38, "y": 44},
-    {"id": "fa", "label": "Follower A (sync)", "kind": "db", "x": 74, "y": 14},
-    {"id": "fb", "label": "Follower B (async)", "kind": "db", "x": 74, "y": 62},
-    {"id": "fc", "label": "Follower C (remote)", "kind": "db", "x": 74, "y": 86},
-    {"id": "mon", "label": "Failover monitor", "kind": "service", "x": 38, "y": 86}
+    {
+      "id": "leader2",
+      "label": "Leader (region 2)",
+      "kind": "db",
+      "x": 38,
+      "y": 14
+    },
+    {
+      "id": "app",
+      "label": "App server",
+      "kind": "server",
+      "x": 9,
+      "y": 50
+    },
+    {
+      "id": "leader",
+      "label": "Leader (primary)",
+      "kind": "db",
+      "x": 38,
+      "y": 44
+    },
+    {
+      "id": "fa",
+      "label": "Follower A (sync)",
+      "kind": "db",
+      "x": 74,
+      "y": 14
+    },
+    {
+      "id": "fb",
+      "label": "Follower B (async)",
+      "kind": "db",
+      "x": 74,
+      "y": 62
+    },
+    {
+      "id": "fc",
+      "label": "Follower C (remote)",
+      "kind": "db",
+      "x": 74,
+      "y": 86
+    },
+    {
+      "id": "mon",
+      "label": "Failover monitor",
+      "kind": "service",
+      "x": 38,
+      "y": 86
+    }
   ],
   "edges": [
-    {"from": "app", "to": "leader"},
-    {"from": "leader", "to": "fa"},
-    {"from": "leader", "to": "fb"},
-    {"from": "leader", "to": "fc"},
-    {"from": "app", "to": "fb"},
-    {"from": "app", "to": "fa"},
-    {"from": "app", "to": "fc"},
-    {"from": "leader", "to": "leader2"},
-    {"from": "mon", "to": "leader"},
-    {"from": "mon", "to": "fa"}
+    {
+      "from": "app",
+      "to": "leader"
+    },
+    {
+      "from": "leader",
+      "to": "fa"
+    },
+    {
+      "from": "leader",
+      "to": "fb"
+    },
+    {
+      "from": "leader",
+      "to": "fc"
+    },
+    {
+      "from": "app",
+      "to": "fb"
+    },
+    {
+      "from": "app",
+      "to": "fa"
+    },
+    {
+      "from": "app",
+      "to": "fc"
+    },
+    {
+      "from": "leader",
+      "to": "leader2"
+    },
+    {
+      "from": "mon",
+      "to": "leader"
+    },
+    {
+      "from": "mon",
+      "to": "fa"
+    }
   ],
   "metrics": [
-    {"id": "wlat", "label": "Write ack", "unit": "ms"},
-    {"id": "lag", "label": "Replica lag", "unit": "ms"},
-    {"id": "copies", "label": "Durable copies", "unit": "copies"}
+    {
+      "id": "wlat",
+      "label": "Write ack",
+      "unit": "ms"
+    },
+    {
+      "id": "lag",
+      "label": "Replica lag",
+      "unit": "ms"
+    },
+    {
+      "id": "copies",
+      "label": "Durable copies",
+      "unit": "copies"
+    }
   ],
   "steps": [
-    {"tag": "QUESTION", "title": "One copy is a single point of failure", "body": "Your database lives on one machine. If its disk dies, the data is gone. If it is busy, every read waits in the same queue as every write. Replication keeps copies of the same data on several machines to fix both problems. The hard part is keeping the copies in agreement while data keeps changing. Numbers here assume copies in the same region about 1 ms apart, and one copy in another region about 70 ms away.", "idea": "Replication buys durability, read capacity and availability, and the price is keeping copies consistent.", "caption": "One leader holds the data and the app has no backup.", "focus": ["app", "leader"], "flows": [], "metrics": {}},
-    {"tag": "CONCEPT", "title": "Leader-follower: one place takes writes", "body": "In the most common design, all writes go to one node, the leader. The leader applies the change, appends it to an ordered replication log, and ships that log to followers, which replay entries in the same order. Because there is a single writer and a single order, followers converge to the same state. This is how PostgreSQL streaming replication and MySQL replication work. The lag of about 10 ms shown in the metrics refers to the in-region followers; the remote follower trails by 70 ms or more.", "idea": "A single leader gives every follower the same ordered log, so copies converge without conflicts.", "caption": "Write hits the leader, then the log streams to all followers.", "focus": ["app", "leader", "fa", "fb", "fc"], "flows": [{"from": "app", "to": "leader", "kind": "request", "label": "INSERT order 41"}, {"from": "leader", "to": "app", "kind": "response", "label": "OK"}, {"from": "leader", "to": "fa", "kind": "replicate", "label": "log entry 41"}, {"from": "leader", "to": "fb", "kind": "replicate", "label": "log entry 41"}, {"from": "leader", "to": "fc", "kind": "replicate", "label": "log entry 41"}], "metrics": {"wlat": "2", "lag": "10", "copies": "1"}},
-    {"tag": "TRADE-OFF", "title": "Synchronous vs asynchronous", "body": "With asynchronous replication the leader answers as soon as its own disk has the write, so the ack is fast but only one copy is certain. If the leader dies before shipping the entry, that write is lost. With a synchronous follower the leader waits for its ack first. That costs one extra round trip (here about 5 ms total) and guarantees two copies. Waiting on every follower is fragile, since one slow node stalls all writes, so real systems keep one sync follower and the rest async. If the sync follower dies, another is promoted to sync, or the system falls back to async.", "idea": "Synchronous replication trades write latency for durability; most systems make just one follower synchronous.", "caption": "Leader waits for Follower A's ack before confirming.", "focus": ["app", "leader", "fa"], "flows": [{"from": "app", "to": "leader", "kind": "request", "label": "INSERT order 42"}, {"from": "leader", "to": "fa", "kind": "replicate", "label": "log entry 42"}, {"from": "fa", "to": "leader", "kind": "response", "label": "ack"}, {"from": "leader", "to": "app", "kind": "response", "label": "committed"}], "metrics": {"wlat": "5", "copies": "2"}},
-    {"tag": "CONCEPT", "title": "Followers absorb the reads", "body": "Most apps read far more than they write, often 10 to 1 or more. Followers can serve reads, so adding followers adds read capacity while the leader keeps handling writes. The app sends SELECT queries to a follower and writes to the leader. This scales reads nicely, but it does nothing for write throughput, since every write still goes through one leader. That limit is what sharding addresses in its own lesson.", "idea": "Followers scale reads and not writes; every write still passes through the leader.", "caption": "A read is served by Follower B instead of the leader.", "focus": ["app", "fb"], "flows": [{"from": "app", "to": "fb", "kind": "request", "label": "SELECT orders"}, {"from": "fb", "to": "app", "kind": "response", "label": "rows"}], "metrics": {"lag": "10"}},
-    {"tag": "PROBLEM", "title": "Replication lag shows you the past", "body": "Async followers trail the leader. Usually that is milliseconds, but a busy follower, a big batch job or a network hiccup can push lag to seconds. Picture a user saving a new display name. The write goes to the leader, the page reloads, and the read lands on a follower that has not received the entry yet. The user sees the old name and thinks the save failed. The data is not lost; the read simply happened too early.", "idea": "With async replication, a read from a follower can return data older than a write you just made.", "caption": "The follower has not applied the write, so the read is stale.", "focus": ["app", "leader", "fb"], "flows": [{"from": "app", "to": "leader", "kind": "request", "label": "UPDATE name"}, {"from": "leader", "to": "fb", "kind": "async", "label": "still in flight"}, {"from": "app", "to": "fb", "kind": "request", "label": "SELECT name"}, {"from": "fb", "to": "app", "kind": "fail", "label": "old name"}], "metrics": {"lag": "800"}},
-    {"tag": "FIX", "title": "Read-your-writes", "body": "The guarantee users expect is read-your-writes: after I write something, I always see it. A simple fix is to send a user's reads to the leader for a short window, say 10 seconds, after they write. A more precise one records the log position of their last write and only reads from a follower that has replayed past it. Related is monotonic reads, meaning a user never sees data go back in time, which you get by pinning each user to one follower.", "idea": "Route a user's reads to the leader, or to a caught-up follower, right after they write.", "caption": "The read goes to the leader and sees the new name.", "focus": ["app", "leader"], "flows": [{"from": "app", "to": "leader", "kind": "request", "label": "SELECT name"}, {"from": "leader", "to": "app", "kind": "response", "label": "new name"}], "metrics": {}},
-    {"tag": "VARIANT", "title": "Multi-leader: a leader per region", "body": "With one leader, users far from it pay a cross-region round trip (about 70 ms) on every write. Multi-leader runs a leader in each region. Each accepts local writes at around 3 ms and ships them to the other leaders asynchronously. The cost is conflicts: if two regions edit the same row at the same time, both succeed locally and the clash surfaces later. You must resolve it, for example last-write-wins (which silently drops one edit), merge rules, or CRDTs. Use it only when you need multi-region writes or offline editing.", "idea": "Multi-leader makes writes local and fast, but concurrent writes to the same data become conflicts you must resolve.", "caption": "Two leaders accept the same edit and a conflict appears.", "focus": ["leader", "leader2"], "flows": [{"from": "leader", "to": "leader2", "kind": "replicate", "label": "set title = A"}, {"from": "leader2", "to": "leader", "kind": "fail", "label": "set title = B"}], "metrics": {"wlat": "3", "lag": "120", "copies": "1"}},
-    {"tag": "VARIANT", "title": "Leaderless: quorum reads and writes", "body": "Dynamo-style systems such as Cassandra have no leader. With n = 3 replicas, the client or a coordinator node sends the write to all three and counts it done once w = 2 reply. The labels on the diagram still say follower, but here all three are equal replicas. A read asks r = 2 replicas and takes the newest version. Since w + r > n, every read set overlaps the write set by at least one node, so it normally sees the latest write. A replica that missed the write is fixed later by read repair or background anti-entropy. Quorums are not magic: concurrent writes and sloppy quorums can still return stale data.", "idea": "With w + r > n, reads and writes overlap on at least one replica, so you usually read the latest value.", "caption": "No leader: the app writes to replicas A, B and C and needs two acks.", "focus": ["app", "fa", "fb", "fc"], "flows": [{"from": "app", "to": "fa", "kind": "request", "label": "write v2"}, {"from": "app", "to": "fb", "kind": "request", "label": "write v2"}, {"from": "app", "to": "fc", "kind": "request", "label": "write v2 (slow)"}, {"from": "fa", "to": "app", "kind": "response", "label": "ack"}, {"from": "fb", "to": "app", "kind": "response", "label": "ack"}], "metrics": {"wlat": "4", "lag": "70", "copies": "2"}},
-    {"tag": "FAILURE", "title": "Failover when the leader dies", "body": "Now the leader crashes. A monitor notices missed heartbeats, typically after a timeout of 10 to 30 seconds, picks the most up-to-date follower (A, the synchronous one, which has every acknowledged write), promotes it, and points the app at it. Two traps follow. Writes the old leader acked only to async followers, or committed while the sync follower was degraded, can still be lost, which is the async risk from earlier. And if the old leader comes back believing it is still in charge, two nodes accept writes (split brain), so the old leader must be fenced off or demoted using an increasing epoch number.", "idea": "Failover restores service but can lose unreplicated writes and risks split brain without fencing.", "caption": "The monitor promotes Follower A and redirects the app.", "focus": ["mon", "leader", "fa", "app"], "flows": [{"from": "mon", "to": "leader", "kind": "fail", "label": "no heartbeat"}, {"from": "mon", "to": "fa", "kind": "request", "label": "promote, epoch 8"}, {"from": "fa", "to": "app", "kind": "handshake", "label": "I am leader"}], "metrics": {"wlat": "5", "copies": "1"}},
-    {"tag": "RECAP", "title": "Pick the weakest guarantee you can live with", "body": "Leader-follower is the default: one ordered log, simple to reason about, with followers for reads and standby. Choose sync or async by how much data loss you can tolerate versus latency. Expect lag and handle it with read-your-writes. Reach for multi-leader or leaderless only when you need multi-region writes or very high availability, and then plan for conflicts. Rehearse failover before you need it.", "idea": "Every replication choice trades latency, consistency and availability; decide which one you can give up.", "caption": "One leader, a sync follower, async followers, and a failover plan.", "focus": ["app", "leader", "fa", "fb", "fc", "mon"], "flows": [], "metrics": {"wlat": "5", "lag": "10", "copies": "2"}}
+    {
+      "tag": "QUESTION",
+      "title": "One copy is a single point of failure",
+      "body": "Your database lives on one machine. If its disk dies, the data is gone. If it is busy, every read waits in the same queue as every write. Replication keeps copies of the same data on several machines to fix both problems. The hard part is keeping the copies in agreement while data keeps changing. Numbers here assume copies in the same region about 1 ms apart, and one copy in another region about 70 ms away.",
+      "idea": "Replication buys durability, read capacity and availability, and the price is keeping copies consistent.",
+      "caption": "One leader holds the data and the app has no backup.",
+      "focus": [
+        "app",
+        "leader"
+      ],
+      "flows": [],
+      "metrics": {}
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "Leader-follower: one place takes writes",
+      "body": "In the most common design, all writes go to one node, the leader. The leader applies the change, appends it to an ordered replication log, and ships that log to followers, which replay entries in the same order. Because there is a single writer and a single order, followers converge to the same state. This is how PostgreSQL streaming replication and MySQL replication work. The lag of about 10 ms shown in the metrics refers to the in-region followers; the remote follower trails by 70 ms or more. Here the leader acknowledges once its own disk has the write and ships the log afterwards (asynchronous), so only one durable copy exists at ack time; the next step shows the synchronous alternative.",
+      "idea": "A single leader gives every follower the same ordered log, so copies converge without conflicts.",
+      "caption": "Write hits the leader, then the log streams to all followers.",
+      "focus": [
+        "app",
+        "leader",
+        "fa",
+        "fb",
+        "fc"
+      ],
+      "flows": [
+        {
+          "from": "app",
+          "to": "leader",
+          "kind": "request",
+          "label": "INSERT order 41"
+        },
+        {
+          "from": "leader",
+          "to": "app",
+          "kind": "response",
+          "label": "OK"
+        },
+        {
+          "from": "leader",
+          "to": "fa",
+          "kind": "replicate",
+          "label": "log entry 41"
+        },
+        {
+          "from": "leader",
+          "to": "fb",
+          "kind": "replicate",
+          "label": "log entry 41"
+        },
+        {
+          "from": "leader",
+          "to": "fc",
+          "kind": "replicate",
+          "label": "log entry 41"
+        }
+      ],
+      "metrics": {
+        "wlat": "2",
+        "lag": "10",
+        "copies": "1"
+      }
+    },
+    {
+      "tag": "TRADE-OFF",
+      "title": "Synchronous vs asynchronous",
+      "body": "With asynchronous replication the leader answers as soon as its own disk has the write, so the ack is fast but only one copy is certain. If the leader dies before shipping the entry, that write is lost. With a synchronous follower the leader waits for its ack first. That costs one extra round trip (here about 5 ms total) and guarantees two copies. Waiting on every follower is fragile, since one slow node stalls all writes, so real systems keep one sync follower and the rest async. If the sync follower dies, another is promoted to sync, or the system falls back to async.",
+      "idea": "Synchronous replication trades write latency for durability; most systems make just one follower synchronous.",
+      "caption": "Leader waits for Follower A's ack before confirming.",
+      "focus": [
+        "app",
+        "leader",
+        "fa"
+      ],
+      "flows": [
+        {
+          "from": "app",
+          "to": "leader",
+          "kind": "request",
+          "label": "INSERT order 42"
+        },
+        {
+          "from": "leader",
+          "to": "fa",
+          "kind": "replicate",
+          "label": "log entry 42"
+        },
+        {
+          "from": "fa",
+          "to": "leader",
+          "kind": "response",
+          "label": "ack"
+        },
+        {
+          "from": "leader",
+          "to": "app",
+          "kind": "response",
+          "label": "committed"
+        }
+      ],
+      "metrics": {
+        "wlat": "5",
+        "copies": "2"
+      }
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "Followers absorb the reads",
+      "body": "Most apps read far more than they write, often 10 to 1 or more. Followers can serve reads, so adding followers adds read capacity while the leader keeps handling writes. The app sends SELECT queries to a follower and writes to the leader. This scales reads nicely, but it does nothing for write throughput, since every write still goes through one leader. That limit is what sharding addresses in its own lesson.",
+      "idea": "Followers scale reads and not writes; every write still passes through the leader.",
+      "caption": "A read is served by Follower B instead of the leader.",
+      "focus": [
+        "app",
+        "fb"
+      ],
+      "flows": [
+        {
+          "from": "app",
+          "to": "fb",
+          "kind": "request",
+          "label": "SELECT orders"
+        },
+        {
+          "from": "fb",
+          "to": "app",
+          "kind": "response",
+          "label": "rows"
+        }
+      ],
+      "metrics": {
+        "lag": "10"
+      }
+    },
+    {
+      "tag": "PROBLEM",
+      "title": "Replication lag shows you the past",
+      "body": "Async followers trail the leader. Usually that is milliseconds, but a busy follower, a big batch job or a network hiccup can push lag to seconds. Picture a user saving a new display name. The write goes to the leader, the page reloads, and the read lands on a follower that has not received the entry yet. The user sees the old name and thinks the save failed. The data is not lost; the read simply happened too early.",
+      "idea": "With async replication, a read from a follower can return data older than a write you just made.",
+      "caption": "The follower has not applied the write, so the read is stale.",
+      "focus": [
+        "app",
+        "leader",
+        "fb"
+      ],
+      "flows": [
+        {
+          "from": "app",
+          "to": "leader",
+          "kind": "request",
+          "label": "UPDATE name"
+        },
+        {
+          "from": "leader",
+          "to": "fb",
+          "kind": "async",
+          "label": "still in flight"
+        },
+        {
+          "from": "app",
+          "to": "fb",
+          "kind": "request",
+          "label": "SELECT name"
+        },
+        {
+          "from": "fb",
+          "to": "app",
+          "kind": "fail",
+          "label": "old name"
+        }
+      ],
+      "metrics": {
+        "lag": "800"
+      }
+    },
+    {
+      "tag": "FIX",
+      "title": "Read-your-writes",
+      "body": "The guarantee users expect is read-your-writes: after I write something, I always see it. A simple fix is to send a user's reads to the leader for a short window, say 10 seconds, after they write. A more precise one records the log position of their last write and only reads from a follower that has replayed past it. Related is monotonic reads, meaning a user never sees data go back in time, which you get by pinning each user to one follower.",
+      "idea": "Route a user's reads to the leader, or to a caught-up follower, right after they write.",
+      "caption": "The read goes to the leader and sees the new name.",
+      "focus": [
+        "app",
+        "leader"
+      ],
+      "flows": [
+        {
+          "from": "app",
+          "to": "leader",
+          "kind": "request",
+          "label": "SELECT name"
+        },
+        {
+          "from": "leader",
+          "to": "app",
+          "kind": "response",
+          "label": "new name"
+        }
+      ],
+      "metrics": {}
+    },
+    {
+      "tag": "VARIANT",
+      "title": "Multi-leader: a leader per region",
+      "body": "With one leader, users far from it pay a cross-region round trip (about 70 ms) on every write. Multi-leader runs a leader in each region. Each accepts local writes at around 3 ms and ships them to the other leaders asynchronously. The cost is conflicts: if two regions edit the same row at the same time, both succeed locally and the clash surfaces later. You must resolve it, for example last-write-wins (which silently drops one edit), merge rules, or CRDTs. Use it only when you need multi-region writes or offline editing.",
+      "idea": "Multi-leader makes writes local and fast, but concurrent writes to the same data become conflicts you must resolve.",
+      "caption": "Two leaders accept the same edit and a conflict appears.",
+      "focus": [
+        "leader",
+        "leader2"
+      ],
+      "flows": [
+        {
+          "from": "leader",
+          "to": "leader2",
+          "kind": "replicate",
+          "label": "set title = A"
+        },
+        {
+          "from": "leader2",
+          "to": "leader",
+          "kind": "fail",
+          "label": "set title = B"
+        }
+      ],
+      "metrics": {
+        "wlat": "3",
+        "lag": "70",
+        "copies": "1"
+      }
+    },
+    {
+      "tag": "VARIANT",
+      "title": "Leaderless: quorum reads and writes",
+      "body": "Dynamo-style systems such as Cassandra have no leader. With n = 3 replicas, the client or a coordinator node sends the write to all three and counts it done once w = 2 reply. The labels on the diagram still say follower, but here all three are equal replicas. A read asks r = 2 replicas and takes the newest version. Since w + r > n, every read set overlaps the write set by at least one node, so it normally sees the latest write. A replica that missed the write is fixed later by read repair or background anti-entropy. Quorums are not magic: concurrent writes and sloppy quorums can still return stale data.",
+      "idea": "With w + r > n, reads and writes overlap on at least one replica, so you usually read the latest value.",
+      "caption": "Write needs 2 acks; a read of 2 replicas always includes one with v2.",
+      "focus": [
+        "app",
+        "fa",
+        "fb",
+        "fc"
+      ],
+      "flows": [
+        {
+          "from": "app",
+          "to": "fa",
+          "kind": "request",
+          "label": "write v2"
+        },
+        {
+          "from": "app",
+          "to": "fb",
+          "kind": "request",
+          "label": "write v2"
+        },
+        {
+          "from": "app",
+          "to": "fc",
+          "kind": "request",
+          "label": "write v2 (slow)"
+        },
+        {
+          "from": "fa",
+          "to": "app",
+          "kind": "response",
+          "label": "ack"
+        },
+        {
+          "from": "fb",
+          "to": "app",
+          "kind": "response",
+          "label": "ack"
+        },
+        {
+          "from": "app",
+          "to": "fb",
+          "kind": "request",
+          "label": "read"
+        },
+        {
+          "from": "app",
+          "to": "fc",
+          "kind": "request",
+          "label": "read"
+        },
+        {
+          "from": "fb",
+          "to": "app",
+          "kind": "response",
+          "label": "v2"
+        },
+        {
+          "from": "fc",
+          "to": "app",
+          "kind": "response",
+          "label": "v1 (stale)"
+        }
+      ],
+      "metrics": {
+        "wlat": "4",
+        "lag": "70",
+        "copies": "2"
+      }
+    },
+    {
+      "tag": "FAILURE",
+      "title": "Failover when the leader dies",
+      "body": "Now the leader crashes. A monitor notices missed heartbeats, typically after a timeout of 10 to 30 seconds, picks the most up-to-date follower (A, the synchronous one, which has every acknowledged write), promotes it, and points the app at it. Two traps follow. Writes the old leader acked only to async followers, or committed while the sync follower was degraded, can still be lost, which is the async risk from earlier. And if the old leader comes back believing it is still in charge, two nodes accept writes (split brain), so the old leader must be fenced off or demoted using an increasing epoch number.",
+      "idea": "Failover restores service but can lose unreplicated writes and risks split brain without fencing.",
+      "caption": "The monitor promotes Follower A and redirects the app.",
+      "focus": [
+        "mon",
+        "leader",
+        "fa",
+        "app"
+      ],
+      "flows": [
+        {
+          "from": "mon",
+          "to": "leader",
+          "kind": "fail",
+          "label": "no heartbeat"
+        },
+        {
+          "from": "mon",
+          "to": "fa",
+          "kind": "request",
+          "label": "promote, epoch 8"
+        },
+        {
+          "from": "fa",
+          "to": "app",
+          "kind": "handshake",
+          "label": "I am leader"
+        }
+      ],
+      "metrics": {
+        "wlat": "5",
+        "copies": "1"
+      }
+    },
+    {
+      "tag": "RECAP",
+      "title": "Pick the weakest guarantee you can live with",
+      "body": "Leader-follower is the default: one ordered log, simple to reason about, with followers for reads and standby. Choose sync or async by how much data loss you can tolerate versus latency. Expect lag and handle it with read-your-writes. Reach for multi-leader or leaderless only when you need multi-region writes or very high availability, and then plan for conflicts. Rehearse failover before you need it.",
+      "idea": "Every replication choice trades latency, consistency and availability; decide which one you can give up.",
+      "caption": "One leader, a sync follower, async followers, and a failover plan.",
+      "focus": [
+        "app",
+        "leader",
+        "fa",
+        "fb",
+        "fc",
+        "mon"
+      ],
+      "flows": [],
+      "metrics": {
+        "wlat": "5",
+        "lag": "10",
+        "copies": "2"
+      }
+    }
   ],
   "quiz": [
-    {"q":"A leader uses fully asynchronous replication and its disk is destroyed a few milliseconds after it acknowledged a write. What is the realistic outcome?","options":["Nothing is lost, because followers always have every acknowledged write","The write is retried by the app and always recovered","That write may be gone if it had not reached any follower yet","All data on all followers is corrupted"],"answer":2,"why":"Async mode acknowledges after the leader's own write. Entries not yet shipped exist only on the dead leader, so acknowledged writes can be lost."},
-    {"q":"A user posts a comment and immediately reloads, but the comment is missing. A few seconds later it appears. Which cause and fix fit best?","options":["Replication lag on the follower that served the read; route that user's reads to the leader briefly after writing","The leader dropped the write; add more followers","A cache bug; make followers synchronous for every write","The follower is leaderless; raise w to 3"],"answer":0,"why":"This is the classic read-your-writes violation from async lag. Reading from the leader (or a caught-up follower) after a write fixes it without slowing every write."},
-    {"q":"A leaderless store has n = 3. Which setting guarantees read and write sets overlap by at least one replica?","options":["w = 1, r = 1","w = 2, r = 1","w = 1, r = 2","w = 2, r = 2"],"answer":3,"why":"The overlap rule is w + r > n. With n = 3, w = 2 and r = 2 gives 4 > 3. Both w = 2, r = 1 and w = 1, r = 2 give 3, which is not greater than 3, so neither guarantees overlap, and w = 1, r = 1 clearly fails."},
-    {"q":"After failover, the old leader restarts and still accepts client writes alongside the new leader. What is this called, and what prevents it?","options":["Replication lag; add a sync follower","Read repair; run anti-entropy","A quorum overlap; raise r","Split brain; fence the old leader with an epoch or token so it steps down"],"answer":3,"why":"Two nodes both believing they are leader is split brain. Epoch numbers or fencing tokens make storage and followers reject the stale leader's writes."},
-    {"q":"Why is making every follower synchronous usually a bad idea?","options":["Synchronous followers cannot serve reads","It removes the ability to serve reads from followers","Any single slow or down follower would block or fail every write","It forces the leader to use a stronger isolation level"],"answer":2,"why":"Writes wait for all acks, so availability and latency become that of the worst replica. Systems typically use one sync follower and keep the rest async."}
+    {
+      "q": "A leader uses fully asynchronous replication and its disk is destroyed a few milliseconds after it acknowledged a write. What is the realistic outcome?",
+      "options": [
+        "Nothing is lost, because followers always have every acknowledged write",
+        "The write is retried by the app and always recovered",
+        "That write may be gone if it had not reached any follower yet",
+        "All data on all followers is corrupted"
+      ],
+      "answer": 2,
+      "why": "Async mode acknowledges after the leader's own write. Entries not yet shipped exist only on the dead leader, so acknowledged writes can be lost."
+    },
+    {
+      "q": "A user posts a comment and immediately reloads, but the comment is missing. A few seconds later it appears. Which cause and fix fit best?",
+      "options": [
+        "Replication lag on the follower that served the read; route that user's reads to the leader briefly after writing",
+        "The leader dropped the write; add more followers",
+        "A cache bug; make followers synchronous for every write",
+        "The follower is leaderless; raise w to 3"
+      ],
+      "answer": 0,
+      "why": "This is the classic read-your-writes violation from async lag. Reading from the leader (or a caught-up follower) after a write fixes it without slowing every write."
+    },
+    {
+      "q": "A leaderless store has n = 3. Which setting guarantees read and write sets overlap by at least one replica?",
+      "options": [
+        "w = 1, r = 1",
+        "w = 2, r = 1",
+        "w = 1, r = 2",
+        "w = 2, r = 2"
+      ],
+      "answer": 3,
+      "why": "The overlap rule is w + r > n. With n = 3, w = 2 and r = 2 gives 4 > 3. Both w = 2, r = 1 and w = 1, r = 2 give 3, which is not greater than 3, so neither guarantees overlap, and w = 1, r = 1 clearly fails."
+    },
+    {
+      "q": "After failover, the old leader restarts and still accepts client writes alongside the new leader. What is this called, and what prevents it?",
+      "options": [
+        "Replication lag; add a sync follower",
+        "Read repair; run anti-entropy",
+        "A quorum overlap; raise r",
+        "Split brain; fence the old leader with an epoch or token so it steps down"
+      ],
+      "answer": 3,
+      "why": "Two nodes both believing they are leader is split brain. Epoch numbers or fencing tokens make storage and followers reject the stale leader's writes."
+    },
+    {
+      "q": "Why is making every follower synchronous usually a bad idea?",
+      "options": [
+        "Synchronous followers cannot serve reads",
+        "It forces all reads to go through the leader",
+        "Any single slow or down follower would block or fail every write",
+        "It forces the leader to use a stronger isolation level"
+      ],
+      "answer": 2,
+      "why": "Writes wait for all acks, so availability and latency become that of the worst replica. Systems typically use one sync follower and keep the rest async."
+    }
   ],
   "cheatsheet": [
-    {"term": "Leader / follower", "def": "The leader accepts all writes and ships an ordered log; followers replay it and can serve reads or take over if the leader fails."},
-    {"term": "Sync vs async", "def": "Sync waits for a follower's ack before confirming a write (more durable, slower). Async confirms immediately (fast, can lose recent writes on leader loss)."},
-    {"term": "Semi-synchronous", "def": "Wait for one follower's ack (ideally any one of several) and replicate to the rest async. You keep at least two copies, and a single slow async follower cannot stall writes, but a lost sync follower must be replaced or the system must fall back to async."},
-    {"term": "Replication lag", "def": "How far a follower trails the leader. Usually milliseconds, but it can grow to seconds under load and makes follower reads stale."},
-    {"term": "Read-your-writes", "def": "Guarantee that a user sees their own earlier writes. Implement by reading from the leader or a caught-up follower after a write."},
-    {"term": "Multi-leader", "def": "Several nodes accept writes, usually one per region. Local writes are fast, but concurrent edits create conflicts needing resolution."},
-    {"term": "Quorum (w + r > n)", "def": "In leaderless stores, require w write acks and r read replies so the sets overlap. Helps freshness but is not strict consistency."},
-    {"term": "Failover and split brain", "def": "Promote a follower when the leader dies. Risks: losing unreplicated writes, and two leaders if the old one returns, so fence with epochs."}
+    {
+      "term": "Leader / follower",
+      "def": "The leader accepts all writes and ships an ordered log; followers replay it and can serve reads or take over if the leader fails."
+    },
+    {
+      "term": "Sync vs async",
+      "def": "Sync waits for a follower's ack before confirming a write (more durable, slower). Async confirms immediately (fast, can lose recent writes on leader loss)."
+    },
+    {
+      "term": "Semi-synchronous",
+      "def": "Wait for one follower's ack (ideally any one of several) and replicate to the rest async. You keep at least two copies, and a single slow async follower cannot stall writes, but a lost sync follower must be replaced or the system must fall back to async."
+    },
+    {
+      "term": "Replication lag",
+      "def": "How far a follower trails the leader. Usually milliseconds, but it can grow to seconds under load and makes follower reads stale."
+    },
+    {
+      "term": "Read-your-writes",
+      "def": "Guarantee that a user sees their own earlier writes. Implement by reading from the leader or a caught-up follower after a write."
+    },
+    {
+      "term": "Multi-leader",
+      "def": "Several nodes accept writes, usually one per region. Local writes are fast, but concurrent edits create conflicts needing resolution."
+    },
+    {
+      "term": "Quorum (w + r > n)",
+      "def": "In leaderless stores, require w write acks and r read replies so the sets overlap. Helps freshness but is not strict consistency."
+    },
+    {
+      "term": "Failover and split brain",
+      "def": "Promote a follower when the leader dies. Risks: losing unreplicated writes, and two leaders if the old one returns, so fence with epochs."
+    }
   ]
 }

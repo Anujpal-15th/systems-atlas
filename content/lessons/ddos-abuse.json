@@ -201,13 +201,14 @@
     {
       "tag": "CONCEPT",
       "title": "Anycast: spread the blow",
-      "body": "With anycast, the same IP address is announced from dozens to hundreds of locations, and internet routing sends each sender to a nearby one (nearest in network terms). A botnet spread across the world therefore lands on many edge sites, each seeing only a slice: if the botnet were spread evenly over 100 sites that is about 4 Gbps each. Edge networks are built with far more total capacity than any one customer, so the edge sites are not overwhelmed. The junk still has to be filtered before it travels on to your origin, which is the next step.",
+      "body": "With anycast, the same IP address is announced from dozens to hundreds of locations, and internet routing sends each sender to a nearby one (nearest in network terms). A botnet spread across the world therefore lands on many edge sites, each seeing only a slice: if the botnet were spread evenly over 100 sites that is about 4 Gbps each. Edge networks are built with far more total capacity than any one customer, so the edge sites are not overwhelmed. Until scrubbing runs (next step), the edge still forwards a mix of junk and real requests, so only about 60% of real users (300 of 500 req/s) get through.",
       "idea": "Anycast turns one big target into many small ones, so capacity adds up instead of piling onto a single link.",
       "caption": "Attack splits across many edge sites; origin still gets junk.",
       "focus": [
         "botnet",
         "users",
-        "edge"
+        "edge",
+        "app"
       ],
       "flows": [
         {
@@ -221,6 +222,12 @@
           "to": "edge",
           "kind": "request",
           "label": "GET /shop"
+        },
+        {
+          "from": "edge",
+          "to": "app",
+          "kind": "fail",
+          "label": "junk still passes"
         }
       ],
       "metrics": {
@@ -263,7 +270,7 @@
     {
       "tag": "QUESTION",
       "title": "The quiet attack that remains",
-      "body": "The flood is still being scrubbed, but the attacker adds a second attack. Instead of garbage packets, about 2,000 of the bots also send perfectly valid HTTPS requests to the search page and login form, roughly 4 per second each (8,000 per second in total), each looking like a browser. This is an application-layer (layer 7) attack. It is only a few tens of Mbps, tiny next to the flood, but search runs a costly database query, so the origin buckles. Packet filters cannot help because every packet is legitimate.",
+      "body": "The flood is still being scrubbed, but the attacker adds a second attack. Instead of garbage packets, about 2,000 of the bots also send perfectly valid HTTPS requests to the search page and login form, roughly 4 per second each (8,000 per second in total), each looking like a browser. This is an application-layer (layer 7) attack. It is only a few tens of Mbps, tiny next to the flood, but search runs a costly database query, so the origin buckles. Packet filters cannot help because every packet is legitimate. The Junk blocked tile now counts these layer-7 requests; nothing filters them yet, so it drops to 0%.",
       "idea": "Layer 7 attacks are cheap for the attacker and expensive for you, so volume is the wrong thing to measure.",
       "caption": "Valid-looking requests reach the origin.",
       "focus": [

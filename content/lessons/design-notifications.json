@@ -162,7 +162,7 @@
     {
       "tag": "FLOW",
       "title": "Accept fast, send later",
-      "body": "The shipping service calls the Notification API with an event: a user id, a template, and data. The API validates the request and, once the event is safely queued, answers 202 Accepted: accepted for processing, not yet sent. That takes tens of milliseconds. It never waits for the provider, because sending is slow and flaky (providers take 100 ms to seconds) and must never sit on the caller's request path.",
+      "body": "The shipping service calls the Notification API with an event: a user id, a template, and data. The API validates the request and will later answer 202 Accepted (accepted for processing, not yet sent), but only after the event is safely queued. That takes tens of milliseconds. It never waits for the provider, because sending is slow and flaky (providers take 100 ms to seconds) and must never sit on the caller's request path.",
       "idea": "Decouple the caller from delivery: acknowledge once the event is durably stored, never after the slow send.",
       "caption": "Event reaches the API, which validates it.",
       "focus": [
@@ -245,7 +245,8 @@
         "events",
         "api",
         "pushq",
-        "emailq"
+        "emailq",
+        "redis"
       ],
       "flows": [
         {
@@ -259,6 +260,12 @@
           "to": "emailq",
           "kind": "async",
           "label": "email msg"
+        },
+        {
+          "from": "api",
+          "to": "redis",
+          "kind": "request",
+          "label": "mark done, 24h"
         },
         {
           "from": "api",
@@ -295,6 +302,12 @@
           "to": "redis",
           "kind": "request",
           "label": "take token"
+        },
+        {
+          "from": "redis",
+          "to": "workers",
+          "kind": "response",
+          "label": "token granted"
         },
         {
           "from": "workers",
@@ -394,9 +407,9 @@
       "idea": "Queues turn a spike into a backlog; separate priorities keep urgent messages ahead of bulk ones.",
       "caption": "Backlog builds, drains at the allowed rate.",
       "focus": [
+        "events",
         "api",
         "pushq",
-        "emailq",
         "workers"
       ],
       "flows": [

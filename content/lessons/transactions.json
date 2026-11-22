@@ -214,13 +214,25 @@
           "from": "txa",
           "to": "engine",
           "kind": "request",
-          "label": "read 100"
+          "label": "read balance"
+        },
+        {
+          "from": "engine",
+          "to": "txa",
+          "kind": "response",
+          "label": "100"
         },
         {
           "from": "txb",
           "to": "engine",
           "kind": "request",
-          "label": "read 100"
+          "label": "read balance"
+        },
+        {
+          "from": "engine",
+          "to": "txb",
+          "kind": "response",
+          "label": "100"
         },
         {
           "from": "txa",
@@ -258,6 +270,12 @@
           "to": "engine",
           "kind": "request",
           "label": "write 70 (open)"
+        },
+        {
+          "from": "txb",
+          "to": "engine",
+          "kind": "request",
+          "label": "read balance"
         },
         {
           "from": "engine",
@@ -354,16 +372,40 @@
           "label": "lock row 1 (A)"
         },
         {
+          "from": "lock",
+          "to": "engine",
+          "kind": "response",
+          "label": "granted"
+        },
+        {
+          "from": "engine",
+          "to": "txa",
+          "kind": "response",
+          "label": "balance = 100"
+        },
+        {
           "from": "txb",
           "to": "engine",
           "kind": "request",
           "label": "SELECT FOR UPDATE"
         },
         {
+          "from": "engine",
+          "to": "lock",
+          "kind": "request",
+          "label": "lock row 1 (B)"
+        },
+        {
           "from": "lock",
           "to": "engine",
           "kind": "fail",
           "label": "held: wait"
+        },
+        {
+          "from": "txa",
+          "to": "engine",
+          "kind": "request",
+          "label": "UPDATE 70; COMMIT"
         },
         {
           "from": "lock",
@@ -376,6 +418,12 @@
           "to": "txb",
           "kind": "response",
           "label": "balance = 70"
+        },
+        {
+          "from": "txb",
+          "to": "engine",
+          "kind": "request",
+          "label": "UPDATE 40; COMMIT"
         }
       ],
       "metrics": {
@@ -425,7 +473,7 @@
       ],
       "metrics": {
         "total": "-80",
-        "versions": "5",
+        "versions": "4",
         "wait": "0",
         "bad": "1"
       }
@@ -456,6 +504,12 @@
           "label": "check conflicts"
         },
         {
+          "from": "engine",
+          "to": "txa",
+          "kind": "response",
+          "label": "committed"
+        },
+        {
           "from": "txb",
           "to": "engine",
           "kind": "request",
@@ -472,6 +526,12 @@
           "to": "engine",
           "kind": "request",
           "label": "retry: sum=20"
+        },
+        {
+          "from": "engine",
+          "to": "txb",
+          "kind": "response",
+          "label": "refused: total 20"
         }
       ],
       "metrics": {

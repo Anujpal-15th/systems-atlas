@@ -151,7 +151,7 @@
           "from": "users",
           "to": "app",
           "kind": "response",
-          "label": "argon2id hash"
+          "label": "salt + hash"
         }
       ],
       "metrics": {
@@ -194,6 +194,18 @@
           "to": "app",
           "kind": "request",
           "label": "Cookie: sid"
+        },
+        {
+          "from": "app",
+          "to": "sessions",
+          "kind": "request",
+          "label": "lookup sid"
+        },
+        {
+          "from": "sessions",
+          "to": "app",
+          "kind": "response",
+          "label": "user 42"
         }
       ],
       "metrics": {
@@ -240,7 +252,8 @@
       "focus": [
         "browser",
         "app",
-        "idp"
+        "idp",
+        "sessions"
       ],
       "flows": [
         {
@@ -278,6 +291,12 @@
           "to": "app",
           "kind": "response",
           "label": "ID + access token"
+        },
+        {
+          "from": "app",
+          "to": "sessions",
+          "kind": "request",
+          "label": "start session"
         }
       ],
       "metrics": {}

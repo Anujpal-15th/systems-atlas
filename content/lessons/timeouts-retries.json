@@ -153,7 +153,7 @@
     {
       "tag": "CONCEPT",
       "title": "Retry the transient failure",
-      "body": "Many failures are brief: a dropped packet, a server restarting, a momentary overload. Trying again often works (retrying a charge safely needs idempotency, covered later). If each attempt fails 30 percent of the time and failures are independent, three attempts all fail only 0.3 x 0.3 x 0.3, about 3 percent. Success climbs from 70 to roughly 97 percent. This only holds when the cause is temporary. A dead dependency fails every time.",
+      "body": "Many failures are brief: a dropped packet, a server restarting, a momentary overload. Trying again often works (retrying a charge safely needs idempotency, covered later). If each attempt fails 30 percent of the time and failures are independent, three attempts all fail only 0.3 x 0.3 x 0.3, about 3 percent. Success climbs from 70 to roughly 97 percent. This only holds when the cause is temporary. A dead dependency fails every time. Retries cost load: on average each call makes 1 + 0.3 + 0.09 = 1.39 attempts, so 600 req/s becomes about 834.",
       "idea": "Retries convert short-lived faults into successes, but only if the next attempt has a real chance of working.",
       "caption": "A second attempt reaches the Payment API and succeeds.",
       "focus": [
@@ -352,7 +352,7 @@
     {
       "tag": "CONCEPT",
       "title": "Retry only what is safe, within a deadline",
-      "body": "Retry connection errors, timeouts, 502, 503, 504 and 429, and honour a Retry-After hint on 429 or 503. Do not retry 400, 403 or 404, because the same request fails again. A timeout on a write leaves it unknown whether the work happened, so retrying a charge can bill twice unless the operation is idempotent or carries an idempotency key (the Idempotency lesson covers this). Also give the whole user action a deadline, say 2 seconds, and pass the remaining time downstream so no layer keeps retrying after the user has left. Three 500 ms attempts plus up to 300 ms of backoff is at most about 1.8 s, which nearly fills that deadline.",
+      "body": "Retry connection errors, timeouts, 502, 503, 504 and 429, and honour a Retry-After hint on 429 or 503. Do not retry 400, 403 or 404, because the same request fails again. A timeout on a write leaves it unknown whether the work happened, so retrying a charge can bill twice unless the operation is idempotent or carries an idempotency key (the Idempotency lesson covers this). Also give the whole user action a deadline, say 2 seconds (some is already spent by the time checkout calls payment), and pass the remaining time downstream so no layer keeps retrying after the user has left. Three 500 ms attempts plus up to 300 ms of backoff is at most about 1.8 s, which nearly fills that deadline.",
       "idea": "Retry only transient, safe errors, and stop when the overall deadline runs out.",
       "caption": "The remaining time shrinks as the request moves downstream.",
       "focus": [
@@ -371,11 +371,17 @@
           "from": "checkout",
           "to": "payment",
           "kind": "request",
-          "label": "left: 1400ms"
+          "label": "left: ~1400ms"
         },
         {
           "from": "payment",
           "to": "checkout",
+          "kind": "response",
+          "label": "200 OK"
+        },
+        {
+          "from": "checkout",
+          "to": "client",
           "kind": "response",
           "label": "200 OK"
         }
@@ -396,8 +402,7 @@
       "focus": [
         "client",
         "checkout",
-        "payment",
-        "db"
+        "payment"
       ],
       "flows": [],
       "metrics": {

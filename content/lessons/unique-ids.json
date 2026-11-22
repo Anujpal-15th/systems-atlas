@@ -174,17 +174,24 @@
       "title": "Add a second writer",
       "body": "Traffic grows, so you split the data across two databases, and each keeps its own counter. Both now hand out 1001, and the moment you merge, export, or reference rows across shards the IDs collide. You can patch it by giving shard 1 odd numbers and shard 2 even numbers, but adding a third shard means changing the scheme. The database box is drawn once, but it stands for two shards.",
       "idea": "A counter only works while exactly one thing owns it; sharding breaks that ownership.",
-      "caption": "Two shards, two counters: the same IDs clash.",
+      "caption": "Two shards, two counters: both issue 1001, so merged rows clash.",
       "focus": [
+        "appa",
         "appb",
         "db"
       ],
       "flows": [
         {
+          "from": "appa",
+          "to": "db",
+          "kind": "request",
+          "label": "id 1001 (shard 1)"
+        },
+        {
           "from": "appb",
           "to": "db",
-          "kind": "fail",
-          "label": "same id 1001"
+          "kind": "request",
+          "label": "id 1001 (shard 2)"
         }
       ],
       "metrics": {

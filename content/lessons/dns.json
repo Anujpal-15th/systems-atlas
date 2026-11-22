@@ -12,56 +12,491 @@
     "How GeoDNS and DNS-based failover steer users, and where they lag"
   ],
   "nodes": [
-    {"id":"browser","label":"Browser + OS","kind":"client","x":10,"y":50},
-    {"id":"resolver","label":"Recursive resolver","kind":"dns","x":33,"y":50},
-    {"id":"root","label":"Root servers","kind":"dns","x":58,"y":12},
-    {"id":"tld","label":".com TLD servers","kind":"dns","x":82,"y":12},
-    {"id":"auth","label":"Authoritative NS","kind":"dns","x":84,"y":42},
-    {"id":"us","label":"Origin US","kind":"server","x":60,"y":78},
-    {"id":"eu","label":"Origin EU","kind":"server","x":86,"y":78}
+    {
+      "id": "browser",
+      "label": "Browser + OS",
+      "kind": "client",
+      "x": 10,
+      "y": 50
+    },
+    {
+      "id": "resolver",
+      "label": "Recursive resolver",
+      "kind": "dns",
+      "x": 33,
+      "y": 50
+    },
+    {
+      "id": "root",
+      "label": "Root servers",
+      "kind": "dns",
+      "x": 58,
+      "y": 12
+    },
+    {
+      "id": "tld",
+      "label": ".com TLD servers",
+      "kind": "dns",
+      "x": 82,
+      "y": 12
+    },
+    {
+      "id": "auth",
+      "label": "Authoritative NS",
+      "kind": "dns",
+      "x": 84,
+      "y": 42
+    },
+    {
+      "id": "us",
+      "label": "Origin US",
+      "kind": "server",
+      "x": 60,
+      "y": 78
+    },
+    {
+      "id": "eu",
+      "label": "Origin EU",
+      "kind": "server",
+      "x": 86,
+      "y": 78
+    }
   ],
   "edges": [
-    {"from":"browser","to":"resolver"},
-    {"from":"resolver","to":"root"},
-    {"from":"resolver","to":"tld"},
-    {"from":"resolver","to":"auth"},
-    {"from":"browser","to":"us"},
-    {"from":"browser","to":"eu"},
-    {"from":"auth","to":"us"},
-    {"from":"auth","to":"eu"}
+    {
+      "from": "browser",
+      "to": "resolver"
+    },
+    {
+      "from": "resolver",
+      "to": "root"
+    },
+    {
+      "from": "resolver",
+      "to": "tld"
+    },
+    {
+      "from": "resolver",
+      "to": "auth"
+    },
+    {
+      "from": "browser",
+      "to": "us"
+    },
+    {
+      "from": "browser",
+      "to": "eu"
+    },
+    {
+      "from": "auth",
+      "to": "us"
+    },
+    {
+      "from": "auth",
+      "to": "eu"
+    }
   ],
   "metrics": [
-    {"id":"lookup","label":"Lookup time","unit":"ms"},
-    {"id":"hops","label":"Servers asked","unit":""},
-    {"id":"ttl","label":"TTL left","unit":"s"}
+    {
+      "id": "lookup",
+      "label": "Lookup time",
+      "unit": "ms"
+    },
+    {
+      "id": "hops",
+      "label": "Servers asked",
+      "unit": ""
+    },
+    {
+      "id": "ttl",
+      "label": "TTL left",
+      "unit": "s"
+    }
   ],
   "steps": [
-    {"tag":"QUESTION","title":"Names are not addresses","body":"Your browser wants example.com, but networks route packets to IP addresses. Something must translate the name into a number, and no single computer holds every name on the internet. DNS solves this with a hierarchy of servers that each know a small slice, plus layers of caching so most lookups never travel far.","idea":"DNS is a distributed, cached, hierarchical phone book, not one big database.","caption":"The browser has a name and needs an IP address.","focus":["browser"],"flows":[],"metrics":{}},
-    {"tag":"CONCEPT","title":"Ask the recursive resolver","body":"The OS hands the question to a recursive resolver, usually run by your ISP or a public provider. Its job is to do the whole chase for you and return one final answer. It keeps a cache, so if anyone nearby asked recently, it answers instantly. Here the cache has nothing for this name, so it has to ask the servers above.","idea":"A recursive resolver does the legwork on behalf of clients and remembers the results.","caption":"Browser asks the resolver; cache miss.","focus":["browser","resolver"],"flows":[{"from":"browser","to":"resolver","kind":"request","label":"A example.com?"}],"metrics":{"lookup":"2","hops":"1"}},
-    {"tag":"FLOW","title":"Root: who runs .com?","body":"The resolver already knows the addresses of the 13 root server identities (hundreds of anycast machines behind them; anycast means many machines share one address and you reach the nearest). It asks one. The root does not know example.com, but it knows who runs each top-level domain, so it replies with a referral to the .com servers. In real life the resolver has usually cached the root and .com referrals, so most cold lookups skip straight to the authoritative server.","idea":"The root only points to the right TLD servers; it never stores individual sites.","caption":"Root refers the resolver to the .com servers.","focus":["resolver","root"],"flows":[{"from":"resolver","to":"root","kind":"request","label":"A example.com?"},{"from":"root","to":"resolver","kind":"response","label":"ask .com TLD"}],"metrics":{"lookup":"22","hops":"2"}},
-    {"tag":"FLOW","title":"TLD: who runs example.com?","body":"The resolver repeats the question to a .com TLD server. The TLD servers hold, for every registered domain, the NS (name server) records naming the servers the owner chose. They reply with another referral to the domain's own name servers. Still no IP address yet, just a closer signpost.","idea":"The TLD tier maps each registered domain to its authoritative name servers.","caption":"TLD refers the resolver to example.com's servers.","focus":["resolver","tld"],"flows":[{"from":"resolver","to":"tld","kind":"request","label":"A example.com?"},{"from":"tld","to":"resolver","kind":"response","label":"ask ns1.example"}],"metrics":{"lookup":"44","hops":"3"}},
-    {"tag":"FLOW","title":"Authoritative: the real answer","body":"An authoritative server holds the actual records for the zone (the set of records one owner manages). It answers with the A record 203.0.113.7 and a TTL (time to live) of 300 seconds. The resolver caches it and returns it to the browser. The whole cold lookup took about four network exchanges; assuming roughly 20-25 ms per upstream exchange, that is about 70 ms in this example.","idea":"Only the authoritative server is the source of truth; everything else is a cached copy.","caption":"Authoritative server answers; resolver caches and replies.","focus":["resolver","auth","browser"],"flows":[{"from":"resolver","to":"auth","kind":"request","label":"A example.com?"},{"from":"auth","to":"resolver","kind":"response","label":"203.0.113.7"},{"from":"resolver","to":"browser","kind":"response","label":"203.0.113.7"}],"metrics":{"lookup":"70","hops":"4","ttl":"300"}},
-    {"tag":"CONCEPT","title":"Record types","body":"The zone holds more than one kind of record. A maps a name to an IPv4 address and AAAA to IPv6. CNAME says one name is an alias for another, so www can follow example.com. MX names the mail servers. TXT holds free text, used for domain verification and email policy such as SPF (a list of servers allowed to send your mail). The resolver asks for www's address; the answer comes back as the alias plus its target address. A CNAME cannot sit at the zone apex (the bare domain with nothing in front, like example.com).","idea":"Pick the record type by purpose: address (A, AAAA), alias (CNAME), mail (MX), metadata (TXT).","caption":"Resolver asks for www and follows a CNAME to an A record.","focus":["resolver","auth"],"flows":[{"from":"resolver","to":"auth","kind":"request","label":"A www?"},{"from":"auth","to":"resolver","kind":"response","label":"CNAME + A"}],"metrics":{}},
-    {"tag":"CACHE","title":"TTL and caching","body":"Two seconds later another user behind the same resolver asks for example.com. The resolver answers from cache in about 2 ms, no root, TLD or authoritative traffic needed. Each cached answer carries a TTL that counts down; at zero it is discarded and re-fetched. Browsers and operating systems cache too, so the real lookup count is far lower.","idea":"A longer TTL means faster lookups and less load, but slower propagation of any change you make.","caption":"Warm cache: one hop, answer in about 2 ms.","focus":["browser","resolver"],"flows":[{"from":"browser","to":"resolver","kind":"request","label":"A example.com?"},{"from":"resolver","to":"browser","kind":"response","label":"cached, 298s"}],"metrics":{"lookup":"2","hops":"1","ttl":"298"}},
-    {"tag":"GEODNS","title":"GeoDNS: different answers by place","body":"The owner runs one site in the US and one in Europe. A GeoDNS authoritative server looks at who is asking, usually the resolver's IP or a client-subnet hint (a truncated copy of the user's network address that the resolver can pass along), and returns the nearest origin. A resolver in Frankfurt gets the EU address, so the user's later connections travel roughly 10-20 ms instead of about 90 ms. This record has a 60 s TTL so the steering can change quickly. It is a rough guess: a user on a distant public resolver can be steered wrongly.","idea":"GeoDNS picks the answer by the asker's location, which is only as accurate as the resolver tells it.","caption":"Authoritative returns the EU address; browser connects there.","focus":["resolver","auth","eu","browser"],"flows":[{"from":"resolver","to":"auth","kind":"request","label":"A (from Frankfurt)"},{"from":"auth","to":"resolver","kind":"response","label":"EU IP"},{"from":"browser","to":"eu","kind":"request","label":"GET /"}],"metrics":{"lookup":"26","hops":"2","ttl":"60"}},
-    {"tag":"WHAT IF","title":"DNS-based failover","body":"Now the EU origin dies. The authoritative server health-checks both origins, notices, and stops returning the EU address. Detection itself takes time too, since a health check usually needs a few failed probes. Resolvers and browsers still hold the old answer until its TTL expires; only then does a new lookup return the US address. With a 60 s TTL, some users keep hitting a dead server for a minute or more, since some clients ignore TTLs. That is why failover-critical records use short TTLs.","idea":"DNS failover works, but it is only as fast as the TTL, so short TTLs buy faster recovery at the cost of more lookups.","caption":"Health check fails; clients with cached answers still hit the dead origin.","focus":["auth","eu","browser"],"flows":[{"from":"auth","to":"eu","kind":"fail","label":"health check"},{"from":"browser","to":"eu","kind":"fail","label":"cached IP, timeout"},{"from":"browser","to":"us","kind":"request","label":"new lookup: US IP"}],"metrics":{"ttl":"60"}},
-    {"tag":"RECAP","title":"What to remember","body":"A recursive resolver chases the answer through root, TLD and authoritative servers, then caches it. Records express different facts: addresses, aliases, mail, metadata. TTL is the dial between speed and agility. GeoDNS and failover both build on this, and both are limited by cached answers you cannot recall.","idea":"DNS is a cached hierarchy; every clever trick on top inherits the TTL delay.","caption":"The full lookup path and the origins it steers to.","focus":["browser","resolver","root","tld","auth","us","eu"],"flows":[],"metrics":{"lookup":"70","hops":"4","ttl":"300"}}
+    {
+      "tag": "QUESTION",
+      "title": "Names are not addresses",
+      "body": "Your browser wants example.com, but networks route packets to IP addresses. Something must translate the name into a number, and no single computer holds every name on the internet. DNS solves this with a hierarchy of servers that each know a small slice, plus layers of caching so most lookups never travel far.",
+      "idea": "DNS is a distributed, cached, hierarchical phone book, not one big database.",
+      "caption": "The browser has a name and needs an IP address.",
+      "focus": [
+        "browser"
+      ],
+      "flows": [],
+      "metrics": {}
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "Ask the recursive resolver",
+      "body": "The OS hands the question to a recursive resolver, usually run by your ISP or a public provider. Its job is to do the whole chase for you and return one final answer. It keeps a cache, so if anyone nearby asked recently, it answers instantly. Here the cache has nothing for this name, so it has to ask the servers above.",
+      "idea": "A recursive resolver does the legwork on behalf of clients and remembers the results.",
+      "caption": "Browser asks the resolver; cache miss.",
+      "focus": [
+        "browser",
+        "resolver"
+      ],
+      "flows": [
+        {
+          "from": "browser",
+          "to": "resolver",
+          "kind": "request",
+          "label": "A example.com?"
+        }
+      ],
+      "metrics": {
+        "lookup": "2",
+        "hops": "1"
+      }
+    },
+    {
+      "tag": "FLOW",
+      "title": "Root: who runs .com?",
+      "body": "The resolver already knows the addresses of the 13 root server identities (hundreds of anycast machines behind them; anycast means many machines share one address and you reach the nearest). It asks one. The root does not know example.com, but it knows who runs each top-level domain, so it replies with a referral to the .com servers. In real life the resolver has usually cached the root and .com referrals, so most cold lookups skip straight to the authoritative server.",
+      "idea": "The root only points to the right TLD servers; it never stores individual sites.",
+      "caption": "Root refers the resolver to the .com servers.",
+      "focus": [
+        "resolver",
+        "root"
+      ],
+      "flows": [
+        {
+          "from": "resolver",
+          "to": "root",
+          "kind": "request",
+          "label": "A example.com?"
+        },
+        {
+          "from": "root",
+          "to": "resolver",
+          "kind": "response",
+          "label": "ask .com TLD"
+        }
+      ],
+      "metrics": {
+        "lookup": "22",
+        "hops": "2"
+      }
+    },
+    {
+      "tag": "FLOW",
+      "title": "TLD: who runs example.com?",
+      "body": "The resolver repeats the question to a .com TLD server. The TLD servers hold, for every registered domain, the NS (name server) records naming the servers the owner chose. They reply with another referral to the domain's own name servers. Still no IP address yet, just a closer signpost.",
+      "idea": "The TLD tier maps each registered domain to its authoritative name servers.",
+      "caption": "TLD refers the resolver to example.com's servers.",
+      "focus": [
+        "resolver",
+        "tld"
+      ],
+      "flows": [
+        {
+          "from": "resolver",
+          "to": "tld",
+          "kind": "request",
+          "label": "A example.com?"
+        },
+        {
+          "from": "tld",
+          "to": "resolver",
+          "kind": "response",
+          "label": "ask ns1.example"
+        }
+      ],
+      "metrics": {
+        "lookup": "44",
+        "hops": "3"
+      }
+    },
+    {
+      "tag": "FLOW",
+      "title": "Authoritative: the real answer",
+      "body": "An authoritative server holds the actual records for the zone (the set of records one owner manages). It answers with the A record 203.0.113.7 and a TTL (time to live) of 300 seconds. The resolver caches it and returns it to the browser. The whole cold lookup took about four network exchanges; assuming roughly 20-25 ms per upstream exchange, that is about 70 ms in this example.",
+      "idea": "Only the authoritative server is the source of truth; everything else is a cached copy.",
+      "caption": "Authoritative server answers; resolver caches and replies.",
+      "focus": [
+        "resolver",
+        "auth",
+        "browser"
+      ],
+      "flows": [
+        {
+          "from": "resolver",
+          "to": "auth",
+          "kind": "request",
+          "label": "A example.com?"
+        },
+        {
+          "from": "auth",
+          "to": "resolver",
+          "kind": "response",
+          "label": "203.0.113.7"
+        },
+        {
+          "from": "resolver",
+          "to": "browser",
+          "kind": "response",
+          "label": "203.0.113.7"
+        }
+      ],
+      "metrics": {
+        "lookup": "70",
+        "hops": "4",
+        "ttl": "300"
+      }
+    },
+    {
+      "tag": "CONCEPT",
+      "title": "Record types",
+      "body": "The zone holds more than one kind of record. A maps a name to an IPv4 address and AAAA to IPv6. CNAME says one name is an alias for another, so www can follow example.com. MX names the mail servers. TXT holds free text, used for domain verification and email policy such as SPF (a list of servers allowed to send your mail). The resolver asks for www's address; the answer comes back as the alias plus its target address. A CNAME cannot sit at the zone apex (the bare domain with nothing in front, like example.com).",
+      "idea": "Pick the record type by purpose: address (A, AAAA), alias (CNAME), mail (MX), metadata (TXT).",
+      "caption": "Resolver asks for www and follows a CNAME to an A record.",
+      "focus": [
+        "resolver",
+        "auth"
+      ],
+      "flows": [
+        {
+          "from": "resolver",
+          "to": "auth",
+          "kind": "request",
+          "label": "A www?"
+        },
+        {
+          "from": "auth",
+          "to": "resolver",
+          "kind": "response",
+          "label": "CNAME + A"
+        }
+      ],
+      "metrics": {}
+    },
+    {
+      "tag": "CACHE",
+      "title": "TTL and caching",
+      "body": "Two seconds later another user behind the same resolver asks for example.com. The resolver answers from cache in about 2 ms, no root, TLD or authoritative traffic needed. Each cached answer carries a TTL that counts down; at zero it is discarded and re-fetched. Browsers and operating systems cache too, so the real lookup count is far lower.",
+      "idea": "A longer TTL means faster lookups and less load, but slower propagation of any change you make.",
+      "caption": "Warm cache: one hop, answer in about 2 ms.",
+      "focus": [
+        "browser",
+        "resolver"
+      ],
+      "flows": [
+        {
+          "from": "browser",
+          "to": "resolver",
+          "kind": "request",
+          "label": "A example.com?"
+        },
+        {
+          "from": "resolver",
+          "to": "browser",
+          "kind": "response",
+          "label": "cached, 298s"
+        }
+      ],
+      "metrics": {
+        "lookup": "2",
+        "hops": "1",
+        "ttl": "298"
+      }
+    },
+    {
+      "tag": "GEODNS",
+      "title": "GeoDNS: different answers by place",
+      "body": "The owner runs one site in the US and one in Europe. A GeoDNS authoritative server looks at who is asking, usually the resolver's IP or a client-subnet hint (a truncated copy of the user's network address that the resolver can pass along), and returns the nearest origin. A resolver in Frankfurt gets the EU address, so the user's later connections travel roughly 10-20 ms instead of about 90 ms. This record has a 60 s TTL so the steering can change quickly. It is a rough guess: a user on a distant public resolver can be steered wrongly.",
+      "idea": "GeoDNS picks the answer by the asker's location, which is only as accurate as the resolver tells it.",
+      "caption": "Authoritative returns the EU address; browser connects there.",
+      "focus": [
+        "resolver",
+        "auth",
+        "eu",
+        "us",
+        "browser"
+      ],
+      "flows": [
+        {
+          "from": "resolver",
+          "to": "auth",
+          "kind": "request",
+          "label": "A (from Frankfurt)"
+        },
+        {
+          "from": "auth",
+          "to": "resolver",
+          "kind": "response",
+          "label": "EU IP"
+        },
+        {
+          "from": "browser",
+          "to": "eu",
+          "kind": "request",
+          "label": "GET /"
+        }
+      ],
+      "metrics": {
+        "lookup": "26",
+        "hops": "2",
+        "ttl": "60"
+      },
+      "chips": [
+        {
+          "node": "us",
+          "text": "~90 ms away"
+        },
+        {
+          "node": "eu",
+          "text": "~15 ms away",
+          "tone": "green"
+        }
+      ]
+    },
+    {
+      "tag": "WHAT IF",
+      "title": "DNS-based failover",
+      "body": "Now the EU origin dies. The authoritative server health-checks both origins, notices, and stops returning the EU address. Detection itself takes time too, since a health check usually needs a few failed probes. Resolvers and browsers still hold the old answer until its TTL expires. With a 60 s TTL, some users keep hitting a dead server for a minute or more, since some clients ignore TTLs. That is why failover-critical records use short TTLs. Once the TTL expires, the next lookup returns the US address and the browser connects there.",
+      "idea": "DNS failover works, but it is only as fast as the TTL, so short TTLs buy faster recovery at the cost of more lookups.",
+      "caption": "Health check fails; clients with cached answers still hit the dead origin.",
+      "focus": [
+        "auth",
+        "eu",
+        "browser"
+      ],
+      "flows": [
+        {
+          "from": "auth",
+          "to": "eu",
+          "kind": "fail",
+          "label": "health check"
+        },
+        {
+          "from": "browser",
+          "to": "eu",
+          "kind": "fail",
+          "label": "cached IP, timeout"
+        },
+        {
+          "from": "browser",
+          "to": "us",
+          "kind": "request",
+          "label": "retry on US IP"
+        }
+      ],
+      "metrics": {
+        "ttl": "60"
+      }
+    },
+    {
+      "tag": "RECAP",
+      "title": "What to remember",
+      "body": "A recursive resolver chases the answer through root, TLD and authoritative servers, then caches it. Records express different facts: addresses, aliases, mail, metadata. TTL is the dial between speed and agility. GeoDNS and failover both build on this, and both are limited by cached answers you cannot recall.",
+      "idea": "DNS is a cached hierarchy; every clever trick on top inherits the TTL delay.",
+      "caption": "The full lookup path and the origins it steers to.",
+      "focus": [
+        "browser",
+        "resolver",
+        "root",
+        "tld",
+        "auth",
+        "us",
+        "eu"
+      ],
+      "flows": [],
+      "metrics": {
+        "lookup": "70",
+        "hops": "4",
+        "ttl": "300"
+      }
+    }
   ],
   "quiz": [
-    {"q":"A resolver has no cached data for example.com. What is the order of servers it contacts?","options":["Authoritative, then TLD, then root","Root, then TLD, then authoritative","TLD, then root, then authoritative","Root, then authoritative, skipping the TLD"],"answer":1,"why":"The root points to the .com TLD servers, which point to the domain's authoritative servers, which hold the actual records."},
-    {"q":"You must move your site to a new IP in three days. Your A record has a 24-hour TTL. What should you do beforehand?","options":["Nothing; DNS updates instantly worldwide","Raise the TTL so resolvers cache the new value longer","Lower the TTL to a few minutes well in advance, then change the IP","Switch the record to a TXT record"],"answer":2,"why":"Caches keep the old answer until the TTL expires, so the TTL must be lowered at least one old-TTL period before the change."},
-    {"q":"You want example.com (the zone apex) to alias to a provider hostname, and also receive mail. Which is the real problem?","options":["MX records cannot point to hostnames","TXT records block aliases","CNAME records only work for IPv6","A CNAME cannot coexist with other records such as MX and NS at the apex"],"answer":3,"why":"A CNAME means the name is entirely an alias, so no other record types may exist at that name; apex names need NS and SOA records. Many DNS providers offer ALIAS/ANAME or CNAME flattening, which resolves the target for you and answers with plain A/AAAA records at the apex."},
-    {"q":"Your EU origin fails and DNS failover removes it, yet some users still see errors for a minute. Most likely cause?","options":["Clients and resolvers are using cached answers until the TTL expires","The authoritative server has not noticed","GeoDNS cannot return US addresses","Root servers are overloaded"],"answer":0,"why":"DNS changes only reach users as cached copies expire, so the TTL sets a floor on failover time for those clients."},
-    {"q":"A user in Berlin uses a public resolver that sits in the US, and GeoDNS returns the US origin. Why?","options":["Root servers geolocate users","A records are always US","GeoDNS saw the resolver's location, not the user's","The TTL expired"],"answer":2,"why":"The authoritative server only sees the resolver's address (unless a client-subnet hint is passed), so a distant resolver makes GeoDNS guess the wrong region."}
+    {
+      "q": "A resolver has no cached data for example.com. What is the order of servers it contacts?",
+      "options": [
+        "Authoritative, then TLD, then root",
+        "Root, then TLD, then authoritative",
+        "TLD, then root, then authoritative",
+        "Root, then authoritative, skipping the TLD"
+      ],
+      "answer": 1,
+      "why": "The root points to the .com TLD servers, which point to the domain's authoritative servers, which hold the actual records."
+    },
+    {
+      "q": "You must move your site to a new IP in three days. Your A record has a 24-hour TTL. What should you do beforehand?",
+      "options": [
+        "Nothing; DNS updates instantly worldwide",
+        "Raise the TTL so resolvers cache the new value longer",
+        "Lower the TTL to a few minutes well in advance, then change the IP",
+        "Switch the record to a TXT record"
+      ],
+      "answer": 2,
+      "why": "Caches keep the old answer until the TTL expires, so the TTL must be lowered at least one old-TTL period before the change."
+    },
+    {
+      "q": "You want example.com (the zone apex) to alias to a provider hostname, and also receive mail. Which is the real problem?",
+      "options": [
+        "MX records cannot point to hostnames",
+        "TXT records block aliases",
+        "CNAME records only work for IPv6",
+        "A CNAME cannot coexist with other records such as MX and NS at the apex"
+      ],
+      "answer": 3,
+      "why": "A CNAME means the name is entirely an alias, so no other record types may exist at that name; apex names need NS and SOA records. Many DNS providers offer ALIAS/ANAME or CNAME flattening, which resolves the target for you and answers with plain A/AAAA records at the apex."
+    },
+    {
+      "q": "Your EU origin fails and DNS failover removes it, yet some users still see errors for a minute. Most likely cause?",
+      "options": [
+        "Clients and resolvers are using cached answers until the TTL expires",
+        "The authoritative server has not noticed",
+        "GeoDNS cannot return US addresses",
+        "Root servers are overloaded"
+      ],
+      "answer": 0,
+      "why": "DNS changes only reach users as cached copies expire, so the TTL sets a floor on failover time for those clients."
+    },
+    {
+      "q": "A user in Berlin uses a public resolver that sits in the US, and GeoDNS returns the US origin. Why?",
+      "options": [
+        "Root servers geolocate users",
+        "A records are always US",
+        "GeoDNS saw the resolver's location, not the user's",
+        "The TTL expired"
+      ],
+      "answer": 2,
+      "why": "The authoritative server only sees the resolver's address (unless a client-subnet hint is passed), so a distant resolver makes GeoDNS guess the wrong region."
+    }
   ],
   "cheatsheet": [
-    {"term":"Recursive resolver","def":"Server that answers clients by chasing the lookup through root, TLD and authoritative servers, and caches results."},
-    {"term":"Authoritative server","def":"Holds the real records for a zone. Its answers are the source of truth; all other copies are caches."},
-    {"term":"Root / TLD","def":"Root refers to TLD servers (.com, .org); TLD servers refer to each domain's name servers via NS records."},
-    {"term":"A / AAAA","def":"Map a name to an IPv4 / IPv6 address. A name can have several, which gives crude load spreading."},
-    {"term":"CNAME","def":"Makes a name an alias of another name. Cannot share a name with other records, so not allowed at the zone apex. Providers' ALIAS/ANAME or CNAME flattening can work around this."},
-    {"term":"MX / TXT","def":"MX lists mail servers with priorities. TXT holds text for SPF, DKIM, DMARC and domain-ownership checks."},
-    {"term":"TTL","def":"Seconds a cached answer may be reused. Rule of thumb: about 60 s for failover records, 300-3600 s for most records, up to a day for rarely changed ones."},
-    {"term":"GeoDNS / failover","def":"Authoritative server varies answers by asker location or origin health. Limited by resolver accuracy and TTL lag."}
+    {
+      "term": "Recursive resolver",
+      "def": "Server that answers clients by chasing the lookup through root, TLD and authoritative servers, and caches results."
+    },
+    {
+      "term": "Authoritative server",
+      "def": "Holds the real records for a zone. Its answers are the source of truth; all other copies are caches."
+    },
+    {
+      "term": "Root / TLD",
+      "def": "Root refers to TLD servers (.com, .org); TLD servers refer to each domain's name servers via NS records."
+    },
+    {
+      "term": "A / AAAA",
+      "def": "Map a name to an IPv4 / IPv6 address. A name can have several, which gives crude load spreading."
+    },
+    {
+      "term": "CNAME",
+      "def": "Makes a name an alias of another name. Cannot share a name with other records, so not allowed at the zone apex. Providers' ALIAS/ANAME or CNAME flattening can work around this."
+    },
+    {
+      "term": "MX / TXT",
+      "def": "MX lists mail servers with priorities. TXT holds text for SPF, DKIM, DMARC and domain-ownership checks."
+    },
+    {
+      "term": "TTL",
+      "def": "Seconds a cached answer may be reused. Rule of thumb: about 60 s for failover records, 300-3600 s for most records, up to a day for rarely changed ones."
+    },
+    {
+      "term": "GeoDNS / failover",
+      "def": "Authoritative server varies answers by asker location or origin health. Limited by resolver accuracy and TTL lag."
+    }
   ]
 }

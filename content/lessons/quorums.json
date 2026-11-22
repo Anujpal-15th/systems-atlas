@@ -12,54 +12,606 @@
     "What quorums still do not give you, such as ordering of concurrent writes"
   ],
   "nodes": [
-    {"id": "client", "label": "Client", "kind": "client", "x": 9, "y": 50},
-    {"id": "coord", "label": "Coordinator", "kind": "service", "x": 34, "y": 50},
-    {"id": "ra", "label": "Replica A", "kind": "db", "x": 64, "y": 14},
-    {"id": "rb", "label": "Replica B", "kind": "db", "x": 64, "y": 50},
-    {"id": "rc", "label": "Replica C", "kind": "db", "x": 64, "y": 86},
-    {"id": "stand", "label": "Node D (stand-in)", "kind": "db", "x": 89, "y": 68}
+    {
+      "id": "client",
+      "label": "Client",
+      "kind": "client",
+      "x": 9,
+      "y": 50
+    },
+    {
+      "id": "coord",
+      "label": "Coordinator",
+      "kind": "service",
+      "x": 34,
+      "y": 50
+    },
+    {
+      "id": "ra",
+      "label": "Replica A",
+      "kind": "db",
+      "x": 64,
+      "y": 14
+    },
+    {
+      "id": "rb",
+      "label": "Replica B",
+      "kind": "db",
+      "x": 64,
+      "y": 50
+    },
+    {
+      "id": "rc",
+      "label": "Replica C",
+      "kind": "db",
+      "x": 64,
+      "y": 86
+    },
+    {
+      "id": "stand",
+      "label": "Node D (stand-in)",
+      "kind": "db",
+      "x": 89,
+      "y": 68
+    }
   ],
   "edges": [
-    {"from": "client", "to": "coord"},
-    {"from": "coord", "to": "ra"},
-    {"from": "coord", "to": "rb"},
-    {"from": "coord", "to": "rc"},
-    {"from": "coord", "to": "stand"},
-    {"from": "stand", "to": "rc"},
-    {"from": "ra", "to": "rb"}
+    {
+      "from": "client",
+      "to": "coord"
+    },
+    {
+      "from": "coord",
+      "to": "ra"
+    },
+    {
+      "from": "coord",
+      "to": "rb"
+    },
+    {
+      "from": "coord",
+      "to": "rc"
+    },
+    {
+      "from": "coord",
+      "to": "stand"
+    },
+    {
+      "from": "stand",
+      "to": "rc"
+    },
+    {
+      "from": "ra",
+      "to": "rb"
+    }
   ],
   "metrics": [
-    {"id": "n", "label": "Copies (N)", "unit": "copies"},
-    {"id": "need", "label": "Quorum size", "unit": "nodes"},
-    {"id": "fresh", "label": "Fresh replicas", "unit": "replicas"},
-    {"id": "ver", "label": "Version seen", "unit": "ver"}
+    {
+      "id": "n",
+      "label": "Copies (N)",
+      "unit": "copies"
+    },
+    {
+      "id": "need",
+      "label": "Quorum size",
+      "unit": "nodes"
+    },
+    {
+      "id": "fresh",
+      "label": "Fresh replicas",
+      "unit": "replicas"
+    },
+    {
+      "id": "ver",
+      "label": "Version seen",
+      "unit": "ver"
+    }
   ],
   "steps": [
-    {"tag": "QUESTION", "title": "No leader, so who is right?", "body": "In a leaderless database such as the original Amazon Dynamo design or databases like Cassandra and Riak, any node can take a write. Each key is stored on N replicas; here N = 3, on A, B and C. Replicas fail and come back at different times, so copies drift apart. If a client reads while they disagree, how many replicas must it ask to be sure it sees the latest write?", "idea": "With no single leader, correctness comes from how many replicas you wait for, not from asking one special node.", "caption": "One key lives on three replicas. Any of them may be stale.", "focus": ["ra", "rb", "rc"], "flows": [], "metrics": {"n": "3", "fresh": "3", "ver": "1"}},
-    {"tag": "WRITE", "title": "Write with W = 2", "body": "The client sends cart:42 = v2 to a coordinator (any node can play this role; it is drawn separately here). It forwards the write to all three replicas but only waits for W = 2 acknowledgements. A and B answer in about 2 ms. C is down and never answers. The write still succeeds, and C is simply behind for now.", "idea": "A write is acknowledged once W replicas have it; the other N - W copies catch up later.", "caption": "A and B ack; C is down. Two acks meet W = 2.", "focus": ["coord", "ra", "rb", "rc"], "flows": [{"from": "client", "to": "coord", "kind": "request", "label": "PUT cart v2"}, {"from": "coord", "to": "ra", "kind": "request", "label": "v2"}, {"from": "coord", "to": "rb", "kind": "request", "label": "v2"}, {"from": "coord", "to": "rc", "kind": "fail", "label": "no reply"}, {"from": "ra", "to": "coord", "kind": "response", "label": "ack"}, {"from": "rb", "to": "coord", "kind": "response", "label": "ack"}, {"from": "coord", "to": "client", "kind": "response", "label": "OK"}], "metrics": {"need": "2", "fresh": "2", "ver": "2"}},
-    {"tag": "READ", "title": "Read with R = 2", "body": "C has restarted but still holds v1. The client now reads and the coordinator asks R = 2 replicas, say B and C. B returns v2, C returns v1, and the coordinator picks the newest (by version number or write timestamp; the clocks lesson covers why this is harder than it sounds), v2. The coordinator could repair C here (read repair, covered below), but assume it has not run yet. Any two replicas must include at least one of the two that took the write, because 2 + 2 = 4 is greater than N = 3.", "idea": "If R + W > N, every read set shares at least one replica with every write set, so the read sees the latest write that completed before it started. This is not full linearizability (see the CAP and consensus lessons).", "caption": "Read set {B, C} overlaps write set {A, B} at B.", "focus": ["coord", "rb", "rc"], "flows": [{"from": "client", "to": "coord", "kind": "request", "label": "GET cart"}, {"from": "coord", "to": "rb", "kind": "request", "label": "read"}, {"from": "coord", "to": "rc", "kind": "request", "label": "read"}, {"from": "rb", "to": "coord", "kind": "response", "label": "v2"}, {"from": "rc", "to": "coord", "kind": "response", "label": "v1 (stale)"}, {"from": "coord", "to": "client", "kind": "response", "label": "v2"}], "metrics": {"need": "2", "fresh": "2", "ver": "2"}},
-    {"tag": "TRADE-OFF", "title": "Turning the knobs", "body": "In systems like Cassandra and Riak, R and W can be chosen per request. W = 1, R = 1 is the fastest, but 1 + 1 is not greater than 3, so a read can land on C and return v1. Even after the W = 2 write above, R = 1 can land on C and return v1, since 1 + 2 is not greater than 3. W = 3, R = 1 gives fresh reads but one dead replica blocks every write. The common middle for N = 3 is W = 2, R = 2, which survives one failure on both paths. Larger quorums also mean waiting for slower replicas, which raises tail latency (the slowest few percent of requests).", "idea": "Pick R and W to trade freshness, write availability and latency; R + W > N buys overlap, and the cost is waiting for more nodes.", "caption": "R = 1 asked only stale C and returned v1.", "focus": ["coord", "rc"], "flows": [{"from": "coord", "to": "rc", "kind": "request", "label": "read (R=1)"}, {"from": "rc", "to": "coord", "kind": "response", "label": "v1 (stale)"}, {"from": "coord", "to": "client", "kind": "response", "label": "v1"}], "metrics": {"need": "1", "fresh": "2", "ver": "1"}},
-    {"tag": "WHAT IF", "title": "Too many replicas down", "body": "Now a network problem cuts the coordinator off from A and C, leaving only B reachable, and W = 2. A strict quorum would reject the write because only 1 of the 3 designated replicas can ack. A sloppy quorum instead lets the coordinator write to a healthy node outside the set, D (the only healthy stand-in here), tagged with a hint that the data belongs to C. B plus D give two acks and the write is accepted. Dynamo and Riak count stand-ins toward the quorum; Cassandra stores hints but does not count them toward the consistency level (except ANY).", "idea": "A sloppy quorum keeps writes available during failures by counting stand-in nodes, at the cost of the overlap guarantee.", "caption": "D holds C's copy as a hint so the write can succeed.", "focus": ["coord", "rb", "stand", "ra", "rc"], "flows": [{"from": "client", "to": "coord", "kind": "request", "label": "PUT cart v3"}, {"from": "coord", "to": "ra", "kind": "fail", "label": "unreachable"}, {"from": "coord", "to": "rc", "kind": "fail", "label": "unreachable"}, {"from": "coord", "to": "rb", "kind": "request", "label": "v3"}, {"from": "coord", "to": "stand", "kind": "request", "label": "v3 + hint for C"}, {"from": "rb", "to": "coord", "kind": "response", "label": "ack"}, {"from": "stand", "to": "coord", "kind": "response", "label": "ack"}, {"from": "coord", "to": "client", "kind": "response", "label": "OK"}], "metrics": {"need": "2", "fresh": "1", "ver": "3"}},
-    {"tag": "CAVEAT", "title": "The catch with sloppy quorums", "body": "D is not one of the three replicas that reads consult. While the partition is still in place, another client reaches a coordinator on A and C's side and reads A and C, both of which missed v3. Only 1 of the 3 designated replicas (B) holds v3, even though 2 copies exist (B and D). A A returns v2 and C returns v1, so that coordinator answers v2 even though the write was acknowledged and R + W is still greater than N. The overlap promise held only for the designated replicas. Sloppy quorums give you eventual consistency and high write availability, not a read-your-writes guarantee.", "idea": "With stand-ins, R + W > N no longer guarantees a fresh read until the hint is delivered.", "caption": "Reading A and C returns old data; v3 sits on D.", "focus": ["coord", "ra", "rc", "stand"], "flows": [{"from": "coord", "to": "ra", "kind": "request", "label": "read"}, {"from": "coord", "to": "rc", "kind": "request", "label": "read"}, {"from": "ra", "to": "coord", "kind": "response", "label": "v2"}, {"from": "rc", "to": "coord", "kind": "response", "label": "v1"}], "metrics": {"need": "2", "fresh": "1", "ver": "2"}},
-    {"tag": "HANDOFF", "title": "Hinted handoff", "body": "The partition heals and C is reachable again. D notices it is holding a hint for C and forwards v3 to it, then deletes its temporary copy. Systems usually cap how long they keep hints, often a few hours, so a node that stays down longer must be repaired another way. Handoff is a fast path, not a guarantee.", "idea": "Hinted handoff replays missed writes to a recovered replica, but hints are best-effort and time-limited.", "caption": "D hands v3 to C once C is back.", "focus": ["stand", "rc"], "flows": [{"from": "stand", "to": "rc", "kind": "replicate", "label": "hint: v3"}, {"from": "rc", "to": "stand", "kind": "response", "label": "ack, drop hint"}], "metrics": {"n": "3", "fresh": "2", "ver": "3"}},
-    {"tag": "REPAIR", "title": "Read repair", "body": "A is still on v2 because it was cut off for the v3 write. No hint reached A in this example (only one stand-in, D, was available and it holds C's hint; a hint for A could also have been lost or expired). A client reads from A and B. B returns v3, A returns v2. The coordinator answers the client with v3 and, in the same breath, writes v3 back to A. The read itself discovered the gap and fixed it, at the cost of one extra write on that path.", "idea": "Read repair heals stale replicas as a side effect of reads, so popular keys converge quickly.", "caption": "Coordinator spots A is behind and pushes v3 to it.", "focus": ["coord", "ra", "rb"], "flows": [{"from": "coord", "to": "ra", "kind": "request", "label": "read"}, {"from": "coord", "to": "rb", "kind": "request", "label": "read"}, {"from": "ra", "to": "coord", "kind": "response", "label": "v2"}, {"from": "rb", "to": "coord", "kind": "response", "label": "v3"}, {"from": "coord", "to": "client", "kind": "response", "label": "v3"}, {"from": "coord", "to": "ra", "kind": "replicate", "label": "repair: v3"}], "metrics": {"fresh": "3", "ver": "3"}},
-    {"tag": "ANTI-ENTROPY", "title": "Background anti-entropy", "body": "Read repair only touches keys that get read, and hints can expire or be lost. So replicas also compare data in the background (in some systems this is a scheduled or operator-run repair job). Each builds a Merkle tree, a tree of hashes over key ranges, and swaps the root hash with a peer. If roots match, nothing is copied. If not, they walk down to the differing ranges and exchange only those keys. This sweeps up cold data nobody reads. Say a rarely read key in range 7 was missed by both hints and reads. Cassandra's nodetool repair builds Merkle trees on demand, whereas Dynamo and Riak run active anti-entropy automatically.", "idea": "Anti-entropy uses hash trees to find and fix differences cheaply, covering keys that read repair and hints miss.", "caption": "A and B compare hash roots, then sync only the differing range.", "focus": ["ra", "rb"], "flows": [{"from": "ra", "to": "rb", "kind": "handshake", "label": "Merkle root"}, {"from": "rb", "to": "ra", "kind": "handshake", "label": "mismatch: range 7"}, {"from": "rb", "to": "ra", "kind": "replicate", "label": "keys in range 7"}], "metrics": {"fresh": "3", "ver": "3"}},
-    {"tag": "RECAP", "title": "What quorums give you", "body": "Store N copies, wait for W acks on writes and R replies on reads. If R + W > N and you use the real replica set, reads overlap the latest write. Sloppy quorums and hinted handoff favor availability, while read repair and anti-entropy pull copies back together. Quorums do not order concurrent writes: that needs version tracking, covered in the clocks and conflict-resolution lessons.", "idea": "Quorums tune the freshness versus availability trade; healing mechanisms provide eventual convergence.", "caption": "Write to W, read from R, repair in the background.", "focus": ["client", "coord", "ra", "rb", "rc", "stand"], "flows": [], "metrics": {"n": "3", "need": "2", "fresh": "3", "ver": "3"}}
+    {
+      "tag": "QUESTION",
+      "title": "No leader, so who is right?",
+      "body": "In a leaderless database such as the original Amazon Dynamo design or databases like Cassandra and Riak, any node can take a write. Each key is stored on N replicas; here N = 3, on A, B and C. Replicas fail and come back at different times, so copies drift apart. If a client reads while they disagree, how many replicas must it ask to be sure it sees the latest write?",
+      "idea": "With no single leader, correctness comes from how many replicas you wait for, not from asking one special node.",
+      "caption": "One key lives on three replicas. Any of them may be stale.",
+      "focus": [
+        "ra",
+        "rb",
+        "rc"
+      ],
+      "flows": [],
+      "metrics": {
+        "n": "3",
+        "fresh": "3",
+        "ver": "1"
+      }
+    },
+    {
+      "tag": "WRITE",
+      "title": "Write with W = 2",
+      "body": "The client sends cart:42 = v2 to a coordinator (any node can play this role; it is drawn separately here). It forwards the write to all three replicas but only waits for W = 2 acknowledgements. A and B answer in about 2 ms. C is down and never answers. The write still succeeds, and C is simply behind for now.",
+      "idea": "A write is acknowledged once W replicas have it; the other N - W copies catch up later.",
+      "caption": "A and B ack; C is down. Two acks meet W = 2.",
+      "focus": [
+        "coord",
+        "ra",
+        "rb",
+        "rc"
+      ],
+      "flows": [
+        {
+          "from": "client",
+          "to": "coord",
+          "kind": "request",
+          "label": "PUT cart v2"
+        },
+        {
+          "from": "coord",
+          "to": "ra",
+          "kind": "request",
+          "label": "v2"
+        },
+        {
+          "from": "coord",
+          "to": "rb",
+          "kind": "request",
+          "label": "v2"
+        },
+        {
+          "from": "coord",
+          "to": "rc",
+          "kind": "fail",
+          "label": "no reply"
+        },
+        {
+          "from": "ra",
+          "to": "coord",
+          "kind": "response",
+          "label": "ack"
+        },
+        {
+          "from": "rb",
+          "to": "coord",
+          "kind": "response",
+          "label": "ack"
+        },
+        {
+          "from": "coord",
+          "to": "client",
+          "kind": "response",
+          "label": "OK"
+        }
+      ],
+      "metrics": {
+        "need": "2",
+        "fresh": "2",
+        "ver": "2"
+      }
+    },
+    {
+      "tag": "READ",
+      "title": "Read with R = 2",
+      "body": "C has restarted but still holds v1. The client now reads and the coordinator asks R = 2 replicas, say B and C. B returns v2, C returns v1, and the coordinator picks the newest (by version number or write timestamp; the clocks lesson covers why this is harder than it sounds), v2. The coordinator could repair C here (read repair, covered below), but assume it has not run yet. Any two replicas must include at least one of the two that took the write, because 2 + 2 = 4 is greater than N = 3.",
+      "idea": "If R + W > N, every read set shares at least one replica with every write set, so the read sees the latest write that completed before it started. This is not full linearizability (see the CAP and consensus lessons).",
+      "caption": "Read set {B, C} overlaps write set {A, B} at B.",
+      "focus": [
+        "coord",
+        "rb",
+        "rc"
+      ],
+      "flows": [
+        {
+          "from": "client",
+          "to": "coord",
+          "kind": "request",
+          "label": "GET cart"
+        },
+        {
+          "from": "coord",
+          "to": "rb",
+          "kind": "request",
+          "label": "read"
+        },
+        {
+          "from": "coord",
+          "to": "rc",
+          "kind": "request",
+          "label": "read"
+        },
+        {
+          "from": "rb",
+          "to": "coord",
+          "kind": "response",
+          "label": "v2"
+        },
+        {
+          "from": "rc",
+          "to": "coord",
+          "kind": "response",
+          "label": "v1 (stale)"
+        },
+        {
+          "from": "coord",
+          "to": "client",
+          "kind": "response",
+          "label": "v2"
+        }
+      ],
+      "metrics": {
+        "need": "2",
+        "fresh": "2",
+        "ver": "2"
+      }
+    },
+    {
+      "tag": "TRADE-OFF",
+      "title": "Turning the knobs",
+      "body": "In systems like Cassandra and Riak, R and W can be chosen per request. W = 1, R = 1 is the fastest, but 1 + 1 is not greater than 3, so a read can land on C and return v1. Even after the W = 2 write above, R = 1 can land on C and return v1, since 1 + 2 is not greater than 3. W = 3, R = 1 gives fresh reads but one dead replica blocks every write. The common middle for N = 3 is W = 2, R = 2, which survives one failure on both paths. Larger quorums also mean waiting for slower replicas, which raises tail latency (the slowest few percent of requests).",
+      "idea": "Pick R and W to trade freshness, write availability and latency; R + W > N buys overlap, and the cost is waiting for more nodes.",
+      "caption": "R = 1 asked only stale C and returned v1.",
+      "focus": [
+        "coord",
+        "rc"
+      ],
+      "flows": [
+        {
+          "from": "coord",
+          "to": "rc",
+          "kind": "request",
+          "label": "read (R=1)"
+        },
+        {
+          "from": "rc",
+          "to": "coord",
+          "kind": "response",
+          "label": "v1 (stale)"
+        },
+        {
+          "from": "coord",
+          "to": "client",
+          "kind": "response",
+          "label": "v1"
+        }
+      ],
+      "metrics": {
+        "need": "1",
+        "fresh": "2",
+        "ver": "1"
+      }
+    },
+    {
+      "tag": "WHAT IF",
+      "title": "Too many replicas down",
+      "body": "Now a network problem cuts the coordinator off from A and C, leaving only B reachable, and W = 2. A strict quorum would reject the write because only 1 of the 3 designated replicas can ack. A sloppy quorum instead lets the coordinator write to a healthy node outside the set, D (the only healthy stand-in here), tagged with a hint that the data belongs to C. B plus D give two acks and the write is accepted. Dynamo and Riak count stand-ins toward the quorum; Cassandra stores hints but does not count them toward the consistency level (except ANY).",
+      "idea": "A sloppy quorum keeps writes available during failures by counting stand-in nodes, at the cost of the overlap guarantee.",
+      "caption": "D holds C's copy as a hint so the write can succeed.",
+      "focus": [
+        "coord",
+        "rb",
+        "stand",
+        "ra",
+        "rc"
+      ],
+      "flows": [
+        {
+          "from": "client",
+          "to": "coord",
+          "kind": "request",
+          "label": "PUT cart v3"
+        },
+        {
+          "from": "coord",
+          "to": "ra",
+          "kind": "fail",
+          "label": "unreachable"
+        },
+        {
+          "from": "coord",
+          "to": "rc",
+          "kind": "fail",
+          "label": "unreachable"
+        },
+        {
+          "from": "coord",
+          "to": "rb",
+          "kind": "request",
+          "label": "v3"
+        },
+        {
+          "from": "coord",
+          "to": "stand",
+          "kind": "request",
+          "label": "v3 + hint for C"
+        },
+        {
+          "from": "rb",
+          "to": "coord",
+          "kind": "response",
+          "label": "ack"
+        },
+        {
+          "from": "stand",
+          "to": "coord",
+          "kind": "response",
+          "label": "ack"
+        },
+        {
+          "from": "coord",
+          "to": "client",
+          "kind": "response",
+          "label": "OK"
+        }
+      ],
+      "metrics": {
+        "need": "2",
+        "fresh": "1",
+        "ver": "3"
+      }
+    },
+    {
+      "tag": "CAVEAT",
+      "title": "The catch with sloppy quorums",
+      "body": "D is not one of the three replicas that reads consult. While the partition is still in place, another client reaches a second coordinator on A and C's side (drawn as the same Coordinator box to keep the diagram small) and reads A and C, both of which missed v3. Only 1 of the 3 designated replicas (B) holds v3, even though 2 copies exist (B and D). A returns v2 and C returns v1, so that coordinator answers v2 even though the write was acknowledged and R + W is still greater than N. The overlap promise held only for the designated replicas. Sloppy quorums give you eventual consistency and high write availability, not a read-your-writes guarantee.",
+      "idea": "With stand-ins, R + W > N no longer guarantees a fresh read until the hint is delivered.",
+      "caption": "Reading A and C returns old data; v3 sits on D.",
+      "focus": [
+        "coord",
+        "ra",
+        "rc",
+        "stand"
+      ],
+      "flows": [
+        {
+          "from": "coord",
+          "to": "ra",
+          "kind": "request",
+          "label": "read"
+        },
+        {
+          "from": "coord",
+          "to": "rc",
+          "kind": "request",
+          "label": "read"
+        },
+        {
+          "from": "ra",
+          "to": "coord",
+          "kind": "response",
+          "label": "v2"
+        },
+        {
+          "from": "rc",
+          "to": "coord",
+          "kind": "response",
+          "label": "v1"
+        }
+      ],
+      "metrics": {
+        "need": "2",
+        "fresh": "1",
+        "ver": "2"
+      }
+    },
+    {
+      "tag": "HANDOFF",
+      "title": "Hinted handoff",
+      "body": "The partition heals and C is reachable again. D notices it is holding a hint for C and forwards v3 to it, then deletes its temporary copy. Systems usually cap how long they keep hints, often a few hours, so a node that stays down longer must be repaired another way. Handoff is a fast path, not a guarantee.",
+      "idea": "Hinted handoff replays missed writes to a recovered replica, but hints are best-effort and time-limited.",
+      "caption": "D hands v3 to C once C is back.",
+      "focus": [
+        "stand",
+        "rc"
+      ],
+      "flows": [
+        {
+          "from": "stand",
+          "to": "rc",
+          "kind": "replicate",
+          "label": "hint: v3"
+        },
+        {
+          "from": "rc",
+          "to": "stand",
+          "kind": "response",
+          "label": "ack, drop hint"
+        }
+      ],
+      "metrics": {
+        "n": "3",
+        "fresh": "2",
+        "ver": "3"
+      }
+    },
+    {
+      "tag": "REPAIR",
+      "title": "Read repair",
+      "body": "A is still on v2 because it was cut off for the v3 write. No hint reached A in this example (only one stand-in, D, was available and it holds C's hint; a hint for A could also have been lost or expired). A client reads from A and B. B returns v3, A returns v2. The coordinator answers the client with v3 and, in the same breath, writes v3 back to A. The read itself discovered the gap and fixed it, at the cost of one extra write on that path.",
+      "idea": "Read repair heals stale replicas as a side effect of reads, so popular keys converge quickly.",
+      "caption": "Coordinator spots A is behind and pushes v3 to it.",
+      "focus": [
+        "coord",
+        "ra",
+        "rb"
+      ],
+      "flows": [
+        {
+          "from": "coord",
+          "to": "ra",
+          "kind": "request",
+          "label": "read"
+        },
+        {
+          "from": "coord",
+          "to": "rb",
+          "kind": "request",
+          "label": "read"
+        },
+        {
+          "from": "ra",
+          "to": "coord",
+          "kind": "response",
+          "label": "v2"
+        },
+        {
+          "from": "rb",
+          "to": "coord",
+          "kind": "response",
+          "label": "v3"
+        },
+        {
+          "from": "coord",
+          "to": "client",
+          "kind": "response",
+          "label": "v3"
+        },
+        {
+          "from": "coord",
+          "to": "ra",
+          "kind": "replicate",
+          "label": "repair: v3"
+        }
+      ],
+      "metrics": {
+        "fresh": "3",
+        "ver": "3"
+      }
+    },
+    {
+      "tag": "ANTI-ENTROPY",
+      "title": "Background anti-entropy",
+      "body": "Read repair only touches keys that get read, and hints can expire or be lost. So replicas also compare data in the background (in some systems this is a scheduled or operator-run repair job). Each builds a Merkle tree, a tree of hashes over key ranges, and swaps the root hash with a peer. If roots match, nothing is copied. If not, they walk down to the differing ranges and exchange only those keys. This sweeps up cold data nobody reads. Say a rarely read key in range 7 was missed by both hints and reads. Cassandra's nodetool repair builds Merkle trees on demand, whereas Dynamo and Riak run active anti-entropy automatically.",
+      "idea": "Anti-entropy uses hash trees to find and fix differences cheaply, covering keys that read repair and hints miss.",
+      "caption": "A and B compare hash roots, then sync only the differing range.",
+      "focus": [
+        "ra",
+        "rb"
+      ],
+      "flows": [
+        {
+          "from": "ra",
+          "to": "rb",
+          "kind": "handshake",
+          "label": "Merkle root"
+        },
+        {
+          "from": "rb",
+          "to": "ra",
+          "kind": "handshake",
+          "label": "mismatch: range 7"
+        },
+        {
+          "from": "rb",
+          "to": "ra",
+          "kind": "replicate",
+          "label": "keys in range 7"
+        }
+      ],
+      "metrics": {
+        "fresh": "3",
+        "ver": "3"
+      }
+    },
+    {
+      "tag": "RECAP",
+      "title": "What quorums give you",
+      "body": "Store N copies, wait for W acks on writes and R replies on reads. If R + W > N and you use the real replica set, reads overlap the latest write. Sloppy quorums and hinted handoff favor availability, while read repair and anti-entropy pull copies back together. Quorums do not order concurrent writes: that needs version tracking, covered in the clocks and conflict-resolution lessons.",
+      "idea": "Quorums tune the freshness versus availability trade; healing mechanisms provide eventual convergence.",
+      "caption": "Write to W, read from R, repair in the background.",
+      "focus": [
+        "client",
+        "coord",
+        "ra",
+        "rb",
+        "rc",
+        "stand"
+      ],
+      "flows": [],
+      "metrics": {
+        "n": "3",
+        "need": "2",
+        "fresh": "3",
+        "ver": "3"
+      }
+    }
   ],
   "quiz": [
-    {"q": "Which setting does NOT guarantee that a read overlaps with the most recent acknowledged write (assume strict quorums and no failures during the read)?", "options": ["N = 3, W = 2, R = 2", "N = 5, W = 3, R = 3", "N = 5, W = 2, R = 3", "N = 3, W = 3, R = 1"], "answer": 2, "why": "Overlap needs R + W > N. For N = 5, W = 2 and R = 3 give 5, which is not greater than 5, so a read set of 3 can miss both replicas that took the write."},
-    {"q": "A sloppy quorum accepts a write using a stand-in node outside the key's usual N replicas. Why can a later read with R + W > N still return old data?", "options": ["Stand-in nodes always reject reads", "The read set may contain only designated replicas that never received the write, since the stand-in is not among them", "R + W > N only applies to leader-based systems", "Hinted handoff deletes the data after a write"], "answer": 1, "why": "The overlap argument depends on both sets being drawn from the same N replicas. The acknowledged copy lives on a node reads do not consult until the hint is handed off."},
-    {"q": "A rarely accessed key is stale on one replica, the hint meant for it expired, and nobody reads the key. What eventually repairs it?", "options": ["Read repair, because every key is read eventually", "Raising R above W", "Hinted handoff, which never expires", "Anti-entropy, which compares replicas in the background using hash trees"], "answer": 3, "why": "Read repair needs a read and the hint is gone, so a periodic background comparison such as Merkle-tree anti-entropy is what finds and copies the missing data."},
-    {"q": "You set N = 3 and W = 3 to make writes as durable as possible. What is the main cost?", "options": ["If any one replica is down or slow, writes fail or stall", "Reads can no longer see the latest write", "The coordinator must be a leader", "Data is stored only twice"], "answer": 0, "why": "W = N means every replica must acknowledge, so a single failure blocks writes and the slowest replica sets write latency. Durability goes up but availability goes down."}
+    {
+      "q": "Which setting does NOT guarantee that a read overlaps with the most recent acknowledged write (assume strict quorums and no failures during the read)?",
+      "options": [
+        "N = 3, W = 2, R = 2",
+        "N = 5, W = 3, R = 3",
+        "N = 5, W = 2, R = 3",
+        "N = 3, W = 3, R = 1"
+      ],
+      "answer": 2,
+      "why": "Overlap needs R + W > N. For N = 5, W = 2 and R = 3 give 5, which is not greater than 5, so a read set of 3 can miss both replicas that took the write."
+    },
+    {
+      "q": "A sloppy quorum accepts a write using a stand-in node outside the key's usual N replicas. Why can a later read with R + W > N still return old data?",
+      "options": [
+        "Stand-in nodes always reject reads",
+        "The read set may contain only designated replicas that never received the write, since the stand-in is not among them",
+        "R + W > N only applies to leader-based systems",
+        "Hinted handoff deletes the data after a write"
+      ],
+      "answer": 1,
+      "why": "The overlap argument depends on both sets being drawn from the same N replicas. The acknowledged copy lives on a node reads do not consult until the hint is handed off."
+    },
+    {
+      "q": "A rarely accessed key is stale on one replica, the hint meant for it expired, and nobody reads the key. What eventually repairs it?",
+      "options": [
+        "Read repair, because every key is read eventually",
+        "Raising R above W",
+        "Hinted handoff, which never expires",
+        "Anti-entropy, which compares replicas in the background using hash trees"
+      ],
+      "answer": 3,
+      "why": "Read repair needs a read and the hint is gone, so a periodic background comparison such as Merkle-tree anti-entropy is what finds and copies the missing data."
+    },
+    {
+      "q": "You set N = 3 and W = 3 to make writes as durable as possible. What is the main cost?",
+      "options": [
+        "If any one replica is down or slow, writes fail or stall",
+        "Reads can no longer see the latest write",
+        "The coordinator must be a leader",
+        "Data is stored only twice"
+      ],
+      "answer": 0,
+      "why": "W = N means every replica must acknowledge, so a single failure blocks writes and the slowest replica sets write latency. Durability goes up but availability goes down."
+    }
   ],
   "cheatsheet": [
-    {"term": "N, R, W", "def": "N = replicas per key, W = acks required before a write succeeds, R = replies required before a read returns. In systems like Cassandra and Riak, R and W can be chosen per request."},
-    {"term": "R + W > N", "def": "Read and write sets share a replica, so a read sees the latest completed write. A write that fails to reach W acks is not rolled back, so a later read may still see it. Not linearizability. Common for N = 3: R = W = 2."},
-    {"term": "Majority quorum", "def": "floor(N/2) + 1 replicas, for example 2 of 3 or 3 of 5. Using it for both R and W tolerates the loss of a minority."},
-    {"term": "Sloppy quorum", "def": "Accepts writes on stand-in nodes outside the key's replica set when designated ones are unreachable. More available, but loses the overlap guarantee."},
-    {"term": "Hinted handoff", "def": "A stand-in stores the write with a hint naming the intended replica and forwards it when that node returns. Hints are time-limited and best-effort."},
-    {"term": "Read repair", "def": "When a read sees different versions, the coordinator returns the newest and writes it back to stale replicas. Only fixes keys that are read."},
-    {"term": "Anti-entropy", "def": "Background sync where replicas compare Merkle trees of their data and copy only the differing ranges. Catches cold keys and expired hints."},
-    {"term": "What quorums do not do", "def": "They do not order concurrent writes to the same key. You still need version metadata such as vector clocks or a merge rule to avoid silently losing updates."}
+    {
+      "term": "N, R, W",
+      "def": "N = replicas per key, W = acks required before a write succeeds, R = replies required before a read returns. In systems like Cassandra and Riak, R and W can be chosen per request."
+    },
+    {
+      "term": "R + W > N",
+      "def": "Read and write sets share a replica, so a read sees the latest completed write. A write that fails to reach W acks is not rolled back, so a later read may still see it. Not linearizability. Common for N = 3: R = W = 2."
+    },
+    {
+      "term": "Majority quorum",
+      "def": "floor(N/2) + 1 replicas, for example 2 of 3 or 3 of 5. Using it for both R and W tolerates the loss of a minority."
+    },
+    {
+      "term": "Sloppy quorum",
+      "def": "Accepts writes on stand-in nodes outside the key's replica set when designated ones are unreachable. More available, but loses the overlap guarantee."
+    },
+    {
+      "term": "Hinted handoff",
+      "def": "A stand-in stores the write with a hint naming the intended replica and forwards it when that node returns. Hints are time-limited and best-effort."
+    },
+    {
+      "term": "Read repair",
+      "def": "When a read sees different versions, the coordinator returns the newest and writes it back to stale replicas. Only fixes keys that are read."
+    },
+    {
+      "term": "Anti-entropy",
+      "def": "Background sync where replicas compare Merkle trees of their data and copy only the differing ranges. Catches cold keys and expired hints."
+    },
+    {
+      "term": "What quorums do not do",
+      "def": "They do not order concurrent writes to the same key. You still need version metadata such as vector clocks or a merge rule to avoid silently losing updates."
+    }
   ]
 }

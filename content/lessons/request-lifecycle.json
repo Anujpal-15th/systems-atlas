@@ -1,6 +1,5 @@
 {
   "slug": "request-lifecycle",
-  "style": "illustrated",
   "title": "How a Request Travels",
   "subtitle": "Follow one page load from the Enter key to the last byte, and see which hops eat the time.",
   "minutes": 10,
@@ -64,7 +63,7 @@
       "kind": "cdn",
       "x": 12,
       "y": 92,
-      "gx": -11,
+      "gx": -13,
       "gy": -12
     }
   ],
@@ -169,7 +168,7 @@
     {
       "tag": "CONNECT",
       "title": "Open a secure connection",
-      "body": "Before sending the request the browser opens a TCP connection (one round trip) and negotiates TLS encryption (one more round trip with TLS 1.3). A round trip is a message going there and the reply coming back (RTT). No page data moves yet. Assume the round trip to the server takes 50 ms (about 25 ms each way). Then the two handshakes cost about 100 ms spent just agreeing to talk.",
+      "body": "Before sending the request the browser opens a TCP connection (one round trip) and negotiates TLS encryption (one more round trip with TLS 1.3). A round trip is a message going there and the reply coming back (RTT). No page data moves yet. Assume the round trip to the server takes 50 ms (about 25 ms each way). Then the two handshakes cost about 100 ms spent just agreeing to talk. The DNS answer is now cached, so later requests skip that lookup.",
       "idea": "Handshakes cost round trips, so physical distance multiplies directly into latency.",
       "caption": "TCP + TLS handshakes complete.",
       "focus": [
@@ -181,13 +180,25 @@
           "from": "browser",
           "to": "lb",
           "kind": "handshake",
-          "label": "TCP/TLS hello"
+          "label": "TCP SYN"
         },
         {
           "from": "lb",
           "to": "browser",
           "kind": "handshake",
-          "label": "TCP/TLS keys"
+          "label": "TCP SYN-ACK"
+        },
+        {
+          "from": "browser",
+          "to": "lb",
+          "kind": "handshake",
+          "label": "TLS hello"
+        },
+        {
+          "from": "lb",
+          "to": "browser",
+          "kind": "handshake",
+          "label": "TLS keys"
         }
       ],
       "chips": [
@@ -300,8 +311,8 @@
     {
       "tag": "RESPONSE",
       "title": "Bytes come back",
-      "body": "The HTML travels back through the load balancer to the browser. The first byte arriving (time to first byte, TTFB) is a common health metric. The browser starts parsing immediately, before the whole response has downloaded. This adds about 50 ms: 25 ms of travel back plus the HTML download.",
-      "idea": "TTFB captures everything up to here: DNS, connect, and server time.",
+      "body": "The HTML travels back through the load balancer to the browser. The first byte arrives about 210 ms in (time to first byte, TTFB), a common health metric. The browser starts parsing immediately, and the rest of the HTML finishes downloading by 235 ms: 25 ms of travel back plus the HTML download.",
+      "idea": "TTFB covers DNS, connect, the request and server time, but not the body download.",
       "caption": "HTML streams back to the browser.",
       "focus": [
         "browser",
@@ -330,7 +341,7 @@
         },
         {
           "node": "browser",
-          "text": "TTFB 235 ms"
+          "text": "TTFB 210 ms"
         }
       ],
       "metrics": {
@@ -428,9 +439,9 @@
     {
       "tag": "WHAT IF",
       "title": "A faraway user",
-      "body": "Back to the healthy 40 ms query, now put the user on another continent, 150 ms away (round trip). The handshakes alone cost about 300 ms and the request with its reply another 150 ms, so 20 + 300 + 150 + 40 = 510 ms for the HTML, with assets still coming from a nearby edge. Code cannot fix the speed of light; moving servers or caches closer to users can.",
+      "body": "Back to the healthy 40 ms query, now put the user on another continent, 150 ms away (round trip). The handshakes alone cost about 300 ms and the request with its reply another 150 ms, so 20 + 300 + 150 + 40 = 510 ms for the HTML, with assets still coming from a nearby edge. Code cannot fix the speed of light; moving servers or caches closer to users can. For comparison, the same path for a nearby user reaches the first byte at about 210 ms.",
       "idea": "Latency from distance is paid per round trip, so fewer round trips and closer servers both help.",
-      "caption": "Each round trip now costs 150 ms.",
+      "caption": "Each round trip now costs 150 ms; first byte at about 510 ms.",
       "focus": [
         "browser",
         "lb"

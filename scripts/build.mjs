@@ -22,7 +22,6 @@ export function validate(l, slug) {
   need(Number.isInteger(l.minutes) && l.minutes >= 3 && l.minutes <= 30, 'minutes int 3-30');
   need(LEVELS.includes(l.level), `level one of ${LEVELS}`);
   need(Array.isArray(l.learn) && l.learn.length >= 3 && l.learn.length <= 6 && l.learn.every(x => str(x, 5, 140)), 'learn: 3-6 strings');
-  need(l.style === undefined || l.style === 'illustrated', 'style must be "illustrated" when present');
   const nodes = Array.isArray(l.nodes) ? l.nodes : [];
   need(nodes.length >= 2 && nodes.length <= 9, 'nodes: 2-9');
   const ids = new Set();
